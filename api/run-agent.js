@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = 'claude-sonnet-4-5';
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -32,9 +32,29 @@ export default async function handler(req, res) {
       system,
       messages: [{ role: 'user', content: userContent }],
     };
-    if (useSearch) body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
-    const response = await client.messages.create(body);
-    const text = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+
+    let response;
+    if (useSearch) {
+      // Web search requires the beta API and betas header
+      try {
+        response = await client.beta.messages.create({
+          ...body,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          betas: ['web-search-2025-03-05'],
+        });
+      } catch (searchErr) {
+        // Fall back to base model if web search isn't available on this key
+        console.warn('Web search unavailable, falling back:', searchErr.message);
+        response = await client.messages.create(body);
+      }
+    } else {
+      response = await client.messages.create(body);
+    }
+
+    const text = (response.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n');
     return res.status(200).json({ text });
   } catch (err) {
     console.error('runAgent error:', err.message);

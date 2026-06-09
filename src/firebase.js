@@ -6,12 +6,12 @@ import { getFunctions } from 'firebase/functions';
 // After creating your web app in Firebase Console:
 // Project Settings → Your apps → Add web app → copy firebaseConfig here
 const firebaseConfig = {
-  apiKey:            'PASTE_YOUR_WEB_API_KEY',
+  apiKey:            'AIzaSyB6KEbMzfSlOo6UdXhHjHAnziDfJIU-EmM',
   authDomain:        'the-council-89570.firebaseapp.com',
   projectId:         'the-council-89570',
   storageBucket:     'the-council-89570.firebasestorage.app',
-  messagingSenderId: 'PASTE_SENDER_ID',
-  appId:             'PASTE_APP_ID',
+  messagingSenderId: '882011984204',
+  appId:             '1:882011984204:web:e74ff2059ffb0ff1c7ffe9',
 };
 
 const app = initializeApp(firebaseConfig);

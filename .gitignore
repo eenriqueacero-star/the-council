@@ -1,0 +1,35 @@
+# deps
+node_modules/
+functions/node_modules/
+
+# build
+dist/
+.firebase/
+
+# env / secrets — NEVER commit these
+.env
+.env.local
+.env.*.local
+functions/.env
+functions/.env.local
+functions/.secret.local
+*.secret.local
+
+# service account keys
+*-service-account*.json
+serviceAccount*.json
+
+# Firebase
+.firebaserc.local
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

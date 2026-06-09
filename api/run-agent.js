@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const MODEL = 'claude-claude-sonnet-4-5';
+const MODEL = 'claude-haiku-4-5-20251001';
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -17,33 +17,50 @@ async function verifyAuth(req) {
   } catch { return false; }
 }
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function callWithRetry(client, body, useSearch, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      if (useSearch) {
+        try {
+          return await client.beta.messages.create({
+            ...body,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            betas: ['web-search-2025-03-05'],
+          });
+        } catch {
+          return await client.messages.create(body);
+        }
+      }
+      return await client.messages.create(body);
+    } catch (err) {
+      if (err.status === 429 && i < retries - 1) {
+        const wait = (i + 1) * 8000; // 8s, 16s backoff
+        console.log(`Rate limited, retrying in ${wait}ms...`);
+        await sleep(wait);
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await verifyAuth(req)) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { system, userContent, useSearch } = req.body;
+  const { system, userContent, useSearch } = req.body || {};
   if (!system || !userContent) return res.status(400).json({ error: 'Missing system or userContent' });
 
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    // No web search for now — plain message to confirm basic flow works
-    const response = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 1000,
-      system,
-      messages: [{ role: 'user', content: userContent }],
-    });
-
-    const text = (response.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('\n');
+    const body = { model: MODEL, max_tokens: 1000, system, messages: [{ role: 'user', content: userContent }] };
+    const response = await callWithRetry(client, body, useSearch);
+    const text = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
     return res.status(200).json({ text });
   } catch (err) {
-    // Log the full error so we can see exactly what Anthropic says
-    console.error('runAgent error status:', err.status);
-    console.error('runAgent error body:', JSON.stringify(err.error ?? err.message));
+    console.error('runAgent error:', err.status, err.message);
     return res.status(500).json({ error: err.message });
   }
 }

@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const MODEL = 'claude-sonnet-4-5';
+const MODEL = 'claude-claude-sonnet-4-5';
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -26,30 +26,14 @@ export default async function handler(req, res) {
 
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const body = {
-      model: MODEL,
+
+    // No web search for now — plain message to confirm basic flow works
+    const response = await client.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1000,
       system,
       messages: [{ role: 'user', content: userContent }],
-    };
-
-    let response;
-    if (useSearch) {
-      // Web search requires the beta API and betas header
-      try {
-        response = await client.beta.messages.create({
-          ...body,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          betas: ['web-search-2025-03-05'],
-        });
-      } catch (searchErr) {
-        // Fall back to base model if web search isn't available on this key
-        console.warn('Web search unavailable, falling back:', searchErr.message);
-        response = await client.messages.create(body);
-      }
-    } else {
-      response = await client.messages.create(body);
-    }
+    });
 
     const text = (response.content || [])
       .filter(b => b.type === 'text')
@@ -57,7 +41,9 @@ export default async function handler(req, res) {
       .join('\n');
     return res.status(200).json({ text });
   } catch (err) {
-    console.error('runAgent error:', err.message);
+    // Log the full error so we can see exactly what Anthropic says
+    console.error('runAgent error status:', err.status);
+    console.error('runAgent error body:', JSON.stringify(err.error ?? err.message));
     return res.status(500).json({ error: err.message });
   }
 }

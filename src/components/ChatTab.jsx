@@ -286,23 +286,23 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
           <MessageSquare size={16} style={{ color: CY }} />
           <span style={{ ...DISP, letterSpacing: '0.04em' }} className="text-sm font-semibold">TALK TO YOUR PM · {acct.label.toUpperCase()}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button onClick={() => setLiveSearch(v => !v)}
-            style={{ ...MONO, borderColor: liveSearch ? '#38e0d4' : 'rgba(255,255,255,0.12)', color: liveSearch ? '#38e0d4' : 'rgba(255,255,255,0.35)' }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg border text-[10px] transition-colors">
-            <Search size={10} />
-            <span>{liveSearch ? 'SEARCH ON' : 'SEARCH OFF'}</span>
+            title={liveSearch ? 'Live search on (costs ~6¢/run) — tap to turn off' : 'Live search off — tap to enable'}
+            style={{ borderColor: liveSearch ? '#38e0d4' : 'rgba(255,255,255,0.15)', color: liveSearch ? '#38e0d4' : 'rgba(255,255,255,0.45)' }}
+            className="flex items-center justify-center w-8 h-8 rounded-lg border transition-colors">
+            <Search size={14} />
           </button>
-          <button onClick={toggleVoice} title={voiceOn ? 'Voice on' : 'Voice off'}
-            style={{ borderColor: voiceOn ? `${CY}66` : 'rgba(255,255,255,0.15)', color: voiceOn ? CY : 'rgba(255,255,255,0.5)' }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] transition-colors">
-            {voiceOn ? <Volume2 size={13} /> : <VolumeX size={13} />}
-            <span style={MONO}>{voiceOn ? 'VOICE ON' : 'MUTED'}</span>
+          <button onClick={toggleVoice}
+            title={voiceOn ? 'Voice on — tap to mute' : 'Voice muted — tap to enable'}
+            style={{ borderColor: voiceOn ? `${CY}66` : 'rgba(255,255,255,0.15)', color: voiceOn ? CY : 'rgba(255,255,255,0.45)' }}
+            className="flex items-center justify-center w-8 h-8 rounded-lg border transition-colors">
+            {voiceOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
           </button>
           <button onClick={clearHistory} disabled={chatBusy} title="Clear chat history"
-            style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.3)' }}
+            style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.35)' }}
             className="flex items-center justify-center w-8 h-8 rounded-lg border transition-colors hover:border-[#ff5d6c]/50 hover:text-[#ff5d6c] disabled:opacity-40">
-            <Trash2 size={13} />
+            <Trash2 size={14} />
           </button>
         </div>
       </div>

@@ -1,0 +1,282 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import { collection, query, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '../firebase.js';
+import { getQuotes } from '../api.js';
+import { AGENTS, STANCE_STYLE } from '../constants/agents.js';
+import { MONO, DISP } from '../constants/styles.js';
+import { Loader2, BarChart2 } from 'lucide-react';
+
+function fmt(ts) {
+  if (!ts) return '—';
+  try {
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  } catch { return '—'; }
+}
+
+function moveStr(from, to) {
+  if (!from || !to) return null;
+  return (to - from) / from * 100;
+}
+
+function parsePrice(v) {
+  if (!v) return NaN;
+  return parseFloat(String(v).replace(/[^0-9.]/g, ''));
+}
+
+function OutcomeBadge({ outcome }) {
+  if (!outcome) return (
+    <span style={{ ...MONO, fontSize: 9, color: '#38e0d4', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#38e0d4', animation: 'pulse 2s cubic-bezier(.4,0,.6,1) infinite' }} />
+      OPEN
+    </span>
+  );
+  if (outcome === 'target') return (
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(56,224,138,0.15)', color: '#38e08a', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
+  );
+  if (outcome === 'stop') return (
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(255,93,108,0.15)', color: '#ff5d6c', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
+  );
+  return (
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.38)', padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
+  );
+}
+
+export default function AlphaTrackerTab({ account }) {
+  const [rulings, setRulings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [grading, setGrading] = useState(false);
+  const [liveQuotes, setLiveQuotes] = useState({});
+
+  useEffect(() => { loadData(); }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function loadData() {
+    setLoading(true);
+    const uid = auth.currentUser?.uid;
+    if (!uid) { setLoading(false); return; }
+
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'users', uid, 'rulings'),
+        orderBy('ts', 'desc')
+      ));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const forAcct = all.filter(r =>
+        !r.account || r.account === account || r.account.split('+').includes(account)
+      );
+      setRulings(forAcct);
+
+      const tickers = [...new Set(forAcct.map(r => r.ticker).filter(Boolean))];
+      if (tickers.length) {
+        getQuotes(tickers).then(q => setLiveQuotes(q)).catch(() => {});
+      }
+
+      const cutoff = Date.now() - 30 * 86400 * 1000;
+      const needs = forAcct.filter(r =>
+        !r.outcomeCheckedAt && r.ts?.toDate && r.ts.toDate().getTime() < cutoff
+      );
+
+      if (needs.length) {
+        setGrading(true);
+        const gradeTickers = [...new Set(needs.map(r => r.ticker).filter(Boolean))];
+        const gq = await getQuotes(gradeTickers).catch(() => ({}));
+
+        await Promise.allSettled(needs.map(r => {
+          const q = gq[r.ticker];
+          const price = q?.price > 0 ? q.price : q?.prevClose;
+          if (!price) return Promise.resolve();
+          const tp = parsePrice(r.takeProfit);
+          const sl = parsePrice(r.stopLoss);
+          let outcome = 'expired';
+          if (!isNaN(tp) && price >= tp) outcome = 'target';
+          else if (!isNaN(sl) && price <= sl) outcome = 'stop';
+          return updateDoc(doc(db, 'users', uid, 'rulings', r.id), {
+            outcomeCheckedAt: new Date().toISOString(),
+            priceAt30d: price,
+            outcome,
+          });
+        }));
+
+        setGrading(false);
+
+        const snap2 = await getDocs(query(
+          collection(db, 'users', uid, 'rulings'),
+          orderBy('ts', 'desc')
+        ));
+        const all2 = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+        setRulings(all2.filter(r =>
+          !r.account || r.account === account || r.account.split('+').includes(account)
+        ));
+      }
+    } catch (e) {
+      console.error('AlphaTracker:', e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const stats = useMemo(() => {
+    const graded      = rulings.filter(r => r.outcome);
+    const targetHit   = graded.filter(r => r.outcome === 'target').length;
+    const stopped     = graded.filter(r => r.outcome === 'stop').length;
+    const withReturn  = graded.filter(r => r.priceAt30d && r.priceAtCall);
+    const avgReturn   = withReturn.length
+      ? withReturn.reduce((s, r) => s + (r.priceAt30d - r.priceAtCall) / r.priceAtCall * 100, 0) / withReturn.length
+      : null;
+
+    const agentAcc = {};
+    AGENTS.forEach(a => {
+      let correct = 0, total = 0;
+      graded.forEach(r => {
+        const st = r.agentStances?.[a.id]?.stance;
+        if (!st) return;
+        const bull = ['PASS', 'BUY'].includes(st);
+        const bear = ['FAIL', 'BEARISH'].includes(st);
+        if (bull || bear) {
+          total++;
+          if (bull && r.outcome === 'target') correct++;
+          if (bear && (r.outcome === 'stop' || r.outcome === 'expired')) correct++;
+        }
+      });
+      agentAcc[a.id] = { correct, total, pct: total > 0 ? Math.round(correct / total * 100) : null };
+    });
+
+    return {
+      total: rulings.length,
+      buyCalls: rulings.filter(r => r.verdict === 'BUY').length,
+      graded: graded.length,
+      targetHit,
+      stopped,
+      avgReturn,
+      agentAcc,
+    };
+  }, [rulings]);
+
+  if (loading) return (
+    <div className="mt-6 flex items-center gap-2" style={{ ...MONO, color: 'rgba(255,255,255,0.35)' }}>
+      <Loader2 size={14} className="animate-spin" />
+      <span className="text-[12px]">Loading alpha tracker…</span>
+    </div>
+  );
+
+  return (
+    <div className="mt-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BarChart2 size={15} style={{ color: '#f5c451' }} />
+          <span style={{ ...DISP, letterSpacing: '0.04em' }} className="text-sm font-semibold">ALPHA TRACKER · ALL-TIME</span>
+        </div>
+        {grading && (
+          <div className="flex items-center gap-1.5" style={{ ...MONO, color: 'rgba(255,255,255,0.35)' }}>
+            <Loader2 size={11} className="animate-spin" />
+            <span className="text-[10px]">GRADING OLD CALLS…</span>
+          </div>
+        )}
+      </div>
+
+      {rulings.length === 0 ? (
+        <div className="mt-8 text-center py-12 border border-dashed border-white/10 rounded-xl">
+          <BarChart2 size={32} className="mx-auto mb-3 opacity-25" style={{ color: '#f5c451' }} />
+          <p className="text-white/40 text-sm">No rulings yet.</p>
+          <p style={MONO} className="text-[11px] text-white/25 mt-1">Run a council on any ticker to start building your track record.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'TOTAL CALLS',    value: String(stats.total), sub: `${stats.buyCalls} BUY · ${stats.total - stats.buyCalls} WATCH/PASS` },
+              { label: 'TARGET HIT',     value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} graded`, color: '#38e08a' },
+              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped / stats.graded * 100)}%` : '—',   sub: `${stats.stopped} losses`, color: '#ff5d6c' },
+              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded call${stats.graded !== 1 ? 's' : ''}`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#38e08a' : '#ff5d6c') : undefined },
+            ].map((c, i) => (
+              <div key={i} className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={MONO} className="text-[9px] text-white/35 tracking-widest mb-1.5">{c.label}</div>
+                <div style={{ ...DISP, color: c.color || '#e8eef0', fontSize: 24, fontWeight: 700, lineHeight: 1 }}>{c.value}</div>
+                <div style={MONO} className="text-[10px] text-white/28 mt-1.5">{c.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {stats.graded >= 5 && (
+            <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={MONO} className="text-[10px] text-white/35 tracking-widest mb-3">AGENT ACCURACY · ALL-TIME</div>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {AGENTS.map(a => {
+                  const s = stats.agentAcc[a.id];
+                  const barColor = s.pct == null ? 'rgba(255,255,255,0.1)'
+                    : s.pct >= 65 ? '#38e08a'
+                    : s.pct >= 45 ? '#f5c451'
+                    : '#ff5d6c';
+                  return (
+                    <div key={a.id} className="flex items-center gap-2.5">
+                      <div className="rounded-md p-1.5 shrink-0" style={{ background: `${a.accent}1a`, border: `1px solid ${a.accent}22` }}>
+                        <a.icon size={11} style={{ color: a.accent }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span style={MONO} className="text-[10px] text-white/55 truncate">{a.name.split(' ')[0]}</span>
+                          <span style={{ ...MONO, color: barColor, fontSize: 10, fontWeight: 700 }}>
+                            {s.pct != null ? `${s.pct}%` : '—'}
+                          </span>
+                        </div>
+                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                          <div style={{ width: `${s.pct || 0}%`, background: barColor, transition: 'width .6s ease' }} className="h-full rounded-full" />
+                        </div>
+                        <div style={MONO} className="text-[9px] text-white/22 mt-0.5">{s.total} call{s.total !== 1 ? 's' : ''}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p style={MONO} className="text-[9px] text-white/18 mt-3">Bull calls (PASS/BUY) scored on target · Bear calls (FAIL/BEARISH) scored on stop or expired.</p>
+            </div>
+          )}
+
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 560 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    {['DATE', 'TICKER', 'VERDICT', 'CONV', 'PRICE@CALL', '30D / NOW', 'MOVE', 'OUTCOME'].map(h => (
+                      <th key={h} style={MONO} className="px-3 py-2.5 text-left text-[9px] text-white/30 tracking-widest font-normal whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rulings.map((r, i) => {
+                    const vs = r.verdict ? STANCE_STYLE[r.verdict === 'PASS' ? 'PASS_FINAL' : r.verdict] : null;
+                    const lq = liveQuotes[r.ticker];
+                    const livePrice = lq?.price > 0 ? lq.price : lq?.prevClose;
+                    const displayPrice = r.outcome ? r.priceAt30d : livePrice;
+                    const move = moveStr(r.priceAtCall, displayPrice);
+                    return (
+                      <tr key={r.id} style={{
+                        borderBottom: i < rulings.length - 1 ? '1px solid rgba(255,255,255,0.04)' : undefined,
+                        background: i % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
+                      }}>
+                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/35 whitespace-nowrap">{fmt(r.ts)}</td>
+                        <td style={{ ...MONO, letterSpacing: '0.1em' }} className="px-3 py-2.5 text-[12px] font-semibold text-white/80">{r.ticker}</td>
+                        <td className="px-3 py-2.5">
+                          {vs && <span style={{ ...MONO, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>{vs.label}</span>}
+                        </td>
+                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/45">{r.conviction ?? '—'}/10</td>
+                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/45">{r.priceAtCall ? `$${r.priceAtCall.toFixed(2)}` : '—'}</td>
+                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/45">{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
+                        <td className="px-3 py-2.5">
+                          {move != null
+                            ? <span style={{ ...MONO, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#38e08a' : '#ff5d6c' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
+                            : <span style={MONO} className="text-[11px] text-white/20">—</span>}
+                        </td>
+                        <td className="px-3 py-2.5"><OutcomeBadge outcome={r.outcome} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

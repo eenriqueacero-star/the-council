@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ACCOUNTS } from './constants/agents.js';
@@ -13,6 +13,7 @@ import CouncilTab from './components/CouncilTab.jsx';
 import PositionsTab from './components/PositionsTab.jsx';
 import DCATab from './components/DCATab.jsx';
 import WatchdogTab from './components/WatchdogTab.jsx';
+import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 
 export default function App() {
@@ -54,19 +55,24 @@ export default function App() {
   const posLoadedRef = useRef(false);
   const saveTimerRef = useRef(null);
 
+  // Wait for Firebase Auth to restore session before loading positions from Firestore.
+  // auth.currentUser is always null on mount — it resolves async.
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) { posLoadedRef.current = true; return; }
-    getDoc(doc(db, 'users', uid, 'data', 'positions')).then(snap => {
-      if (snap.exists() && snap.data().positions) {
-        setPositions(prev => {
-          const cloud = snap.data().positions;
-          const merged = { ...prev };
-          Object.entries(cloud).forEach(([k, v]) => { merged[k] = { ...(prev[k] || {}), ...v }; });
-          return merged;
-        });
-      }
-    }).catch(() => {}).finally(() => { posLoadedRef.current = true; });
+    const unsub = onAuthStateChanged(auth, user => {
+      unsub(); // one-shot: unsubscribe after first auth state is known
+      if (!user) { posLoadedRef.current = true; return; }
+      getDoc(doc(db, 'users', user.uid, 'data', 'positions')).then(snap => {
+        if (snap.exists() && snap.data().positions) {
+          setPositions(prev => {
+            const cloud = snap.data().positions;
+            const merged = { ...prev };
+            Object.entries(cloud).forEach(([k, v]) => { merged[k] = { ...(prev[k] || {}), ...v }; });
+            return merged;
+          });
+        }
+      }).catch(() => {}).finally(() => { posLoadedRef.current = true; });
+    });
+    return unsub;
   }, []);
 
   useEffect(() => {
@@ -152,7 +158,6 @@ export default function App() {
 
         <TabNav tab={tab} setTab={setTab} />
 
-        {/* ChatTab stays mounted across tab switches so chat state is never lost */}
         <div style={{ display: tab === 'chat' ? undefined : 'none' }}>
           <ChatTab {...shared} />
         </div>
@@ -176,6 +181,7 @@ export default function App() {
         )}
         {tab === 'dca'       && <DCATab {...shared} />}
         {tab === 'watchdog'  && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
+        {tab === 'alpha'     && <AlphaTrackerTab account={account} />}
         {tab === 'roadmap'   && <RoadmapTab />}
 
         <p className="mt-8 text-[10px] text-white/25 text-center leading-relaxed" style={MONO}>THE COUNCIL · LIVE AI AGENTS · NOT FINANCIAL ADVICE — YOU EXECUTE, YOU DECIDE</p>

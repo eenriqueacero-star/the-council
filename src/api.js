@@ -45,3 +45,14 @@ export async function getQuotes(tickers) {
   if (!res.ok) throw new Error(`api_unreachable_${res.status}`);
   return res.json();
 }
+
+export async function getCandles(tickers, range) {
+  const headers = await authHeaders();
+  const res = await fetch('/api/get-candles', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ tickers, range }),
+  });
+  if (!res.ok) throw new Error(`api_unreachable_${res.status}`);
+  return res.json();
+}

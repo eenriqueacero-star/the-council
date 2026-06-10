@@ -2,8 +2,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/run-agent.js": { "maxDuration": 60 },
-    "api/get-quotes.js": { "maxDuration": 30 }
+    "api/run-agent.js":   { "maxDuration": 60 },
+    "api/get-quotes.js":  { "maxDuration": 30 },
+    "api/get-candles.js": { "maxDuration": 30 },
+    "api/send-push.js":   { "maxDuration": 10 }
   },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }

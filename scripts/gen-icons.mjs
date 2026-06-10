@@ -32,29 +32,7 @@ function chunk(type, data) {
   return Buffer.concat([len, t, data, crc]);
 }
 
-function png(size, pixel) {
-  const raw = Buffer.alloc(size * (size * 4 + 1));
-  for (let y = 0; y < size; y++) {
-    const row = y * (size * 4 + 1);
-    for (let x = 0; x < size; x++) {
-      const [r, g, b, a] = pixel(x, y);
-      const o = row + 1 + x * 4;
-      raw[o] = r; raw[o + 1] = g; raw[o + 2] = b; raw[o + 3] = a;
-    }
-  }
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
-  ihdr[8] = 8; ihdr[9] = 6; // 8-bit RGBA
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw, { level: 9 })),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
-
-function pngRect(w, h, pixel) {
+function makePng(w, h, pixel) {
   const raw = Buffer.alloc(h * (w * 4 + 1));
   for (let y = 0; y < h; y++) {
     const row = y * (w * 4 + 1);
@@ -67,7 +45,7 @@ function pngRect(w, h, pixel) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0);
   ihdr.writeUInt32BE(h, 4);
-  ihdr[8] = 8; ihdr[9] = 6;
+  ihdr[8] = 8; ihdr[9] = 6; // 8-bit RGBA
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', ihdr),
@@ -108,7 +86,6 @@ function badgeIcon(size) {
   };
 }
 
-// Splash: arc reactor centered at 42% height, ~44% of min-dimension as icon size
 function splashPixel(w, h) {
   const cx = w / 2, cy = h * 0.42;
   const sz = Math.min(w, h) * 0.44;
@@ -124,6 +101,12 @@ function splashPixel(w, h) {
   };
 }
 
+// --- Icons (always generated first, never skipped) ---
+for (const s of [180, 192, 512]) writeFileSync(join(OUT, `icon-${s}.png`), makePng(s, s, appIcon(s)));
+writeFileSync(join(OUT, 'badge-96.png'), makePng(96, 96, badgeIcon(96)));
+console.log('icons written to public/icons/');
+
+// --- Splash screens (isolated so failures cannot affect icons above) ---
 // iPhone SE 2/3 · XR/11 · X/XS/11Pro/12mini/13mini · 12/13/14 · 11ProMax/XSMax · 12/13/14ProMax · 14Pro/15/15Pro · 14ProMax/15Plus/15ProMax
 const SPLASHES = [
   [750,  1334],
@@ -136,11 +119,11 @@ const SPLASHES = [
   [1290, 2796],
 ];
 
-for (const s of [180, 192, 512]) writeFileSync(join(OUT, `icon-${s}.png`), png(s, appIcon(s)));
-writeFileSync(join(OUT, 'badge-96.png'), png(96, badgeIcon(96)));
-console.log('icons written to public/icons/');
-
-for (const [w, h] of SPLASHES) {
-  writeFileSync(join(OUT, `splash-${w}x${h}.png`), pngRect(w, h, splashPixel(w, h)));
+try {
+  for (const [w, h] of SPLASHES) {
+    writeFileSync(join(OUT, `splash-${w}x${h}.png`), makePng(w, h, splashPixel(w, h)));
+  }
+  console.log('splash screens written to public/icons/');
+} catch (e) {
+  console.warn('splash generation failed (non-fatal):', e.message);
 }
-console.log('splash screens written to public/icons/');

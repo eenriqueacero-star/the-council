@@ -329,10 +329,17 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
 
   async function handleSave() {
     setSaving(true); setSaved(false);
-    try { await onSave(); } catch {}
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    try {
+      await Promise.race([
+        onSave(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
+      ]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {}
+    setSaving(false);
   }
+
   function handleAdd() {
     const t = newTicker.trim().toUpperCase();
     if (!t) return; addTicker(t); setNewTicker('');

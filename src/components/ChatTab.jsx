@@ -8,7 +8,9 @@ import { useVoice } from '../hooks/useVoice.js';
 import { notifyDevices } from '../push.js';
 import ArcReactor from './ArcReactor.jsx';
 import { db, auth } from '../firebase.js';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
+import { loadTickerHistory } from '../utils/rulingContext.js';
 
 export default function ChatTab({ account, acct, positionsLine, flagApiDown }) {
   const GREETING = `Good to see you, sir. The council stands ready. Ask me how a holding looks, or say "should I buy —" and I'll convene the agents.`;
@@ -29,9 +31,8 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown }) {
     return doc(db, 'users', uid, 'chat', acct);
   }
 
-  // Load from Firestore on mount and when account switches; fall back to localStorage
   useEffect(() => {
-    setChat([{ role: 'pm', text: GREETING }]); // clear immediately so old account's chat never bleeds through
+    setChat([{ role: 'pm', text: GREETING }]);
     loadCancelRef.current = false;
     const ref = firestoreRef(account);
     if (ref) {
@@ -58,7 +59,6 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown }) {
     return () => { loadCancelRef.current = true; };
   }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Save current chat to Firestore (+ localStorage backup)
   function saveChat() {
     setChat(current => {
       const msgs = current.slice(-120);
@@ -77,7 +77,6 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown }) {
     try { localStorage.removeItem(`council_chat_${account}`); } catch {}
   }
 
-  // Only scroll when a new message is appended — not on in-place updates (cooldown tick, agent fill-in)
   useEffect(() => {
     if (chat.length > prevChatLenRef.current) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -109,15 +108,14 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
   async function sendChat(raw) {
     const text = (typeof raw === 'string' ? raw : chatInput).trim();
     if (!text || chatBusy) return;
-    loadCancelRef.current = true; // prevent any in-flight Firestore load from overwriting new messages
+    loadCancelRef.current = true;
     setChatInput(''); stopSpeaking();
     setChat(p => [...p, { role: 'user', text }]);
-    saveChat(); // persist user message before any async work — survives a refresh
+    saveChat();
     setChatBusy(true);
 
     try {
     const acctLine = `Active account: ${acct.label}'s (${acct.sub}); current positions: ${positionsLine}; DCA ${acct.dcaNote}.`;
-    // Pass last 6 PM/user turns as context so the PM understands follow-up messages
     const recentCtx = chat
       .filter(m => (m.role === 'user' || m.role === 'pm') && m.text)
       .slice(-6)
@@ -135,7 +133,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
       router = { speak: errMessage(e), convene: false, ticker: null };
     }
 
-    // Safety: convene=true with no ticker — ask for clarification instead of going silent
     if (router.convene && !router.ticker) {
       const msg = router.speak || 'Which ticker would you like me to run the council on, sir?';
       setChat(p => [...p, { role: 'pm', text: msg }]); speak(msg);
@@ -166,21 +163,29 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
       }
     } else if (router.convene && router.ticker) {
       const tkr = String(router.ticker).toUpperCase();
+      const uid = auth.currentUser?.uid;
       const intro = router.speak || `Consulting the council on ${tkr}, sir.`;
       setChat(p => [...p, { role: 'pm', text: intro }]); speak(intro);
       const runId = Date.now();
       setChat(p => [...p, { role: 'council', runId, ticker: tkr, agents: {}, debateRound: 1 }]);
       saveChat();
 
+      let chatCurrentPrice = null;
+      let chatRawQuote = null;
       let priceLine = '';
       try {
         const quotes = await getQuotes([tkr]);
-        const q = quotes[tkr];
-        const livePrice = (q?.price && q.price > 0) ? q.price : q?.prevClose;
-        if (livePrice) priceLine = `CURRENT LIVE PRICE: $${livePrice.toFixed(2)} (real-time quote — use this for ALL price levels, entries, stops, and targets; ignore any training-data prices). `;
+        chatRawQuote = quotes[tkr];
+        chatCurrentPrice = (chatRawQuote?.price && chatRawQuote.price > 0) ? chatRawQuote.price : chatRawQuote?.prevClose;
+        if (chatCurrentPrice) priceLine = `CURRENT LIVE PRICE: $${chatCurrentPrice.toFixed(2)} (real-time quote — use this for ALL price levels, entries, stops, and targets; ignore any training-data prices). `;
       } catch {}
 
-      const baseContent = `Ticker: ${tkr}. ${priceLine}The investor is considering BUYING it. ${acctLine} Today is ${new Date().toDateString()}. Return ONLY the JSON.`;
+      const [chatAgentCtx, tickerHistory] = await Promise.all([
+        loadAgentContext(tkr, chatRawQuote),
+        uid ? loadTickerHistory(uid, tkr, chatCurrentPrice) : Promise.resolve(''),
+      ]);
+
+      const baseContent = `Ticker: ${tkr}. ${priceLine}The investor is considering BUYING it. ${acctLine} Today is ${new Date().toDateString()}. Return ONLY the JSON.${tickerHistory}`;
       const allRounds = [];
 
       for (let round = 0; round < 2; round++) {
@@ -206,8 +211,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
 
         for (let i = 0; i < AGENTS.length; i++) {
           const ag = AGENTS[i];
+          const ctxSuffix = isFirst ? buildAgentContext(ag.id, chatAgentCtx) : '';
           try {
-            const txt = await callAgent(ag.system, userContent, ag.search && liveSearch && isFirst);
+            const txt = await callAgent(ag.system, userContent + ctxSuffix, ag.search && liveSearch && isFirst);
             const pr = extractJSON(txt);
             roundResults[ag.id] = pr || { stance: 'CAUTION' };
           } catch {
@@ -215,20 +221,17 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
             roundResults[ag.id] = { stance: 'CAUTION' };
           }
           setChat(p => p.map(m => m.runId === runId ? { ...m, agents: { ...m.agents, [ag.id]: roundResults[ag.id] } } : m));
-          // 3s gap between agents — sequential calls avoid burst rate-limiting
           if (i < AGENTS.length - 1) await new Promise(r => setTimeout(r, 3000));
         }
 
         allRounds.push(roundResults);
         saveChat();
 
-        // Consensus = no polar opposition between bulls (PASS/BUY) and bears (FAIL/BEARISH)
         const stances = AGENTS.map(a => roundResults[a.id]?.stance).filter(Boolean);
         const hasBull = stances.some(s => ['PASS', 'BUY'].includes(s));
         const hasBear = stances.some(s => ['FAIL', 'BEARISH'].includes(s));
         if (!(hasBull && hasBear)) break;
 
-        // 60s cooldown between rounds — lets Groq's rolling rate-limit window fully clear
         if (round < 1) {
           const SECS = 60;
           for (let s = SECS - 1; s >= 0; s--) {
@@ -238,7 +241,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
         }
       }
 
-      // Trim to stance+headline only — sending full JSON burns ~700 extra tokens
       const council = allRounds.map((r, i) =>
         `Round ${i + 1}: ${AGENTS.map(ag => {
           const res = r[ag.id];
@@ -263,7 +265,29 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
       speak(synth.speak);
       notifyDevices(`${tkr}: ${synth.verdict} · ${synth.conviction}/10`, synth.speak);
 
-      // Auto-continue: PM follows up after a natural beat
+      if (uid) {
+        const lastRound = allRounds[allRounds.length - 1];
+        if (lastRound) {
+          const agentStances = {};
+          AGENTS.forEach(a => {
+            const r = lastRound[a.id];
+            if (r) agentStances[a.id] = { stance: r.stance || null, score: r.score ?? null, headline: r.headline || null };
+          });
+          addDoc(collection(db, 'users', uid, 'rulings'), {
+            ticker: tkr,
+            account,
+            date: new Date().toISOString().split('T')[0],
+            ts: serverTimestamp(),
+            priceAtCall: chatCurrentPrice || null,
+            agentStances,
+            verdict: synth.verdict, conviction: synth.conviction,
+            entry: null, stopLoss: null, takeProfit: null,
+            summary: synth.speak || null,
+            outcomeCheckedAt: null, priceAt30d: null, outcome: null,
+          }).catch(() => {});
+        }
+      }
+
       if (synth.followUp) {
         await new Promise(r => setTimeout(r, 1000));
         setChat(p => [...p, { role: 'pm', text: synth.followUp }]);

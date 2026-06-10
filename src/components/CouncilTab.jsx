@@ -6,6 +6,10 @@ import { extractJSON } from '../utils.js';
 import { callAgent, getQuotes } from '../api.js';
 import { useVoice } from '../hooks/useVoice.js';
 import { notifyDevices } from '../push.js';
+import { db, auth } from '../firebase.js';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
+import { loadTickerHistory } from '../utils/rulingContext.js';
 
 const MAX_ROUNDS = 2;
 
@@ -57,6 +61,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   async function convene() {
     const t = ticker.trim().toUpperCase();
     if (!t || running) return;
+    const uid = auth.currentUser?.uid;
     setActive(t); setRunning(true); setSynthesis({ status: 'idle', result: null });
     setDebateHistory([]); setCurrentRound(0);
     setElapsed(0); elapsedRef.current = 0;
@@ -70,15 +75,22 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       : `Account under review: ${acct.label}'s (${acct.sub}). This account currently holds: ${councilPositionsLine}. DCA: ${acct.dcaNote}. Judge concentration and sizing against THIS account.`;
     const capLine = capital.trim() ? `Available capital to deploy: $${capital.trim()}.` : 'Available capital not specified.';
 
+    let livePrice = null;
+    let rawQuote = null;
     let priceLine = '';
     try {
       const quotes = await getQuotes([t]);
-      const q = quotes[t];
-      const livePrice = (q?.price && q.price > 0) ? q.price : q?.prevClose;
+      rawQuote = quotes[t];
+      livePrice = (rawQuote?.price && rawQuote.price > 0) ? rawQuote.price : rawQuote?.prevClose;
       if (livePrice) priceLine = `CURRENT LIVE PRICE: $${livePrice.toFixed(2)} (real-time quote — use this for ALL price levels, entries, stops, and targets; ignore any training-data prices). `;
     } catch {}
 
-    const baseContent = `Ticker under consideration: ${t}. ${priceLine}The investor is thinking about BUYING it. ${acctLine} ${capLine} Today is ${new Date().toDateString()}. Return ONLY the JSON.`;
+    const [agentCtx, tickerHistory] = await Promise.all([
+      loadAgentContext(t, rawQuote),
+      uid ? loadTickerHistory(uid, t, livePrice) : Promise.resolve(''),
+    ]);
+
+    const baseContent = `Ticker under consideration: ${t}. ${priceLine}The investor is thinking about BUYING it. ${acctLine} ${capLine} Today is ${new Date().toDateString()}. Return ONLY the JSON.${tickerHistory}`;
     const allRounds = [];
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -104,8 +116,9 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
       for (let i = 0; i < AGENTS.length; i++) {
         const a = AGENTS[i];
+        const ctxSuffix = isFirst ? buildAgentContext(a.id, agentCtx) : '';
         try {
-          const txt = await callAgent(a.system, userContent, a.search && liveSearch && isFirst);
+          const txt = await callAgent(a.system, userContent + ctxSuffix, a.search && liveSearch && isFirst);
           const p = extractJSON(txt);
           roundResults[a.id] = p || { stance: 'CAUTION', headline: 'Could not parse output', points: [], score: 5 };
           setAgentState(prev => ({ ...prev, [a.id]: { status: 'done', result: roundResults[a.id] } }));
@@ -165,7 +178,29 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
       const txt = await callAgent(synthSystem, `Council ${roundWord} for ${t}:\n${debateTranscript}\n\n${acctLine}\n${capLine}\n${priceLine}Final ruling. Return ONLY the JSON.`, false, 900);
       const p = extractJSON(txt);
       setSynthesis({ status: 'done', result: p || { verdict: 'WATCH', conviction: 5, sizing: 'n/a', summary: 'Could not parse synthesis.', bull: [], risks: [] } });
-      if (p) notifyDevices(`${t}: ${p.verdict} · ${p.conviction}/10`, p.summary || 'Council ruling is in.');
+      if (p) {
+        notifyDevices(`${t}: ${p.verdict} · ${p.conviction}/10`, p.summary || 'Council ruling is in.');
+        if (uid) {
+          const lastRound = allRounds[allRounds.length - 1];
+          const agentStances = {};
+          AGENTS.forEach(a => {
+            const r = lastRound[a.id];
+            if (r && !r._error) agentStances[a.id] = { stance: r.stance || null, score: r.score ?? null, headline: r.headline || null };
+          });
+          addDoc(collection(db, 'users', uid, 'rulings'), {
+            ticker: t,
+            account: isMulti ? councilAccounts.join('+') : account,
+            date: new Date().toISOString().split('T')[0],
+            ts: serverTimestamp(),
+            priceAtCall: livePrice || null,
+            agentStances,
+            verdict: p.verdict, conviction: p.conviction,
+            entry: p.entry || null, stopLoss: p.stopLoss || null,
+            takeProfit: p.takeProfit || null, summary: p.summary || null,
+            outcomeCheckedAt: null, priceAt30d: null, outcome: null,
+          }).catch(() => {});
+        }
+      }
     } catch (e) {
       const code = e?.message?.match(/ERR-[\w]+/)?.[0] || 'ERR-NET';
       flagApiDown();

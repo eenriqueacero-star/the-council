@@ -7,18 +7,32 @@ async function authHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 }
 
-// Drop-in replacement for the prototype's callAgent().
-// Calls /api/run-agent (Vercel serverless function) — no key in the browser.
-export async function callAgent(system, userContent, useSearch) {
-  const headers = await authHeaders();
-  const res = await fetch('/api/run-agent', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ system, userContent, useSearch: !!useSearch }),
-  });
-  if (!res.ok) throw new Error(`api_unreachable_${res.status}`);
-  const data = await res.json();
-  return data.text;
+export async function callAgent(system, userContent, useSearch, maxTokens = 512) {
+  let headers;
+  try { headers = await authHeaders(); }
+  catch { throw new Error('ERR-401: Not authenticated'); }
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res;
+    try { res = await fetch('/api/run-agent', { method: 'POST', headers, body: JSON.stringify({ system, userContent, useSearch: !!useSearch, maxTokens }) }); }
+    catch { throw new Error('ERR-NET: No response from server'); }
+
+    if (res.status === 429 && attempt === 0) {
+      const retryAfter = res.headers?.get?.('retry-after');
+      const waitMs = retryAfter ? Math.max(parseInt(retryAfter, 10) * 1000, 35000) : 35000;
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!res.ok) {
+      let body = {};
+      try { body = await res.json(); } catch {}
+      const code = body.code || `ERR-${res.status}`;
+      throw new Error(`${code}: ${body.error || res.statusText}`);
+    }
+    const data = await res.json();
+    return data.text;
+  }
 }
 
 export async function getQuotes(tickers) {

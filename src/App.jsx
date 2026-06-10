@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { signOut } from 'firebase/auth';
-import { auth } from './firebase.js';
+import { auth, db } from './firebase.js';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ACCOUNTS } from './constants/agents.js';
 import { MONO, DISP, CY } from './constants/styles.js';
 import ArcReactor from './components/ArcReactor.jsx';
@@ -15,32 +16,90 @@ import WatchdogTab from './components/WatchdogTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 
 export default function App() {
-  const [account, setAccount] = useState('edwin');
+  const [account, setAccount] = useState(() => localStorage.getItem('council_account') || 'edwin');
   const [tab,     setTab]     = useState('chat');
   const [apiDown, setApiDown] = useState(false);
 
-  // Lifted so AccountSelector can disable during long ops
   const [running,   setRunning]   = useState(false);
   const [wdRunning, setWdRunning] = useState(false);
-
-  // Council tab state (lifted so it survives tab switches)
   const [ticker,     setTicker]     = useState('');
   const [capital,    setCapital]    = useState('');
   const [active,     setActive]     = useState(null);
   const [agentState, setAgentState] = useState({});
   const [synthesis,  setSynthesis]  = useState({ status: 'idle', result: null });
 
-  // Positions per account
+  const [councilAccounts, setCouncilAccounts] = useState([account]);
+  useEffect(() => { setCouncilAccounts([account]); }, [account]);
+
   const [positions, setPositions] = useState(() => {
-    const o = {};
+    const defaults = {};
     Object.entries(ACCOUNTS).forEach(([k, a]) => {
-      o[k] = {};
-      a.holdings.forEach(t => (o[k][t] = { shares: '', cost: '' }));
+      defaults[k] = {};
+      a.holdings.forEach(t => (defaults[k][t] = { shares: '', cost: '' }));
     });
-    return o;
+    try {
+      const saved = localStorage.getItem('council_positions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        Object.entries(ACCOUNTS).forEach(([k, a]) => {
+          if (!parsed[k]) parsed[k] = defaults[k];
+          else a.holdings.forEach(t => { if (!parsed[k][t]) parsed[k][t] = { shares: '', cost: '' }; });
+        });
+        return parsed;
+      }
+    } catch {}
+    return defaults;
   });
 
+  const posLoadedRef = useRef(false);
+  const saveTimerRef = useRef(null);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) { posLoadedRef.current = true; return; }
+    getDoc(doc(db, 'users', uid, 'data', 'positions')).then(snap => {
+      if (snap.exists() && snap.data().positions) {
+        setPositions(prev => {
+          const cloud = snap.data().positions;
+          const merged = { ...prev };
+          Object.entries(cloud).forEach(([k, v]) => { merged[k] = { ...(prev[k] || {}), ...v }; });
+          return merged;
+        });
+      }
+    }).catch(() => {}).finally(() => { posLoadedRef.current = true; });
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('council_positions', JSON.stringify(positions)); } catch {}
+    if (!posLoadedRef.current) return;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+      setDoc(doc(db, 'users', uid, 'data', 'positions'), { positions, updatedAt: Date.now() }).catch(() => {});
+    }, 1500);
+  }, [positions]);
+
+  useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
+
+  async function savePositions() {
+    try { localStorage.setItem('council_positions', JSON.stringify(positions)); } catch {}
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    await setDoc(doc(db, 'users', uid, 'data', 'positions'), { positions, updatedAt: Date.now() });
+  }
+
   const flagApiDown = () => setApiDown(true);
+
+  function buildCombinedLine(selectedAccounts) {
+    return selectedAccounts.map(k => {
+      const a  = ACCOUNTS[k];
+      const pm = positions[k] || {};
+      const holdings = Object.keys(pm).length ? Object.keys(pm) : a.holdings;
+      const line = holdings.map(t => { const p = pm[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
+      return selectedAccounts.length > 1 ? `${a.label}(${line})` : line;
+    }).join(' | ');
+  }
 
   const acct        = ACCOUNTS[account];
   const posMap      = positions[account] || {};
@@ -62,24 +121,18 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", background: '#070a0c', color: '#e8eef0', minHeight: '100vh' }} className="relative overflow-hidden">
-      {/* Animated grid */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.4]" style={{ backgroundImage: 'linear-gradient(rgba(56,224,138,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(56,224,138,0.04) 1px, transparent 1px)', backgroundSize: '44px 44px', animation: 'gridmove 8s linear infinite' }} />
-      {/* Radial glow */}
       <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -10%, rgba(245,196,81,0.10), transparent 55%)' }} />
-      {/* Floating orbs */}
       <div className="orb pointer-events-none absolute -top-20 -left-20 w-72 h-72 rounded-full" style={{ background: 'radial-gradient(circle, rgba(56,224,212,0.10), transparent 70%)', filter: 'blur(8px)' }} />
       <div className="orb pointer-events-none absolute top-1/3 -right-24 w-80 h-80 rounded-full" style={{ background: 'radial-gradient(circle, rgba(176,131,255,0.09), transparent 70%)', filter: 'blur(8px)', animationDelay: '3s' }} />
-      {/* CRT scanline */}
       <div className="crtline" />
 
-      {/* Boot sequence overlay */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#070a0c', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', animation: 'bootFade 2s ease forwards', pointerEvents: 'none' }}>
         <ArcReactor size={96} />
         <div style={{ ...DISP, color: CY }} className="text-sm tracking-[0.42em] neon">THE COUNCIL</div>
         <div style={{ ...MONO, animation: 'bootText 1.3s steps(30) forwards' }} className="text-white/45 text-[10px] tracking-[0.22em] overflow-hidden whitespace-nowrap">CALIBRATING 6 AGENTS · LOADING PROTOCOLS · ONLINE</div>
       </div>
 
-      {/* HUD corner brackets */}
       <div className="pointer-events-none fixed inset-0 z-20">
         {[['top-3 left-3', 0], ['top-3 right-3', 1], ['bottom-3 left-3', 2], ['bottom-3 right-3', 3]].map(([pos, i]) => (
           <div key={i} className={`absolute ${pos} w-6 h-6`} style={{
@@ -99,7 +152,10 @@ export default function App() {
 
         <TabNav tab={tab} setTab={setTab} />
 
-        {tab === 'chat'      && <ChatTab {...shared} />}
+        {/* ChatTab stays mounted across tab switches so chat state is never lost */}
+        <div style={{ display: tab === 'chat' ? undefined : 'none' }}>
+          <ChatTab {...shared} />
+        </div>
         {tab === 'council'   && (
           <CouncilTab {...shared}
             running={running} setRunning={setRunning}
@@ -108,11 +164,14 @@ export default function App() {
             active={active} setActive={setActive}
             agentState={agentState} setAgentState={setAgentState}
             synthesis={synthesis} setSynthesis={setSynthesis}
+            councilAccounts={councilAccounts}
+            setCouncilAccounts={setCouncilAccounts}
+            councilPositionsLine={buildCombinedLine(councilAccounts)}
           />
         )}
         {tab === 'positions' && (
           <PositionsTab {...shared}
-            setPos={setPos} addTicker={addTicker} removeTicker={removeTicker}
+            setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions}
           />
         )}
         {tab === 'dca'       && <DCATab {...shared} />}

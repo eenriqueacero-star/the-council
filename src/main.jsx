@@ -4,16 +4,19 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase.js';
 import App from './App.jsx';
 import AuthGate from './components/AuthGate.jsx';
+import { registerSW } from './push.js';
 import './index.css';
 
+// Keep the service worker fresh on every load so subscribed devices stay reachable
+registerSW();
+
 function Root() {
-  const [user, setUser] = useState(undefined); // undefined = still resolving
+  const [user, setUser] = useState(undefined);
 
   useEffect(() => {
     return onAuthStateChanged(auth, u => setUser(u));
   }, []);
 
-  // Don't flash the login screen while Firebase resolves auth state
   if (user === undefined) return null;
 
   return (

@@ -3,7 +3,7 @@ import { collection, query, orderBy, getDocs, doc, updateDoc } from 'firebase/fi
 import { db, auth } from '../firebase.js';
 import { getQuotes } from '../api.js';
 import { AGENTS, STANCE_STYLE } from '../constants/agents.js';
-import { MONO, DISP } from '../constants/styles.js';
+import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
 import { Loader2, BarChart2 } from 'lucide-react';
 
 function fmt(ts) {
@@ -26,19 +26,19 @@ function parsePrice(v) {
 
 function OutcomeBadge({ outcome }) {
   if (!outcome) return (
-    <span style={{ ...MONO, fontSize: 9, color: '#38e0d4', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#38e0d4', animation: 'pulse 2s cubic-bezier(.4,0,.6,1) infinite' }} />
+    <span style={{ ...MONO, fontSize: 9, color: ICE, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: ICE, animation: 'pulse 2s cubic-bezier(.4,0,.6,1) infinite' }} />
       OPEN
     </span>
   );
   if (outcome === 'target') return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(56,224,138,0.15)', color: '#38e08a', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(47,203,138,0.15)', color: '#2fcb8a', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
   );
   if (outcome === 'stop') return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(255,93,108,0.15)', color: '#ff5d6c', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(232,92,92,0.15)', color: '#e85c5c', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
   );
   return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.38)', padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(226,221,213,0.06)', color: 'rgba(226,221,213,0.38)', padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
   );
 }
 
@@ -153,7 +153,7 @@ export default function AlphaTrackerTab({ account }) {
   }, [rulings]);
 
   if (loading) return (
-    <div className="mt-6 flex items-center gap-2" style={{ ...MONO, color: 'rgba(255,255,255,0.35)' }}>
+    <div className="mt-6 flex items-center gap-2" style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }}>
       <Loader2 size={14} className="animate-spin" />
       <span className="text-[12px]">Loading alpha tracker…</span>
     </div>
@@ -163,11 +163,11 @@ export default function AlphaTrackerTab({ account }) {
     <div className="mt-6 space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BarChart2 size={15} style={{ color: '#f5c451' }} />
-          <span style={{ ...DISP, letterSpacing: '0.04em' }} className="text-sm font-semibold">ALPHA TRACKER · ALL-TIME</span>
+          <BarChart2 size={14} style={{ color: CY }} />
+          <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.70)', fontWeight: 600 }} className="text-[11px]">ALPHA TRACKER · ALL-TIME</span>
         </div>
         {grading && (
-          <div className="flex items-center gap-1.5" style={{ ...MONO, color: 'rgba(255,255,255,0.35)' }}>
+          <div className="flex items-center gap-1.5" style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }}>
             <Loader2 size={11} className="animate-spin" />
             <span className="text-[10px]">GRADING OLD CALLS…</span>
           </div>
@@ -175,38 +175,38 @@ export default function AlphaTrackerTab({ account }) {
       </div>
 
       {rulings.length === 0 ? (
-        <div className="mt-8 text-center py-12 border border-dashed border-white/10 rounded-xl">
-          <BarChart2 size={32} className="mx-auto mb-3 opacity-25" style={{ color: '#f5c451' }} />
-          <p className="text-white/40 text-sm">No rulings yet.</p>
-          <p style={MONO} className="text-[11px] text-white/25 mt-1">Run a council on any ticker to start building your track record.</p>
+        <div className="mt-8 text-center py-12 border border-dashed rounded-xl" style={{ borderColor: 'rgba(226,221,213,0.08)' }}>
+          <BarChart2 size={28} className="mx-auto mb-3" style={{ color: CY, opacity: 0.22 }} />
+          <p style={{ ...SANS, color: 'rgba(226,221,213,0.42)' }} className="text-sm">No rulings yet.</p>
+          <p style={{ ...MONO, color: 'rgba(226,221,213,0.25)' }} className="text-[11px] mt-1">Run a council on any ticker to start building your track record.</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'TOTAL CALLS',    value: String(stats.total), sub: `${stats.buyCalls} BUY · ${stats.total - stats.buyCalls} WATCH/PASS` },
-              { label: 'TARGET HIT',     value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} graded`, color: '#38e08a' },
-              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped / stats.graded * 100)}%` : '—',   sub: `${stats.stopped} losses`, color: '#ff5d6c' },
-              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded call${stats.graded !== 1 ? 's' : ''}`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#38e08a' : '#ff5d6c') : undefined },
+              { label: 'TARGET HIT',     value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} graded`, color: '#2fcb8a' },
+              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped / stats.graded * 100)}%` : '—',   sub: `${stats.stopped} losses`, color: '#e85c5c' },
+              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded call${stats.graded !== 1 ? 's' : ''}`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#2fcb8a' : '#e85c5c') : undefined },
             ].map((c, i) => (
-              <div key={i} className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={MONO} className="text-[9px] text-white/35 tracking-widest mb-1.5">{c.label}</div>
-                <div style={{ ...DISP, color: c.color || '#e8eef0', fontSize: 24, fontWeight: 700, lineHeight: 1 }}>{c.value}</div>
-                <div style={MONO} className="text-[10px] text-white/28 mt-1.5">{c.sub}</div>
+              <div key={i} className="rounded-xl p-4" style={{ background: '#0e0f18', border: '1px solid rgba(226,221,213,0.07)' }}>
+                <div style={{ ...MONO, letterSpacing: '0.10em' }} className="text-[9px] text-[rgba(226,221,213,0.35)] tracking-widest mb-1.5">{c.label}</div>
+                <div style={{ ...MONO, color: c.color || 'rgba(226,221,213,0.95)', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{c.value}</div>
+                <div style={{ ...MONO, color: 'rgba(226,221,213,0.28)' }} className="text-[10px] mt-1.5">{c.sub}</div>
               </div>
             ))}
           </div>
 
           {stats.graded >= 5 && (
-            <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={MONO} className="text-[10px] text-white/35 tracking-widest mb-3">AGENT ACCURACY · ALL-TIME</div>
+            <div className="rounded-xl p-4" style={{ background: '#0e0f18', border: '1px solid rgba(226,221,213,0.07)' }}>
+              <div style={{ ...MONO, letterSpacing: '0.10em' }} className="text-[10px] text-[rgba(226,221,213,0.35)] tracking-widest mb-3">AGENT ACCURACY · ALL-TIME</div>
               <div className="grid sm:grid-cols-3 gap-3">
                 {AGENTS.map(a => {
                   const s = stats.agentAcc[a.id];
-                  const barColor = s.pct == null ? 'rgba(255,255,255,0.1)'
-                    : s.pct >= 65 ? '#38e08a'
-                    : s.pct >= 45 ? '#f5c451'
-                    : '#ff5d6c';
+                  const barColor = s.pct == null ? 'rgba(226,221,213,0.10)'
+                    : s.pct >= 65 ? '#2fcb8a'
+                    : s.pct >= 45 ? CY
+                    : '#e85c5c';
                   return (
                     <div key={a.id} className="flex items-center gap-2.5">
                       <div className="rounded-md p-1.5 shrink-0" style={{ background: `${a.accent}1a`, border: `1px solid ${a.accent}22` }}>
@@ -214,31 +214,31 @@ export default function AlphaTrackerTab({ account }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1 mb-1">
-                          <span style={MONO} className="text-[10px] text-white/55 truncate">{a.name.split(' ')[0]}</span>
+                          <span style={{ ...MONO, color: 'rgba(226,221,213,0.55)' }} className="text-[10px] truncate">{a.name.split(' ')[0]}</span>
                           <span style={{ ...MONO, color: barColor, fontSize: 10, fontWeight: 700 }}>
                             {s.pct != null ? `${s.pct}%` : '—'}
                           </span>
                         </div>
-                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(226,221,213,0.07)' }}>
                           <div style={{ width: `${s.pct || 0}%`, background: barColor, transition: 'width .6s ease' }} className="h-full rounded-full" />
                         </div>
-                        <div style={MONO} className="text-[9px] text-white/22 mt-0.5">{s.total} call{s.total !== 1 ? 's' : ''}</div>
+                        <div style={{ ...MONO, color: 'rgba(226,221,213,0.22)' }} className="text-[9px] mt-0.5">{s.total} call{s.total !== 1 ? 's' : ''}</div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <p style={MONO} className="text-[9px] text-white/18 mt-3">Bull calls (PASS/BUY) scored on target · Bear calls (FAIL/BEARISH) scored on stop or expired.</p>
+              <p style={{ ...MONO, color: 'rgba(226,221,213,0.18)' }} className="text-[9px] mt-3">Bull calls (PASS/BUY) scored on target · Bear calls (FAIL/BEARISH) scored on stop or expired.</p>
             </div>
           )}
 
-          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(226,221,213,0.07)' }}>
             <div className="overflow-x-auto">
               <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 560 }}>
                 <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <tr style={{ background: 'rgba(226,221,213,0.02)', borderBottom: '1px solid rgba(226,221,213,0.07)' }}>
                     {['DATE', 'TICKER', 'VERDICT', 'CONV', 'PRICE@CALL', '30D / NOW', 'MOVE', 'OUTCOME'].map(h => (
-                      <th key={h} style={MONO} className="px-3 py-2.5 text-left text-[9px] text-white/30 tracking-widest font-normal whitespace-nowrap">{h}</th>
+                      <th key={h} style={{ ...MONO, letterSpacing: '0.08em' }} className="px-3 py-2.5 text-left text-[9px] text-[rgba(226,221,213,0.30)] tracking-widest font-normal whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -251,21 +251,21 @@ export default function AlphaTrackerTab({ account }) {
                     const move = moveStr(r.priceAtCall, displayPrice);
                     return (
                       <tr key={r.id} style={{
-                        borderBottom: i < rulings.length - 1 ? '1px solid rgba(255,255,255,0.04)' : undefined,
-                        background: i % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
+                        borderBottom: i < rulings.length - 1 ? '1px solid rgba(226,221,213,0.04)' : undefined,
+                        background: i % 2 === 0 ? 'rgba(226,221,213,0.01)' : 'transparent',
                       }}>
-                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/35 whitespace-nowrap">{fmt(r.ts)}</td>
-                        <td style={{ ...MONO, letterSpacing: '0.1em' }} className="px-3 py-2.5 text-[12px] font-semibold text-white/80">{r.ticker}</td>
+                        <td style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="px-3 py-2.5 text-[11px] whitespace-nowrap">{fmt(r.ts)}</td>
+                        <td style={{ ...MONO, letterSpacing: '0.1em', color: 'rgba(226,221,213,0.80)', fontWeight: 600 }} className="px-3 py-2.5 text-[12px]">{r.ticker}</td>
                         <td className="px-3 py-2.5">
                           {vs && <span style={{ ...MONO, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>{vs.label}</span>}
                         </td>
-                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/45">{r.conviction ?? '—'}/10</td>
-                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/45">{r.priceAtCall ? `$${r.priceAtCall.toFixed(2)}` : '—'}</td>
-                        <td style={MONO} className="px-3 py-2.5 text-[11px] text-white/45">{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
+                        <td style={{ ...MONO, color: 'rgba(226,221,213,0.45)' }} className="px-3 py-2.5 text-[11px]">{r.conviction ?? '—'}/10</td>
+                        <td style={{ ...MONO, color: 'rgba(226,221,213,0.45)' }} className="px-3 py-2.5 text-[11px]">{r.priceAtCall ? `$${r.priceAtCall.toFixed(2)}` : '—'}</td>
+                        <td style={{ ...MONO, color: 'rgba(226,221,213,0.45)' }} className="px-3 py-2.5 text-[11px]">{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
                         <td className="px-3 py-2.5">
                           {move != null
-                            ? <span style={{ ...MONO, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#38e08a' : '#ff5d6c' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
-                            : <span style={MONO} className="text-[11px] text-white/20">—</span>}
+                            ? <span style={{ ...MONO, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#2fcb8a' : '#e85c5c' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
+                            : <span style={{ ...MONO, color: 'rgba(226,221,213,0.20)' }} className="text-[11px]">—</span>}
                         </td>
                         <td className="px-3 py-2.5"><OutcomeBadge outcome={r.outcome} /></td>
                       </tr>

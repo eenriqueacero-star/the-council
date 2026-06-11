@@ -82,9 +82,12 @@ Only files listed under `functions` can have custom timeouts — adding a functi
 
 Vercel deploys automatically from **`main` branch only**. Feature branches are never deployed. Always push production-ready changes to `main`.
 
-### JARVIS UI conventions
+### UI conventions — "The Brief Room"
 
-- Background: `#070a0c`, accent cyan: `#38e0d4`, gold: `#f5c451`, purple: `#b083ff`
-- `MONO` / `DISP` / `CY` style constants in `src/constants/styles.js`
-- Neon glow via `.neon` CSS class in `index.css`; CRT scanline via `.crtline`
+- Background: `#080910`, amber accent `CY = #c8922a` (human/interactive), steel blue `ICE = #7db8e8` (AI/machine outputs)
+- Green: `#2fcb8a`, Red: `#e85c5c`
+- `MONO` / `DISP` / `SANS` / `CY` / `ICE` style constants in `src/constants/styles.js`
+- Typography: JetBrains Mono for all UI labels/code; Inter (SANS) for prose/body copy
+- Neon glow via `.neon` CSS class in `index.css`; `dealIn` card entrance animation
 - Tab layout uses `flex overflow-x-auto no-scrollbar` (7 tabs don't fit in a grid)
+- No ambient animations, no CRT scanlines, no orbs

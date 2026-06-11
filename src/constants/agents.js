@@ -33,51 +33,51 @@ export const ACCOUNTS = {
 };
 
 export const AGENTS = [
-  { id: 'technical', name: 'Technical Analyst',  role: 'Sell Protocol + 4-Gate chart check',    icon: Activity,  accent: '#38e0d4', search: true,
+  { id: 'technical', name: 'Technical Analyst',  role: 'Sell Protocol + 4-Gate chart check',    icon: Activity,  accent: '#4ecdc4', search: true,
     system: `You are the TECHNICAL ANALYST on an investment council. ${PROTOCOLS}
 Your ONLY job: judge the chart for the given ticker. Search the web for recent price action, weekly trend, key levels. Is the weekly in an uptrend? Are red candles forming into a confirmed downtrend? Where is support/resistance?
 Respond ONLY with JSON in a \`\`\`json block: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10>,"headline":"<8 words max>","points":["<short>","<short>","<short>"]}` },
 
-  { id: 'catalyst',  name: 'Catalyst Scout',     role: 'Catalyst within 60 days?',              icon: Telescope, accent: '#f5c451', search: true,
+  { id: 'catalyst',  name: 'Catalyst Scout',     role: 'Catalyst within 60 days?',              icon: Telescope, accent: '#c8922a', search: true,
     system: `You are the CATALYST SCOUT on an investment council. ${PROTOCOLS}
 Your ONLY job: find whether the ticker has a hard catalyst within 60 days (earnings, launch, regulatory, guidance). Search for the next earnings date. State the bull thesis in one line.
 Respond ONLY with JSON in a \`\`\`json block: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10>,"headline":"<8 words max>","points":["<catalyst + date>","<bull thesis>","<short>"]}` },
 
-  { id: 'risk',      name: 'Risk Manager',        role: 'Sizing, concentration, dilution',       icon: Shield,    accent: '#5b9dff', search: true,
+  { id: 'risk',      name: 'Risk Manager',        role: 'Sizing, concentration, dilution',       icon: Shield,    accent: '#5a96e8', search: true,
     system: `You are the RISK MANAGER on an investment council. ${PROTOCOLS}
 Your ONLY job: assess risk of ADDING this ticker to the account described in the prompt. Concerns: concentration vs the account's existing holdings, dilution/share-count flags (search for recent secondaries/heavy SBC), beta/volatility, suggested starter size.
 Respond ONLY with JSON in a \`\`\`json block: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10 where 10=low risk>,"headline":"<8 words max>","points":["<concentration take>","<dilution/vol flag>","<sizing rec>"]}` },
 
-  { id: 'macro',     name: 'Macro Agent',         role: 'Headwind-day check (Gate 4)',           icon: Globe,     accent: '#b083ff', search: true,
+  { id: 'macro',     name: 'Macro Agent',         role: 'Headwind-day check (Gate 4)',           icon: Globe,     accent: '#9b72e8', search: true,
     system: `You are the MACRO AGENT on an investment council. ${PROTOCOLS}
 Your ONLY job: judge today's macro tape for Gate 4. Search for TODAY's conditions: Fed/rates, CPI, oil, Iran/Middle East, semiconductor tone. Is today a macro headwind day where new entries should pause?
 Respond ONLY with JSON in a \`\`\`json block: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10 where 10=clear skies>,"headline":"<8 words max>","points":["<rates/CPI>","<oil/geopolitics>","<sector tone>"]}` },
 
-  { id: 'bear',      name: "Devil's Advocate",    role: 'Forced to argue AGAINST',               icon: Swords,    accent: '#ff5d6c', search: true,
+  { id: 'bear',      name: "Devil's Advocate",    role: 'Forced to argue AGAINST',               icon: Swords,    accent: '#e85c5c', search: true,
     system: `You are the DEVIL'S ADVOCATE on an investment council. ${PROTOCOLS}
 Your ONLY job: build the strongest BEAR case against buying this ticker now. Search for risks, bear theses, valuation concerns, competitive threats, downgrades. Be sharp and specific.
 Respond ONLY with JSON in a \`\`\`json block: {"stance":"BEARISH","score":<0-10 strength-of-bear-case>,"headline":"<8 words max>","points":["<bear>","<bear>","<bear>"]}` },
 
-  { id: 'sizer',     name: 'Position Sizer',      role: 'Turns the call into dollars + shares',  icon: Wallet,    accent: '#7ee787', search: true,
+  { id: 'sizer',     name: 'Position Sizer',      role: 'Turns the call into dollars + shares',  icon: Wallet,    accent: '#2fcb8a', search: true,
     system: `You are the POSITION SIZER on an investment council. ${PROTOCOLS}
 Your ONLY job: translate the decision into concrete numbers for the stated available capital and account. Search for the ticker's CURRENT share price. Compute a small starter dollar amount, approximate shares at current price, and % of available capital. If no capital stated, give % guidance. Keep starters genuinely small.
 Respond ONLY with JSON in a \`\`\`json block: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10 where 10=fits cleanly>,"headline":"<8 words max>","points":["<starter $ + approx shares>","<% of available capital>","<scale-up plan>"]}` },
 ];
 
 export const STANCE_STYLE = {
-  PASS:       { bg: 'rgba(56,224,138,0.12)',  fg: '#38e08a', label: 'PASS' },
-  FAIL:       { bg: 'rgba(255,93,108,0.12)',  fg: '#ff5d6c', label: 'FAIL' },
-  CAUTION:    { bg: 'rgba(245,196,81,0.12)',  fg: '#f5c451', label: 'CAUTION' },
-  BEARISH:    { bg: 'rgba(255,93,108,0.12)',  fg: '#ff5d6c', label: 'BEAR CASE' },
-  BUY:        { bg: 'rgba(56,224,138,0.14)',  fg: '#38e08a', label: 'BUY' },
-  WATCH:      { bg: 'rgba(245,196,81,0.14)',  fg: '#f5c451', label: 'WATCH' },
-  PASS_FINAL: { bg: 'rgba(255,93,108,0.14)',  fg: '#ff5d6c', label: 'PASS' },
+  PASS:       { bg: 'rgba(47,203,138,0.12)',  fg: '#2fcb8a', label: 'PASS' },
+  FAIL:       { bg: 'rgba(232,92,92,0.12)',   fg: '#e85c5c', label: 'FAIL' },
+  CAUTION:    { bg: 'rgba(200,146,42,0.12)',  fg: '#c8922a', label: 'CAUTION' },
+  BEARISH:    { bg: 'rgba(232,92,92,0.12)',   fg: '#e85c5c', label: 'BEAR CASE' },
+  BUY:        { bg: 'rgba(47,203,138,0.14)',  fg: '#2fcb8a', label: 'BUY' },
+  WATCH:      { bg: 'rgba(200,146,42,0.14)',  fg: '#c8922a', label: 'WATCH' },
+  PASS_FINAL: { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'PASS' },
 };
 
 export const WD_STYLE = {
-  HOLD:  { bg: 'rgba(56,224,138,0.12)',  fg: '#38e08a', label: 'HOLD' },
-  WATCH: { bg: 'rgba(245,196,81,0.12)',  fg: '#f5c451', label: 'WATCH' },
-  SELL:  { bg: 'rgba(255,93,108,0.14)',  fg: '#ff5d6c', label: 'SELL SIGNAL' },
+  HOLD:  { bg: 'rgba(47,203,138,0.12)',  fg: '#2fcb8a', label: 'HOLD' },
+  WATCH: { bg: 'rgba(200,146,42,0.12)',  fg: '#c8922a', label: 'WATCH' },
+  SELL:  { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'SELL SIGNAL' },
 };
 
 // ---- Demo data (Phase C will remove these) ----

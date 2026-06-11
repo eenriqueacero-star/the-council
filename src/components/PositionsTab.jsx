@@ -3,13 +3,13 @@ import {
   Briefcase, Check, X, Plus, Save, CloudUpload, RefreshCw, Loader2,
   ChevronDown, ChevronUp, ArrowUp, ArrowDown,
 } from 'lucide-react';
-import { MONO, DISP } from '../constants/styles.js';
+import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
 import { getQuotes, getCandles } from '../api.js';
 
-const GREEN = '#7ee787';
-const RED   = '#ff5d6c';
-const YLW   = '#f5c451';
-const TEAL  = '#38e0d4';
+const GREEN = '#2fcb8a';
+const RED   = '#e85c5c';
+const YLW   = CY;
+const TEAL  = ICE;
 
 const PALETTE = [TEAL, GREEN, YLW, '#b083ff', '#ff8c5d', '#38a8e0', '#e0a838', '#8de038', '#d438e0', '#5d8cff'];
 const RANGES  = ['1H', '1D', '1W', '1M', '1Y', 'All'];
@@ -128,23 +128,23 @@ function EquityCurveChart({ portfolio, spy, range }) {
       <polyline points={portLine} fill="none" stroke={portColor} strokeWidth="2" strokeLinejoin="round" />
       {lblIdx.map(i => portfolio[i] && (
         <text key={i} x={toX(i)} y={H - 4} textAnchor="middle"
-          fill="rgba(255,255,255,0.25)" style={{ fontSize: '9px', fontFamily: "'IBM Plex Mono', monospace" }}>
+          fill="rgba(255,255,255,0.25)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
           {fmtX(portfolio[i].t, range)}
         </text>
       ))}
       {[minV, maxV].map((v, i) => (
         <text key={i} x={PL - 4} y={toY(v) + 3} textAnchor="end"
-          fill="rgba(255,255,255,0.25)" style={{ fontSize: '9px', fontFamily: "'IBM Plex Mono', monospace" }}>
+          fill="rgba(255,255,255,0.25)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
           {v >= 0 ? '+' : ''}{v.toFixed(1)}%
         </text>
       ))}
       <line x1={PL + 2} y1={PT + 7} x2={PL + 14} y2={PT + 7} stroke={portColor} strokeWidth="2" />
       <text x={PL + 18} y={PT + 10} fill="rgba(255,255,255,0.35)"
-        style={{ fontSize: '9px', fontFamily: "'IBM Plex Mono', monospace" }}>PORTFOLIO</text>
+        style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>PORTFOLIO</text>
       <line x1={PL + 80} y1={PT + 7} x2={PL + 92} y2={PT + 7}
         stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeDasharray="4,3" />
       <text x={PL + 96} y={PT + 10} fill="rgba(255,255,255,0.35)"
-        style={{ fontSize: '9px', fontFamily: "'IBM Plex Mono', monospace" }}>SPY</text>
+        style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>SPY</text>
     </svg>
   );
 }
@@ -195,15 +195,15 @@ function DonutChart({ rows, totalValue, highlighted, onSliceClick }) {
       {hlRow ? (
         <>
           <text x={CX} y={CY - 4} textAnchor="middle" fill="white"
-            style={{ fontSize: '10px', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700 }}>{hlRow.ticker}</text>
+            style={{ fontSize: '10px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{hlRow.ticker}</text>
           <text x={CX} y={CY + 10} textAnchor="middle" fill="rgba(255,255,255,0.5)"
-            style={{ fontSize: '9px', fontFamily: "'IBM Plex Mono', monospace" }}>
+            style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
             {(hlRow.mktVal / totalValue * 100).toFixed(1)}%
           </text>
         </>
       ) : (
         <text x={CX} y={CY + 4} textAnchor="middle" fill="rgba(255,255,255,0.25)"
-          style={{ fontSize: '8px', fontFamily: "'IBM Plex Mono', monospace" }}>ALLOC</text>
+          style={{ fontSize: '8px', fontFamily: "'JetBrains Mono', monospace" }}>ALLOC</text>
       )}
     </svg>
   );
@@ -365,7 +365,7 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Briefcase size={15} style={{ color: GREEN }} />
-          <span style={{ ...DISP, letterSpacing: '0.04em' }} className="text-sm font-semibold">
+          <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.70)', fontWeight: 600 }} className="text-[11px]">
             POSITIONS · {acct.label.toUpperCase()}
           </span>
         </div>
@@ -543,10 +543,12 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
       )}
 
       {/* Collapsible edit */}
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(226,221,213,0.09)' }}>
         <button onClick={() => setEditOpen(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors"
-          style={{ background: 'rgba(255,255,255,0.025)' }}>
+          className="w-full flex items-center justify-between px-4 py-3 transition-colors"
+          style={{ background: 'rgba(226,221,213,0.02)' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(226,221,213,0.04)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(226,221,213,0.02)'}>
           <div className="flex items-center gap-2">
             <Briefcase size={12} style={{ color: 'rgba(255,255,255,0.5)' }} />
             <span style={{ ...MONO, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.08em' }} className="text-[11px]">
@@ -581,7 +583,7 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
                 const bookPct = totalVal > 0 && mktVal > 0 ? (mktVal / totalVal) * 100 : 0;
                 const isHeavy = bookPct > 25;
                 return (
-                  <div key={t} className="bg-white/[0.025] border border-white/10 rounded-xl overflow-hidden">
+                  <div key={t} className="border rounded-xl overflow-hidden" style={{ background: '#0e0f18', borderColor: 'rgba(226,221,213,0.08)' }}>
                     {bookPct > 0 && (
                       <div className="h-0.5 w-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         <div className="h-full transition-all duration-500"
@@ -592,12 +594,18 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
                       <span style={DISP} className="w-16 font-semibold text-sm pl-1 shrink-0">{t}</span>
                       <input value={p.shares || ''} onChange={e => setPos(t, 'shares', e.target.value.replace(/[^0-9.]/g, ''))}
                         inputMode="decimal" placeholder="shares" style={MONO}
-                        className="flex-1 min-w-0 bg-white/[0.04] border border-white/12 rounded-lg px-2.5 py-2 text-sm outline-none focus:border-[#7ee787]/60 transition-colors" />
+                        style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+                        className="flex-1 min-w-0 border rounded-lg px-2.5 py-2 text-sm outline-none transition-colors"
+                        onFocus={e => e.target.style.borderColor = `${GREEN}55`}
+                        onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
                       <div className="relative flex-1 min-w-0">
                         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 text-sm" style={MONO}>$</span>
                         <input value={p.cost || ''} onChange={e => setPos(t, 'cost', e.target.value.replace(/[^0-9.]/g, ''))}
-                          inputMode="decimal" placeholder="avg" style={MONO}
-                          className="w-full bg-white/[0.04] border border-white/12 rounded-lg pl-6 pr-2 py-2 text-sm outline-none focus:border-[#7ee787]/60 transition-colors" />
+                          inputMode="decimal" placeholder="avg"
+                          style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+                          className="w-full border rounded-lg pl-6 pr-2 py-2 text-sm outline-none transition-colors"
+                          onFocus={e => e.target.style.borderColor = `${GREEN}55`}
+                          onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
                       </div>
                       <button onClick={() => removeTicker(t)}
                         className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-white/35 hover:text-[#ff5d6c] hover:bg-[#ff5d6c]/10 transition-colors">
@@ -614,16 +622,19 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
                 <Plus size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
                 <input value={newTicker} onChange={e => setNewTicker(e.target.value.toUpperCase())}
                   onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                  placeholder="add ticker (e.g. OKLO)" style={{ ...MONO, letterSpacing: '0.1em' }}
-                  className="w-full bg-white/[0.04] border border-white/15 rounded-lg pl-9 pr-3 py-2.5 text-sm uppercase outline-none focus:border-[#7ee787]/60 transition-colors" />
+                  placeholder="add ticker (e.g. OKLO)"
+                  style={{ ...MONO, letterSpacing: '0.1em', background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+                  className="w-full border rounded-lg pl-9 pr-3 py-2.5 text-sm uppercase outline-none transition-colors"
+                  onFocus={e => e.target.style.borderColor = `${GREEN}55`}
+                  onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
               </div>
               <button onClick={handleAdd} disabled={!newTicker.trim()}
-                style={{ ...DISP, background: newTicker.trim() ? GREEN : 'rgba(126,231,135,0.25)', color: '#06140a' }}
-                className="px-4 py-2.5 rounded-lg font-semibold text-sm transition-all hover:brightness-110 disabled:cursor-not-allowed">ADD</button>
+                style={{ ...MONO, background: newTicker.trim() ? GREEN : `${GREEN}28`, color: '#04120a', letterSpacing: '0.10em', fontWeight: 600 }}
+                className="px-4 py-2.5 rounded-lg text-[13px] transition-all hover:brightness-110 disabled:cursor-not-allowed">ADD</button>
             </div>
 
             <div className="mt-3 rounded-xl p-3 flex items-start gap-2.5"
-              style={{ background: 'rgba(126,231,135,0.06)', border: '1px solid rgba(126,231,135,0.2)' }}>
+              style={{ background: `${GREEN}0a`, border: `1px solid ${GREEN}28` }}>
               <Check size={14} style={{ color: GREEN }} className="mt-0.5 shrink-0" />
               <p className="text-[12px] text-white/65 leading-relaxed">
                 Council sees: <span className="text-white/85">{positionsLine || 'no positions yet'}</span>

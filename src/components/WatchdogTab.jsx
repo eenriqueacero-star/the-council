@@ -82,7 +82,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
             const Icon = sty ? iconMap[r.status] : Loader2;
             return (
               <div key={h}
-                style={{ animation: st.status === 'done' ? 'cardIn .4s ease both' : undefined, background: '#0e0f18', borderColor: sty ? `${sty.fg}33` : 'rgba(226,221,213,0.07)' }}
+                style={{ animation: st.status === 'done' ? 'cardIn .4s ease both' : undefined, background: '#111827', borderColor: sty ? `${sty.fg}33` : 'rgba(255,255,255,0.06)' }}
                 className="lift border rounded-xl p-3.5 flex items-start gap-3">
                 <div className="rounded-lg p-2 mt-0.5 shrink-0" style={{ background: sty ? sty.bg : 'rgba(226,221,213,0.04)' }}>
                   {st.status === 'running'

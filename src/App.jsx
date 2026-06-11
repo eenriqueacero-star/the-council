@@ -3,11 +3,10 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ACCOUNTS } from './constants/agents.js';
-import { MONO, DISP, CY } from './constants/styles.js';
-import ArcReactor from './components/ArcReactor.jsx';
+import { SANS, CY } from './constants/styles.js';
 import Header from './components/Header.jsx';
 import AccountSelector from './components/AccountSelector.jsx';
-import TabNav from './components/TabNav.jsx';
+import BottomNav from './components/BottomNav.jsx';
 import ChatTab from './components/ChatTab.jsx';
 import CouncilTab from './components/CouncilTab.jsx';
 import PositionsTab from './components/PositionsTab.jsx';
@@ -16,9 +15,16 @@ import WatchdogTab from './components/WatchdogTab.jsx';
 import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 
+const MORE_TABS = ['dca', 'alpha', 'roadmap'];
+const MORE_NAV = [
+  { id: 'dca',     label: 'DCA Allocator' },
+  { id: 'alpha',   label: 'Alpha Tracker' },
+  { id: 'roadmap', label: 'Roadmap' },
+];
+
 export default function App() {
   const [account, setAccount] = useState(() => localStorage.getItem('council_account') || 'edwin');
-  const [tab,     setTab]     = useState('chat');
+  const [tab,     setTab]     = useState('positions');
   const [apiDown, setApiDown] = useState(false);
 
   const [running,   setRunning]   = useState(false);
@@ -55,11 +61,9 @@ export default function App() {
   const posLoadedRef = useRef(false);
   const saveTimerRef = useRef(null);
 
-  // Wait for Firebase Auth to restore session before loading positions from Firestore.
-  // auth.currentUser is always null on mount — it resolves async.
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, user => {
-      unsub(); // one-shot: unsubscribe after first auth state is known
+      unsub();
       if (!user) { posLoadedRef.current = true; return; }
       getDoc(doc(db, 'users', user.uid, 'data', 'positions')).then(snap => {
         if (snap.exists() && snap.data().positions) {
@@ -107,9 +111,9 @@ export default function App() {
     }).join(' | ');
   }
 
-  const acct        = ACCOUNTS[account];
-  const posMap      = positions[account] || {};
-  const acctHoldings = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
+  const acct          = ACCOUNTS[account];
+  const posMap        = positions[account] || {};
+  const acctHoldings  = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
   const positionsLine = acctHoldings
     .map(t => { const p = posMap[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; })
     .join(', ');
@@ -125,65 +129,70 @@ export default function App() {
 
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown };
 
+  const navTab = MORE_TABS.includes(tab) ? 'more' : tab;
+  function handleNavChange(t) {
+    if (t === 'more') {
+      if (!MORE_TABS.includes(tab)) setTab('dca');
+    } else {
+      setTab(t);
+    }
+  }
+
   return (
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", background: '#080910', color: '#e2ddd5', minHeight: '100vh' }} className="relative overflow-hidden">
-      {/* Single ambient amber glow — top only */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -8%, rgba(200,146,42,0.07), transparent 52%)' }} />
-
-      {/* Boot sequence overlay */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#080910', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', animation: 'bootFade 2s ease forwards', pointerEvents: 'none' }}>
-        <ArcReactor size={80} />
-        <div style={{ ...DISP, color: CY, letterSpacing: '0.28em', fontWeight: 700 }} className="text-sm neon">THE COUNCIL</div>
-        <div style={{ ...MONO, animation: 'bootText 1.3s steps(30) forwards', color: 'rgba(226,221,213,0.35)' }} className="text-[10px] tracking-[0.18em] overflow-hidden whitespace-nowrap">CALIBRATING 6 AGENTS · LOADING PROTOCOLS · ONLINE</div>
-      </div>
-
-      {/* HUD corner brackets */}
-      <div className="pointer-events-none fixed inset-0 z-20">
-        {[['top-3 left-3', 0], ['top-3 right-3', 1], ['bottom-3 left-3', 2], ['bottom-3 right-3', 3]].map(([pos, i]) => (
-          <div key={i} className={`absolute ${pos} w-5 h-5`} style={{
-            borderTop:    i < 2  ? `1px solid ${CY}` : 'none',
-            borderBottom: i >= 2 ? `1px solid ${CY}` : 'none',
-            borderLeft:   i % 2 === 0 ? `1px solid ${CY}` : 'none',
-            borderRight:  i % 2 === 1 ? `1px solid ${CY}` : 'none',
-            opacity: 0.28,
-          }} />
-        ))}
-      </div>
-
-      <div className="relative max-w-5xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
+    <div style={{ background: '#0a0e1a', color: '#e2e8f0', minHeight: '100vh', ...SANS }}>
+      <div style={{ maxWidth: '430px', margin: '0 auto', position: 'relative', minHeight: '100vh' }}>
         <Header onSignOut={() => signOut(auth)} />
-
         <AccountSelector account={account} setAccount={setAccount} positions={positions} running={running} wdRunning={wdRunning} />
 
-        <TabNav tab={tab} setTab={setTab} />
+        {/* More sub-nav */}
+        {MORE_TABS.includes(tab) && (
+          <div className="flex gap-2 px-4 pt-3 pb-1">
+            {MORE_NAV.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{
+                  ...SANS,
+                  fontSize: '13px', fontWeight: 500,
+                  padding: '5px 13px', borderRadius: '999px',
+                  border: `1px solid ${tab === t.id ? CY + '44' : 'rgba(255,255,255,0.10)'}`,
+                  background: tab === t.id ? CY + '18' : 'transparent',
+                  color: tab === t.id ? CY : 'rgba(255,255,255,0.42)',
+                  transition: 'all .15s', cursor: 'pointer',
+                }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        <div style={{ display: tab === 'chat' ? undefined : 'none' }}>
-          <ChatTab {...shared} />
+        <div className="px-4" style={{ paddingBottom: '90px' }}>
+          <div style={{ display: tab === 'chat' ? undefined : 'none' }}>
+            <ChatTab {...shared} />
+          </div>
+          {tab === 'council' && (
+            <CouncilTab {...shared}
+              running={running} setRunning={setRunning}
+              ticker={ticker} setTicker={setTicker}
+              capital={capital} setCapital={setCapital}
+              active={active} setActive={setActive}
+              agentState={agentState} setAgentState={setAgentState}
+              synthesis={synthesis} setSynthesis={setSynthesis}
+              councilAccounts={councilAccounts}
+              setCouncilAccounts={setCouncilAccounts}
+              councilPositionsLine={buildCombinedLine(councilAccounts)}
+            />
+          )}
+          {tab === 'positions' && (
+            <PositionsTab {...shared}
+              setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions}
+            />
+          )}
+          {tab === 'dca'      && <DCATab {...shared} />}
+          {tab === 'watchdog' && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
+          {tab === 'alpha'    && <AlphaTrackerTab account={account} />}
+          {tab === 'roadmap'  && <RoadmapTab />}
         </div>
-        {tab === 'council'   && (
-          <CouncilTab {...shared}
-            running={running} setRunning={setRunning}
-            ticker={ticker} setTicker={setTicker}
-            capital={capital} setCapital={setCapital}
-            active={active} setActive={setActive}
-            agentState={agentState} setAgentState={setAgentState}
-            synthesis={synthesis} setSynthesis={setSynthesis}
-            councilAccounts={councilAccounts}
-            setCouncilAccounts={setCouncilAccounts}
-            councilPositionsLine={buildCombinedLine(councilAccounts)}
-          />
-        )}
-        {tab === 'positions' && (
-          <PositionsTab {...shared}
-            setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions}
-          />
-        )}
-        {tab === 'dca'       && <DCATab {...shared} />}
-        {tab === 'watchdog'  && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
-        {tab === 'alpha'     && <AlphaTrackerTab account={account} />}
-        {tab === 'roadmap'   && <RoadmapTab />}
 
-        <p className="mt-8 text-[10px] text-center leading-relaxed" style={{ ...MONO, color: 'rgba(226,221,213,0.20)' }}>THE COUNCIL · LIVE AI AGENTS · NOT FINANCIAL ADVICE — YOU EXECUTE, YOU DECIDE</p>
+        <BottomNav tab={navTab} setTab={handleNavChange} />
       </div>
     </div>
   );

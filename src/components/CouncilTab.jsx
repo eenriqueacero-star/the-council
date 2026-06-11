@@ -239,10 +239,10 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(226,221,213,0.30)' }} />
           <input value={ticker} onChange={e => setTicker(e.target.value)} onKeyDown={e => e.key === 'Enter' && convene()}
             placeholder="e.g. AAPL"
-            style={{ ...MONO, letterSpacing: '0.15em', background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+            style={{ ...MONO, letterSpacing: '0.15em', background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: '#e2e8f0' }}
             className="w-full border rounded-lg pl-9 pr-3 py-3 text-lg uppercase outline-none transition-colors"
             onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
         </div>
         <button onClick={convene} disabled={running || !ticker.trim()}
           style={{ ...MONO, letterSpacing: '0.10em', fontWeight: 600, background: running || !ticker.trim() ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808' }}
@@ -256,11 +256,11 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
           <Wallet size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(226,221,213,0.30)' }} />
           <input value={capital} onChange={e => setCapital(e.target.value.replace(/[^0-9.]/g, ''))} onKeyDown={e => e.key === 'Enter' && convene()}
             inputMode="decimal" placeholder="available capital (optional)"
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+            style={{ ...MONO, background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.08)', color: '#e2e8f0' }}
             className="w-full border rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none transition-colors"
             onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
-          {capital.trim() && <span style={{ ...MONO, color: '#2fcb8a' }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px]">${Number(capital).toLocaleString()}</span>}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+          {capital.trim() && <span style={{ ...MONO, color: '#00d395' }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px]">${Number(capital).toLocaleString()}</span>}
         </div>
       </div>
 
@@ -275,7 +275,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                 if (sel && councilAccounts.length === 1) return;
                 setCouncilAccounts(sel ? councilAccounts.filter(k => k !== key) : [...councilAccounts, key]);
               }}
-              style={{ ...MONO, background: sel ? 'rgba(200,146,42,0.12)' : 'rgba(226,221,213,0.03)', border: `1px solid ${sel ? `${CY}55` : 'rgba(226,221,213,0.10)'}`, color: sel ? CY : 'rgba(226,221,213,0.40)' }}
+              style={{ ...MONO, background: sel ? 'rgba(200,146,42,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${sel ? `${CY}55` : 'rgba(255,255,255,0.08)'}`, color: sel ? CY : 'rgba(226,221,213,0.40)' }}
               className="text-[10px] px-2.5 py-1 rounded-lg transition-all disabled:opacity-40 hover:brightness-110">
               {a.label}
             </button>
@@ -298,7 +298,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
         <span style={{ ...MONO, color: 'rgba(226,221,213,0.30)', letterSpacing: '0.10em' }} className="text-[10px]">QUICK:</span>
         {quickPicks.map(q => (
           <button key={q} onClick={() => setTicker(q)} disabled={running}
-            style={{ ...MONO, borderColor: 'rgba(226,221,213,0.10)', color: 'rgba(226,221,213,0.55)' }}
+            style={{ ...MONO, borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(226,221,213,0.55)' }}
             className="text-[11px] px-2.5 py-1 rounded border transition-colors disabled:opacity-40 hover:border-[rgba(200,146,42,0.45)] hover:text-[#c8922a]">{q}</button>
         ))}
         <button onClick={runDemo} disabled={running}
@@ -328,9 +328,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
             return (
               <div key={ri} className={!isLastDone ? 'opacity-60 mb-2' : 'mb-2'}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
+                  <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.06)' }} />
                   <span style={{ ...MONO, color: 'rgba(226,221,213,0.40)', letterSpacing: '0.10em' }} className="text-[10px]">{label}</span>
-                  <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
+                  <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.06)' }} />
                 </div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {AGENTS.map(a => {
@@ -339,7 +339,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                     const ss = r && STANCE_STYLE[r.stance];
                     return (
                       <div key={a.id} onClick={() => r && !r._error && openDrawer(a, r)}
-                        style={{ background: '#0e0f18', borderColor: (r && !r._error) ? `${a.accent}38` : 'rgba(232,92,92,0.25)', cursor: (r && !r._error) ? 'pointer' : 'default' }}
+                        style={{ background: '#111827', borderColor: (r && !r._error) ? `${a.accent}38` : 'rgba(232,92,92,0.25)', cursor: (r && !r._error) ? 'pointer' : 'default' }}
                         className="lift border rounded-xl p-4 transition-all">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5">
@@ -363,7 +363,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                             </ul>
                           </div>
                         )}
-                        {r?._error && <div className="mt-3 flex items-center gap-2" style={{ ...MONO, color: '#e85c5c' }}><AlertTriangle size={12} /><span className="text-[11px]">{r.errorCode || 'ERR-NET'}</span></div>}
+                        {r?._error && <div className="mt-3 flex items-center gap-2" style={{ ...MONO, color: '#ff4d4d' }}><AlertTriangle size={12} /><span className="text-[11px]">{r.errorCode || 'ERR-NET'}</span></div>}
                         {r && !r._error && <div style={{ ...MONO, color: 'rgba(226,221,213,0.20)' }} className="mt-3 text-[9px] text-right">tap to hear ›</div>}
                       </div>
                     );
@@ -399,9 +399,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
           {showLiveRound && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
+                <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.06)' }} />
                 <span style={{ ...MONO, color: 'rgba(226,221,213,0.40)', letterSpacing: '0.10em' }} className="text-[10px]">{liveLabel}</span>
-                <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
+                <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.06)' }} />
               </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {AGENTS.map(a => {
@@ -409,7 +409,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                   const Icon = a.icon; const r = st.result; const ss = r && STANCE_STYLE[r.stance];
                   return (
                     <div key={a.id} onClick={() => st.status === 'done' && r && openDrawer(a, r)}
-                      style={{ animation: st.status === 'done' ? 'cardIn .5s cubic-bezier(.2,.7,.2,1) both' : undefined, background: '#0e0f18', borderColor: st.status === 'done' ? `${a.accent}38` : 'rgba(226,221,213,0.07)', cursor: st.status === 'done' ? 'pointer' : 'default' }}
+                      style={{ animation: st.status === 'done' ? 'cardIn .5s cubic-bezier(.2,.7,.2,1) both' : undefined, background: '#111827', borderColor: st.status === 'done' ? `${a.accent}38` : 'rgba(255,255,255,0.06)', cursor: st.status === 'done' ? 'pointer' : 'default' }}
                       className="lift relative border rounded-xl p-4 overflow-hidden transition-all">
                       {st.status === 'running' && <div className="absolute left-0 right-0 h-12 scanline" style={{ background: `linear-gradient(${a.accent}18, transparent)` }} />}
                       <div className="flex items-start justify-between gap-2 relative">
@@ -420,7 +420,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                         {st.status === 'done' && ss && <span style={{ ...MONO, background: ss.bg, color: ss.fg }} className="text-[9px] font-semibold px-2 py-1 rounded whitespace-nowrap">{ss.label}</span>}
                       </div>
                       {st.status === 'running' && <div className="mt-4 flex items-center gap-2" style={{ ...MONO, color: 'rgba(226,221,213,0.40)' }}><Loader2 size={13} className="animate-spin" /><span className="text-[11px]">{st.debating ? 'rebutting…' : 'analyzing…'}</span></div>}
-                      {st.status === 'error'   && <div className="mt-4 flex items-center gap-2" style={{ ...MONO, color: '#e85c5c' }}><AlertTriangle size={13} /><span className="text-[11px]">{st.errorCode || 'ERR-NET'} — retry</span></div>}
+                      {st.status === 'error'   && <div className="mt-4 flex items-center gap-2" style={{ ...MONO, color: '#ff4d4d' }}><AlertTriangle size={13} /><span className="text-[11px]">{st.errorCode || 'ERR-NET'} — retry</span></div>}
                       {st.status === 'done' && r && (
                         <div className="mt-3 relative">
                           <div className="flex items-center justify-between gap-2 mb-2">
@@ -448,12 +448,12 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
       {active && (
         <div ref={synthRef} className="mt-5">
           {synthesis.status === 'running' && (
-            <div className="border rounded-xl p-6 flex items-center gap-3" style={{ ...MONO, background: '#0e0f18', borderColor: `${CY}28`, color: CY }}>
+            <div className="border rounded-xl p-6 flex items-center gap-3" style={{ ...MONO, background: '#111827', borderColor: `${CY}28`, color: CY }}>
               <Loader2 size={16} className="animate-spin" /><span className="text-sm">Portfolio Manager reviewing the full debate…</span>
             </div>
           )}
           {synthesis.status === 'error' && (
-            <div className="border rounded-xl p-5 flex items-center gap-3" style={{ ...MONO, background: '#0e0f18', borderColor: 'rgba(232,92,92,0.28)', color: '#e85c5c' }}>
+            <div className="border rounded-xl p-5 flex items-center gap-3" style={{ ...MONO, background: '#111827', borderColor: 'rgba(232,92,92,0.28)', color: '#ff4d4d' }}>
               <AlertTriangle size={16} />
               <div>
                 <div className="text-sm font-semibold">{synthesis.errorCode || 'ERR-NET'} — PM synthesis failed</div>
@@ -467,7 +467,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
             </div>
           )}
           {synthesis.status === 'done' && synthesis.result && vStyle && (
-            <div style={{ animation: 'cardIn .5s cubic-bezier(.2,.7,.2,1) both', background: '#0c0d14', borderColor: `${vStyle.fg}44`, boxShadow: `0 0 24px ${vStyle.fg}14` }}
+            <div style={{ animation: 'cardIn .5s cubic-bezier(.2,.7,.2,1) both', background: '#0d1424', borderColor: `${vStyle.fg}44`, boxShadow: `0 0 24px ${vStyle.fg}14` }}
               className="border rounded-xl p-5 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Crown size={14} style={{ color: CY }} />
@@ -480,7 +480,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                 </div>
                 <div className="flex-1 min-w-[160px]">
                   <div className="flex items-center justify-between text-[11px] mb-1" style={{ ...MONO, color: 'rgba(226,221,213,0.45)' }}><span>CONVICTION</span><span>{synthesis.result.conviction}/10</span></div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(226,221,213,0.08)' }}>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
                     <div style={{ width: `${(synthesis.result.conviction / 10) * 100}%`, background: vStyle.fg, transition: 'width .8s ease' }} className="h-full rounded-full" />
                   </div>
                   <div className="mt-3 flex items-start gap-2 text-[12px]" style={{ ...MONO, color: 'rgba(226,221,213,0.60)' }}>
@@ -495,9 +495,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {synthesis.result.entry && (<div><div className="flex items-center gap-1 mb-1"><Target size={10} style={{ color: ICE }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">AGGRESSIVE ENTRY</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: ICE }}>{synthesis.result.entry}</div></div>)}
                     {synthesis.result.conservativeEntry && (<div><div className="flex items-center gap-1 mb-1"><Target size={10} style={{ color: `${ICE}80` }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">CONSERVATIVE ENTRY</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: `${ICE}cc` }}>{synthesis.result.conservativeEntry}</div></div>)}
-                    {synthesis.result.stopLoss && (<div><div className="flex items-center gap-1 mb-1"><TrendingDown size={10} style={{ color: '#e85c5c' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">STOP LOSS</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#e85c5c' }}>{synthesis.result.stopLoss}</div></div>)}
-                    {synthesis.result.invalidation && (<div><div className="flex items-center gap-1 mb-1"><X size={10} style={{ color: '#e85c5c' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">INVALIDATION</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: 'rgba(232,92,92,0.75)' }}>{synthesis.result.invalidation}</div></div>)}
-                    {synthesis.result.takeProfit && (<div><div className="flex items-center gap-1 mb-1"><TrendingUp size={10} style={{ color: '#2fcb8a' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">TAKE PROFIT</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#2fcb8a' }}>{synthesis.result.takeProfit}</div></div>)}
+                    {synthesis.result.stopLoss && (<div><div className="flex items-center gap-1 mb-1"><TrendingDown size={10} style={{ color: '#ff4d4d' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">STOP LOSS</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#ff4d4d' }}>{synthesis.result.stopLoss}</div></div>)}
+                    {synthesis.result.invalidation && (<div><div className="flex items-center gap-1 mb-1"><X size={10} style={{ color: '#ff4d4d' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">INVALIDATION</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: 'rgba(232,92,92,0.75)' }}>{synthesis.result.invalidation}</div></div>)}
+                    {synthesis.result.takeProfit && (<div><div className="flex items-center gap-1 mb-1"><TrendingUp size={10} style={{ color: '#00d395' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">TAKE PROFIT</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#00d395' }}>{synthesis.result.takeProfit}</div></div>)}
                     {synthesis.result.positionSize && (<div><div className="flex items-center gap-1 mb-1"><Wallet size={10} style={{ color: CY }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">POSITION SIZE</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: CY }}>{synthesis.result.positionSize}</div></div>)}
                     {synthesis.result.timeframe && (<div><div className="flex items-center gap-1 mb-1"><Clock size={10} style={{ color: 'rgba(226,221,213,0.40)' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">TIMEFRAME</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: 'rgba(226,221,213,0.70)' }}>{synthesis.result.timeframe}</div></div>)}
                   </div>
@@ -506,12 +506,12 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
               )}
               <div className="mt-4 grid sm:grid-cols-2 gap-3">
                 <div className="rounded-lg p-3" style={{ background: 'rgba(47,203,138,0.05)', border: '1px solid rgba(47,203,138,0.16)' }}>
-                  <div style={{ ...MONO, color: '#2fcb8a', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">BULL</div>
-                  <ul className="space-y-1">{(synthesis.result.bull || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(226,221,213,0.70)' }}><span style={{ color: '#2fcb8a' }}>+</span>{b}</li>)}</ul>
+                  <div style={{ ...MONO, color: '#00d395', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">BULL</div>
+                  <ul className="space-y-1">{(synthesis.result.bull || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(226,221,213,0.70)' }}><span style={{ color: '#00d395' }}>+</span>{b}</li>)}</ul>
                 </div>
                 <div className="rounded-lg p-3" style={{ background: 'rgba(232,92,92,0.05)', border: '1px solid rgba(232,92,92,0.16)' }}>
-                  <div style={{ ...MONO, color: '#e85c5c', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">RISKS</div>
-                  <ul className="space-y-1">{(synthesis.result.risks || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(226,221,213,0.70)' }}><span style={{ color: '#e85c5c' }}>!</span>{b}</li>)}</ul>
+                  <div style={{ ...MONO, color: '#ff4d4d', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">RISKS</div>
+                  <ul className="space-y-1">{(synthesis.result.risks || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(226,221,213,0.70)' }}><span style={{ color: '#ff4d4d' }}>!</span>{b}</li>)}</ul>
                 </div>
               </div>
             </div>
@@ -520,7 +520,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
       )}
 
       {!active && (
-        <div className="mt-12 text-center py-10 border border-dashed rounded-xl" style={{ borderColor: 'rgba(226,221,213,0.08)' }}>
+        <div className="mt-12 text-center py-10 border border-dashed rounded-xl" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
           <Crown size={28} className="mx-auto mb-3" style={{ color: CY, opacity: 0.22 }} />
           <p style={{ ...SANS, color: 'rgba(226,221,213,0.45)' }} className="text-sm">Type a ticker and convene the council for {acctLabel}.</p>
           <p style={{ ...MONO, color: 'rgba(226,221,213,0.25)' }} className="text-[11px] mt-2">6 specialists analyze → debate → PM delivers the ruling.</p>
@@ -531,7 +531,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
         <>
           <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.55)' }} onClick={() => { stopSpeaking(); setDrawer(null); }} />
           <div className="fixed right-0 top-0 bottom-0 z-50 flex flex-col w-full max-w-sm"
-            style={{ background: '#0c0d14', borderLeft: `1px solid ${drawer.agent.accent}28`, animation: 'slideInRight .25s ease' }}>
+            style={{ background: '#0d1424', borderLeft: `1px solid ${drawer.agent.accent}28`, animation: 'slideInRight .25s ease' }}>
             <div className="flex items-center justify-between p-5" style={{ borderBottom: '1px solid rgba(226,221,213,0.07)' }}>
               <div className="flex items-center gap-3">
                 <div className="rounded-xl p-2.5" style={{ background: `${drawer.agent.accent}1a`, border: `1px solid ${drawer.agent.accent}33` }}>

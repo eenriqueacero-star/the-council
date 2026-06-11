@@ -32,10 +32,10 @@ function OutcomeBadge({ outcome }) {
     </span>
   );
   if (outcome === 'target') return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(47,203,138,0.15)', color: '#2fcb8a', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(47,203,138,0.15)', color: '#00d395', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
   );
   if (outcome === 'stop') return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(232,92,92,0.15)', color: '#e85c5c', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
+    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(232,92,92,0.15)', color: '#ff4d4d', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
   );
   return (
     <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(226,221,213,0.06)', color: 'rgba(226,221,213,0.38)', padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
@@ -185,11 +185,11 @@ export default function AlphaTrackerTab({ account }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'TOTAL CALLS',    value: String(stats.total), sub: `${stats.buyCalls} BUY · ${stats.total - stats.buyCalls} WATCH/PASS` },
-              { label: 'TARGET HIT',     value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} graded`, color: '#2fcb8a' },
-              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped / stats.graded * 100)}%` : '—',   sub: `${stats.stopped} losses`, color: '#e85c5c' },
-              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded call${stats.graded !== 1 ? 's' : ''}`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#2fcb8a' : '#e85c5c') : undefined },
+              { label: 'TARGET HIT',     value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} graded`, color: '#00d395' },
+              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped / stats.graded * 100)}%` : '—',   sub: `${stats.stopped} losses`, color: '#ff4d4d' },
+              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded call${stats.graded !== 1 ? 's' : ''}`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#00d395' : '#ff4d4d') : undefined },
             ].map((c, i) => (
-              <div key={i} className="rounded-xl p-4" style={{ background: '#0e0f18', border: '1px solid rgba(226,221,213,0.07)' }}>
+              <div key={i} className="rounded-xl p-4" style={{ background: '#111827', border: '1px solid rgba(226,221,213,0.07)' }}>
                 <div style={{ ...MONO, letterSpacing: '0.10em' }} className="text-[9px] text-[rgba(226,221,213,0.35)] tracking-widest mb-1.5">{c.label}</div>
                 <div style={{ ...MONO, color: c.color || 'rgba(226,221,213,0.95)', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{c.value}</div>
                 <div style={{ ...MONO, color: 'rgba(226,221,213,0.28)' }} className="text-[10px] mt-1.5">{c.sub}</div>
@@ -198,15 +198,15 @@ export default function AlphaTrackerTab({ account }) {
           </div>
 
           {stats.graded >= 5 && (
-            <div className="rounded-xl p-4" style={{ background: '#0e0f18', border: '1px solid rgba(226,221,213,0.07)' }}>
+            <div className="rounded-xl p-4" style={{ background: '#111827', border: '1px solid rgba(226,221,213,0.07)' }}>
               <div style={{ ...MONO, letterSpacing: '0.10em' }} className="text-[10px] text-[rgba(226,221,213,0.35)] tracking-widest mb-3">AGENT ACCURACY · ALL-TIME</div>
               <div className="grid sm:grid-cols-3 gap-3">
                 {AGENTS.map(a => {
                   const s = stats.agentAcc[a.id];
                   const barColor = s.pct == null ? 'rgba(226,221,213,0.10)'
-                    : s.pct >= 65 ? '#2fcb8a'
+                    : s.pct >= 65 ? '#00d395'
                     : s.pct >= 45 ? CY
-                    : '#e85c5c';
+                    : '#ff4d4d';
                   return (
                     <div key={a.id} className="flex items-center gap-2.5">
                       <div className="rounded-md p-1.5 shrink-0" style={{ background: `${a.accent}1a`, border: `1px solid ${a.accent}22` }}>
@@ -219,7 +219,7 @@ export default function AlphaTrackerTab({ account }) {
                             {s.pct != null ? `${s.pct}%` : '—'}
                           </span>
                         </div>
-                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(226,221,213,0.07)' }}>
+                        <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
                           <div style={{ width: `${s.pct || 0}%`, background: barColor, transition: 'width .6s ease' }} className="h-full rounded-full" />
                         </div>
                         <div style={{ ...MONO, color: 'rgba(226,221,213,0.22)' }} className="text-[9px] mt-0.5">{s.total} call{s.total !== 1 ? 's' : ''}</div>
@@ -252,7 +252,7 @@ export default function AlphaTrackerTab({ account }) {
                     return (
                       <tr key={r.id} style={{
                         borderBottom: i < rulings.length - 1 ? '1px solid rgba(226,221,213,0.04)' : undefined,
-                        background: i % 2 === 0 ? 'rgba(226,221,213,0.01)' : 'transparent',
+                        background: i % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
                       }}>
                         <td style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="px-3 py-2.5 text-[11px] whitespace-nowrap">{fmt(r.ts)}</td>
                         <td style={{ ...MONO, letterSpacing: '0.1em', color: 'rgba(226,221,213,0.80)', fontWeight: 600 }} className="px-3 py-2.5 text-[12px]">{r.ticker}</td>
@@ -264,7 +264,7 @@ export default function AlphaTrackerTab({ account }) {
                         <td style={{ ...MONO, color: 'rgba(226,221,213,0.45)' }} className="px-3 py-2.5 text-[11px]">{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
                         <td className="px-3 py-2.5">
                           {move != null
-                            ? <span style={{ ...MONO, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#2fcb8a' : '#e85c5c' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
+                            ? <span style={{ ...MONO, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#00d395' : '#ff4d4d' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
                             : <span style={{ ...MONO, color: 'rgba(226,221,213,0.20)' }} className="text-[11px]">—</span>}
                         </td>
                         <td className="px-3 py-2.5"><OutcomeBadge outcome={r.outcome} /></td>

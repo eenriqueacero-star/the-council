@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Briefcase, Check, X, Plus, Save, CloudUpload, RefreshCw, Loader2,
-  ChevronDown, ChevronUp, ArrowUp, ArrowDown,
+  Check, X, Plus, Save, CloudUpload, RefreshCw, Loader2,
+  ChevronDown, ChevronUp, ChevronRight,
 } from 'lucide-react';
-import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
+import { MONO, SANS, CY } from '../constants/styles.js';
 import { getQuotes, getCandles } from '../api.js';
 
-const GREEN = '#2fcb8a';
-const RED   = '#e85c5c';
-const YLW   = CY;
-const TEAL  = ICE;
+const GREEN  = '#00d395';
+const RED    = '#ff4d4d';
+const RANGES = ['1H', '1D', '1W', '1M', '1Y', 'All'];
 
-const PALETTE = [TEAL, GREEN, YLW, '#b083ff', '#ff8c5d', '#38a8e0', '#e0a838', '#8de038', '#d438e0', '#5d8cff'];
-const RANGES  = ['1H', '1D', '1W', '1M', '1Y', 'All'];
-
-function fmt(n)     { return isNaN(n) || n == null ? '—' : Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function fmtPct(n)  { if (isNaN(n) || n == null) return '—'; return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
-function fmtPnl(n)  { if (isNaN(n) || n == null) return '—'; return (n >= 0 ? '+$' : '-$') + fmt(n); }
+function fmt(n)    { return isNaN(n) || n == null ? '—' : Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtPct(n) { if (isNaN(n) || n == null) return '—'; return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
+function fmtPnl(n) { if (isNaN(n) || n == null) return '—'; return (n >= 0 ? '+$' : '-$') + fmt(n); }
 function fmtTime(d) { return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); }
 function fmtX(ts, range) {
   const d = new Date(ts);
@@ -69,177 +65,150 @@ function computeEquityCurve(candles, posMap) {
   };
 }
 
-function EquityCurveChart({ portfolio, spy, range }) {
+function EquityCurveChart({ portfolio, spy, range, loading }) {
+  if (loading) {
+    return <div className="skel" style={{ height: 110, borderRadius: 12, width: '100%' }} />;
+  }
   if (!portfolio?.length || portfolio.length < 2) {
     return (
-      <div className="flex items-center justify-center h-[130px] text-[11px]"
-        style={{ ...MONO, color: 'rgba(255,255,255,0.2)' }}>
-        No historical data for this range
+      <div className="flex items-center justify-center rounded-2xl" style={{ height: 110, background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <span style={{ ...MONO, fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>No chart data for this range</span>
       </div>
     );
   }
 
-  const W = 560, H = 130, PL = 40, PR = 10, PT = 10, PB = 26;
+  const W = 560, H = 120, PL = 36, PR = 8, PT = 8, PB = 24;
   const cW = W - PL - PR, cH = H - PT - PB;
-
   const allV = [...portfolio.map(d => d.v), ...spy.map(d => d.v)];
   const minV = Math.min(...allV), maxV = Math.max(...allV);
   const vR = maxV - minV || 1;
-
   const toX = i => PL + (i / (portfolio.length - 1)) * cW;
   const toY = v => PT + cH - ((v - minV) / vR) * cH;
 
   const portLine = portfolio.map((d, i) => `${toX(i).toFixed(1)},${toY(d.v).toFixed(1)}`).join(' ');
-  const spyLine  = spy.length > 1
-    ? spy.map((d, i) => { const x = PL + (i / (spy.length - 1)) * cW; return `${x.toFixed(1)},${toY(d.v).toFixed(1)}`; }).join(' ')
-    : null;
-
+  const spyLine  = spy.length > 1 ? spy.map((d, i) => { const x = PL + (i / (spy.length - 1)) * cW; return `${x.toFixed(1)},${toY(d.v).toFixed(1)}`; }).join(' ') : null;
   const lastV = portfolio[portfolio.length - 1].v;
   const portColor = lastV >= 0 ? GREEN : RED;
-  const showZero = 0 >= minV && 0 <= maxV;
-
-  const areaD = `M ${PL.toFixed(1)},${(PT + cH).toFixed(1)} L ${portfolio.map((d, i) => `${toX(i).toFixed(1)},${toY(d.v).toFixed(1)}`).join(' L ')} L ${(PL + cW).toFixed(1)},${(PT + cH).toFixed(1)} Z`;
-
-  const lblIdx = portfolio.length > 4
-    ? [0, Math.floor(portfolio.length / 3), Math.floor(2 * portfolio.length / 3), portfolio.length - 1]
-    : [0, portfolio.length - 1];
+  const areaD = `M ${PL},${PT + cH} L ${portfolio.map((d, i) => `${toX(i).toFixed(1)},${toY(d.v).toFixed(1)}`).join(' L ')} L ${PL + cW},${PT + cH} Z`;
+  const lblIdx = portfolio.length > 4 ? [0, Math.floor(portfolio.length / 3), Math.floor(2 * portfolio.length / 3), portfolio.length - 1] : [0, portfolio.length - 1];
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
       <defs>
-        <linearGradient id="ecGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={portColor} stopOpacity="0.22" />
+        <linearGradient id="ecGrad2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={portColor} stopOpacity="0.28" />
           <stop offset="100%" stopColor={portColor} stopOpacity="0.01" />
         </linearGradient>
       </defs>
       {[minV, (minV + maxV) / 2, maxV].map((v, i) => (
-        <line key={i} x1={PL} y1={toY(v)} x2={W - PR} y2={toY(v)}
-          stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+        <line key={i} x1={PL} y1={toY(v)} x2={W - PR} y2={toY(v)} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
       ))}
-      {showZero && (
-        <line x1={PL} y1={toY(0)} x2={W - PR} y2={toY(0)}
-          stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3,4" />
+      {0 >= minV && 0 <= maxV && (
+        <line x1={PL} y1={toY(0)} x2={W - PR} y2={toY(0)} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="3,4" />
       )}
-      <path d={areaD} fill="url(#ecGrad)" />
-      {spyLine && (
-        <polyline points={spyLine} fill="none"
-          stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeDasharray="4,3" />
-      )}
+      <path d={areaD} fill="url(#ecGrad2)" />
+      {spyLine && <polyline points={spyLine} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" strokeDasharray="4,3" />}
       <polyline points={portLine} fill="none" stroke={portColor} strokeWidth="2" strokeLinejoin="round" />
       {lblIdx.map(i => portfolio[i] && (
-        <text key={i} x={toX(i)} y={H - 4} textAnchor="middle"
-          fill="rgba(255,255,255,0.25)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
+        <text key={i} x={toX(i)} y={H - 3} textAnchor="middle" fill="rgba(255,255,255,0.22)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
           {fmtX(portfolio[i].t, range)}
         </text>
       ))}
       {[minV, maxV].map((v, i) => (
-        <text key={i} x={PL - 4} y={toY(v) + 3} textAnchor="end"
-          fill="rgba(255,255,255,0.25)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
+        <text key={i} x={PL - 3} y={toY(v) + 3} textAnchor="end" fill="rgba(255,255,255,0.22)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
           {v >= 0 ? '+' : ''}{v.toFixed(1)}%
         </text>
       ))}
-      <line x1={PL + 2} y1={PT + 7} x2={PL + 14} y2={PT + 7} stroke={portColor} strokeWidth="2" />
-      <text x={PL + 18} y={PT + 10} fill="rgba(255,255,255,0.35)"
-        style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>PORTFOLIO</text>
-      <line x1={PL + 80} y1={PT + 7} x2={PL + 92} y2={PT + 7}
-        stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeDasharray="4,3" />
-      <text x={PL + 96} y={PT + 10} fill="rgba(255,255,255,0.35)"
-        style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>SPY</text>
     </svg>
   );
 }
 
-function DonutChart({ rows, totalValue, highlighted, onSliceClick }) {
-  const valued = rows.filter(r => r.mktVal > 0);
-  if (!valued.length || totalValue <= 0) return null;
-
-  const CX = 70, CY = 70, R = 58, RI = 34, SZ = 140;
-  let cum = -90;
-
-  const slices = valued.map((r, i) => {
-    const pct = r.mktVal / totalValue;
-    const start = cum;
-    cum += pct * 360;
-    return { ticker: r.ticker, pct, start, end: cum, color: PALETTE[i % PALETTE.length] };
-  });
-
-  function xy(angle, r) {
-    const rad = angle * Math.PI / 180;
-    return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
-  }
-
-  function arc(s, e, ro, ri) {
-    if (e - s >= 359.9) {
-      return `M ${CX} ${CY - ro} A ${ro} ${ro} 0 1 1 ${CX - 0.01} ${CY - ro} Z M ${CX} ${CY - ri} A ${ri} ${ri} 0 1 0 ${CX - 0.01} ${CY - ri} Z`;
-    }
-    const large = (e - s) > 180 ? 1 : 0;
-    const p1 = xy(s, ro), p2 = xy(e, ro), p3 = xy(e, ri), p4 = xy(s, ri);
-    return `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} A ${ro} ${ro} 0 ${large} 1 ${p2.x.toFixed(2)} ${p2.y.toFixed(2)} L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)} A ${ri} ${ri} 0 ${large} 0 ${p4.x.toFixed(2)} ${p4.y.toFixed(2)} Z`;
-  }
-
-  const hlRow = highlighted ? rows.find(r => r.ticker === highlighted) : null;
-
+function PositionCard({ r, totalVal }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <svg viewBox={`0 0 ${SZ} ${SZ}`} className="w-full max-w-[140px] mx-auto cursor-pointer">
-      {slices.map(s => {
-        const isHL = highlighted === s.ticker;
-        return (
-          <path key={s.ticker}
-            d={arc(s.start, s.end, isHL ? R + 7 : R, RI)}
-            fill={s.color}
-            opacity={highlighted && !isHL ? 0.3 : 1}
-            style={{ transition: 'opacity 0.2s' }}
-            onClick={() => onSliceClick(s.ticker === highlighted ? null : s.ticker)} />
-        );
-      })}
-      {hlRow ? (
-        <>
-          <text x={CX} y={CY - 4} textAnchor="middle" fill="white"
-            style={{ fontSize: '10px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{hlRow.ticker}</text>
-          <text x={CX} y={CY + 10} textAnchor="middle" fill="rgba(255,255,255,0.5)"
-            style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
-            {(hlRow.mktVal / totalValue * 100).toFixed(1)}%
-          </text>
-        </>
-      ) : (
-        <text x={CX} y={CY + 4} textAnchor="middle" fill="rgba(255,255,255,0.25)"
-          style={{ fontSize: '8px', fontFamily: "'JetBrains Mono', monospace" }}>ALLOC</text>
+    <div onClick={() => setExpanded(v => !v)}
+      style={{ background: '#111827', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', cursor: 'pointer', marginBottom: '8px', transition: 'border-color .15s' }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'}
+      onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}>
+      <div style={{ padding: '14px 16px' }}>
+        {/* Top row: ticker + price */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+          <div>
+            <span style={{ ...MONO, fontWeight: 700, fontSize: '15px', color: '#e2e8f0' }}>{r.ticker}</span>
+            {r.shares > 0 && <span style={{ ...SANS, fontSize: '11px', color: 'rgba(255,255,255,0.30)', marginLeft: '6px' }}>{r.shares} sh</span>}
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ ...MONO, fontWeight: 600, fontSize: '14px', color: '#e2e8f0' }}>{r.price ? `$${fmt(r.price)}` : '—'}</div>
+            {r.dayPct != null && (
+              <div style={{ ...MONO, fontSize: '11px', color: r.dayPct >= 0 ? GREEN : RED }}>{fmtPct(r.dayPct)}</div>
+            )}
+          </div>
+        </div>
+
+        {/* P&L row */}
+        {r.pnlAmt != null && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+            <span style={{ ...MONO, fontSize: '12px', color: r.pnlAmt >= 0 ? GREEN : RED }}>{fmtPnl(r.pnlAmt)}</span>
+            {r.pnlPct != null && <span style={{ ...MONO, fontSize: '11px', color: r.pnlPct >= 0 ? GREEN + 'bb' : RED + 'bb' }}>({fmtPct(r.pnlPct)})</span>}
+            <span style={{ ...SANS, fontSize: '11px', color: 'rgba(255,255,255,0.28)' }}>unrealized</span>
+          </div>
+        )}
+
+        {/* Portfolio weight */}
+        {r.mktVal > 0 && totalVal > 0 && (
+          <div style={{ marginTop: '4px', ...SANS, fontSize: '11px', color: 'rgba(255,255,255,0.28)' }}>
+            ${fmt(r.mktVal)} · {((r.mktVal / totalVal) * 100).toFixed(1)}% of portfolio
+          </div>
+        )}
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div style={{ padding: '12px 16px 14px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {r.shares > 0 && (
+              <div>
+                <div style={{ ...SANS, fontSize: '10px', color: 'rgba(255,255,255,0.30)', marginBottom: '3px' }}>Shares</div>
+                <div style={{ ...MONO, fontSize: '13px', color: '#e2e8f0' }}>{r.shares}</div>
+              </div>
+            )}
+            {r.cost > 0 && (
+              <div>
+                <div style={{ ...SANS, fontSize: '10px', color: 'rgba(255,255,255,0.30)', marginBottom: '3px' }}>Avg Cost</div>
+                <div style={{ ...MONO, fontSize: '13px', color: '#e2e8f0' }}>${fmt(r.cost)}</div>
+              </div>
+            )}
+            {r.mktVal > 0 && (
+              <div>
+                <div style={{ ...SANS, fontSize: '10px', color: 'rgba(255,255,255,0.30)', marginBottom: '3px' }}>Market Value</div>
+                <div style={{ ...MONO, fontSize: '13px', color: '#e2e8f0' }}>${fmt(r.mktVal)}</div>
+              </div>
+            )}
+            {r.cost > 0 && (
+              <div>
+                <div style={{ ...SANS, fontSize: '10px', color: 'rgba(255,255,255,0.30)', marginBottom: '3px' }}>Break-even</div>
+                <div style={{ ...MONO, fontSize: '13px', color: '#e2e8f0' }}>${fmt(r.cost)}</div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
-    </svg>
-  );
-}
-
-function ColHdr({ id, label, cls, sortCol, sortDir, onSort }) {
-  const active = id === sortCol;
-  return (
-    <th onClick={() => onSort(id)}
-      className={`${cls} px-2 py-2.5 cursor-pointer select-none whitespace-nowrap`}
-      style={{ ...MONO, color: active ? TEAL : 'rgba(255,255,255,0.3)', fontSize: '9px', letterSpacing: '0.06em', fontWeight: 600 }}>
-      <span className="flex items-center gap-0.5">
-        {label}
-        {active
-          ? (sortDir === 'asc' ? <ArrowUp size={8} style={{ color: TEAL }} /> : <ArrowDown size={8} style={{ color: TEAL }} />)
-          : <ArrowUp size={8} style={{ color: 'rgba(255,255,255,0.15)' }} />}
-      </span>
-    </th>
+    </div>
   );
 }
 
 export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTicker, removeTicker, positionsLine, onSave }) {
-  const [range, setRange]             = useState('1D');
-  const [quotes, setQuotes]           = useState({});
-  const [candles, setCandles]         = useState({});
-  const [qLoading, setQL]             = useState(false);
-  const [cLoading, setCL]             = useState(false);
+  const [range, setRange]           = useState('1D');
+  const [quotes, setQuotes]         = useState({});
+  const [candles, setCandles]       = useState({});
+  const [qLoading, setQL]           = useState(false);
+  const [cLoading, setCL]           = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [flash, setFlash]             = useState(false);
-  const [sortCol, setSortCol]         = useState('value');
-  const [sortDir, setSortDir]         = useState('desc');
-  const [highlighted, setHighlighted] = useState(null);
-  const [editOpen, setEditOpen]       = useState(false);
-  const [newTicker, setNewTicker]     = useState('');
-  const [saving, setSaving]           = useState(false);
-  const [saved, setSaved]             = useState(false);
+  const [flash, setFlash]           = useState(false);
+  const [editOpen, setEditOpen]     = useState(false);
+  const [newTicker, setNewTicker]   = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [saved, setSaved]           = useState(false);
 
   const heldTickers = acctHoldings.filter(t => parseFloat(posMap[t]?.shares) > 0);
   const heldKey     = heldTickers.join(',');
@@ -271,7 +240,7 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
     return () => clearInterval(id);
   }, [acct.label, range, heldKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = acctHoldings.map((t, i) => {
+  const rows = acctHoldings.map(t => {
     const p      = posMap[t] || {};
     const shares = parseFloat(p.shares) || 0;
     const cost   = parseFloat(p.cost)   || 0;
@@ -282,58 +251,26 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
     const basis  = shares * cost;
     const pnlAmt = (price && cost) ? mktVal - basis : null;
     const pnlPct = (price && cost) ? ((price - cost) / cost) * 100 : null;
-    return { ticker: t, shares, cost, price, mktVal, basis, pnlAmt, pnlPct, dayPct, color: PALETTE[i % PALETTE.length] };
+    return { ticker: t, shares, cost, price, mktVal, basis, pnlAmt, pnlPct, dayPct };
   });
 
-  const valued      = rows.filter(r => r.mktVal > 0);
-  const totalVal    = valued.reduce((s, r) => s + r.mktVal, 0);
-  const totalBasis  = valued.reduce((s, r) => s + r.basis, 0);
-  const totalPnl    = totalVal - totalBasis;
-  const totalPnlPct = totalBasis > 0 ? (totalPnl / totalBasis) * 100 : null;
-
+  const valued       = rows.filter(r => r.mktVal > 0);
+  const totalVal     = valued.reduce((s, r) => s + r.mktVal, 0);
+  const totalBasis   = valued.reduce((s, r) => s + r.basis, 0);
+  const totalPnl     = totalVal - totalBasis;
+  const totalPnlPct  = totalBasis > 0 ? (totalPnl / totalBasis) * 100 : null;
   const dayChgDollar = valued.reduce((s, r) => {
     if (r.dayPct == null || !r.price || !r.shares) return s;
     return s + r.shares * r.price * r.dayPct / (100 + r.dayPct);
   }, 0);
   const dayChgPct = totalVal > 0 ? (dayChgDollar / (totalVal - dayChgDollar)) * 100 : null;
 
-  function handleSort(col) {
-    if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortCol(col); setSortDir('desc'); }
-  }
-  const getV = (r, col) => {
-    switch (col) {
-      case 'ticker': return r.ticker;
-      case 'shares': return r.shares;
-      case 'cost':   return r.cost;
-      case 'price':  return r.price;
-      case 'value':  return r.mktVal;
-      case 'pnl$':   return r.pnlAmt ?? -Infinity;
-      case 'pnl%':   return r.pnlPct ?? -Infinity;
-      case 'day':    return r.dayPct ?? -Infinity;
-      case 'be':     return r.cost ?? -Infinity;
-      default:       return r.mktVal;
-    }
-  };
-  const sorted = [...rows].sort((a, b) => {
-    const va = getV(a, sortCol), vb = getV(b, sortCol);
-    if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-    return sortDir === 'asc' ? va - vb : vb - va;
-  });
-
-  const movers = [...rows]
-    .filter(r => r.dayPct != null && r.shares > 0 && r.price > 0)
-    .sort((a, b) => b.dayPct - a.dayPct);
-
   const { portfolio: ecPort, spy: ecSpy } = computeEquityCurve(candles, posMap);
 
   async function handleSave() {
     setSaving(true); setSaved(false);
     try {
-      await Promise.race([
-        onSave(),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
-      ]);
+      await Promise.race([onSave(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch {}
@@ -346,270 +283,168 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
   }
 
   const isLoading = qLoading || cLoading;
-  const COLS = [
-    { id: 'ticker', label: 'TICKER',     cls: 'text-left' },
-    { id: 'shares', label: 'SHARES',     cls: 'text-right hidden sm:table-cell' },
-    { id: 'cost',   label: 'AVG COST',   cls: 'text-right hidden sm:table-cell' },
-    { id: 'price',  label: 'PRICE',      cls: 'text-right' },
-    { id: 'value',  label: 'VALUE',      cls: 'text-right' },
-    { id: 'pnl$',   label: 'P&L $',      cls: 'text-right hidden md:table-cell' },
-    { id: 'pnl%',   label: 'P&L %',      cls: 'text-right' },
-    { id: 'day',    label: 'DAY %',      cls: 'text-right' },
-    { id: 'be',     label: 'BREAK-EVEN', cls: 'text-right hidden lg:table-cell' },
-  ];
 
   return (
-    <div className="mt-6 space-y-4">
+    <div style={{ paddingTop: '16px' }}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Briefcase size={15} style={{ color: GREEN }} />
-          <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.70)', fontWeight: 600 }} className="text-[11px]">
-            POSITIONS · {acct.label.toUpperCase()}
+      {/* Hero card */}
+      <div style={{ background: '#111827', borderRadius: '20px', padding: '20px 20px 16px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
+        {qLoading && !lastUpdated ? (
+          <>
+            <div className="skel" style={{ height: 36, width: '60%', marginBottom: 10 }} />
+            <div className="skel" style={{ height: 18, width: '40%', marginBottom: 8 }} />
+          </>
+        ) : (
+          <>
+            <div style={{ ...SANS, fontSize: '30px', fontWeight: 700, letterSpacing: '-0.5px', color: '#e2e8f0', lineHeight: 1 }}>
+              {valued.length > 0 ? `$${totalVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+            </div>
+            {dayChgDollar !== 0 && (
+              <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ ...SANS, fontSize: '14px', fontWeight: 600, color: dayChgDollar >= 0 ? GREEN : RED }}>
+                  {dayChgDollar >= 0 ? '+' : ''}${Math.abs(dayChgDollar).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                {dayChgPct != null && (
+                  <span style={{ ...SANS, fontSize: '13px', color: dayChgDollar >= 0 ? GREEN + 'cc' : RED + 'cc' }}>
+                    ({fmtPct(dayChgPct)}) today
+                  </span>
+                )}
+              </div>
+            )}
+            {totalPnl !== 0 && (
+              <div style={{ marginTop: '4px', ...SANS, fontSize: '12px', color: 'rgba(255,255,255,0.40)' }}>
+                {fmtPnl(totalPnl)} unrealized {totalPnlPct != null && `(${fmtPct(totalPnlPct)})`}
+              </div>
+            )}
+          </>
+        )}
+        <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ ...MONO, fontSize: '11px', color: 'rgba(255,255,255,0.28)' }}>
+            {lastUpdated ? `as of ${fmtTime(lastUpdated)}` : 'loading…'}
           </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {lastUpdated && (
-            <span style={{ ...MONO, color: flash ? GREEN : 'rgba(255,255,255,0.3)', transition: 'color 0.5s' }}
-              className="text-[10px] flex items-center gap-1">
-              {fmtTime(lastUpdated)}
-              {flash && <span style={{ color: GREEN }}>●</span>}
-            </span>
-          )}
-          <button onClick={() => doRefresh(heldTickers, range)} disabled={isLoading}
-            style={{ ...MONO, borderColor: 'rgba(255,255,255,0.12)', color: isLoading ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.5)' }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg border text-[10px] hover:border-white/25 disabled:cursor-not-allowed transition-colors">
-            {isLoading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
-            <span>REFRESH</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: GREEN }} className="blink" />
+              <span style={{ ...SANS, fontSize: '11px', color: GREEN, fontWeight: 500 }}>Live</span>
+            </div>
+            <button onClick={() => doRefresh(heldTickers, range)} disabled={isLoading}
+              style={{ color: 'rgba(255,255,255,0.30)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'color .15s' }}
+              className="disabled:opacity-40">
+              {isLoading ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Range pills */}
-      <div className="flex gap-1.5 flex-wrap">
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
         {RANGES.map(r => (
           <button key={r} onClick={() => setRange(r)}
             style={{
               ...MONO,
-              background: range === r ? `${TEAL}20` : 'transparent',
-              border: `1px solid ${range === r ? TEAL : 'rgba(255,255,255,0.12)'}`,
-              color: range === r ? TEAL : 'rgba(255,255,255,0.4)',
-            }}
-            className="px-3 py-1 rounded-lg text-[11px] transition-all hover:border-white/25">
+              fontSize: '11px', padding: '5px 12px', borderRadius: '999px', cursor: 'pointer',
+              background: range === r ? GREEN + '18' : 'transparent',
+              border: `1px solid ${range === r ? GREEN + '50' : 'rgba(255,255,255,0.10)'}`,
+              color: range === r ? GREEN : 'rgba(255,255,255,0.40)',
+              transition: 'all .15s',
+            }}>
             {r}
           </button>
         ))}
       </div>
 
-      {/* Summary cards */}
-      {valued.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            { label: 'TOTAL VALUE',     val: `$${totalVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,    sub: null,                                             col: 'white' },
-            { label: 'COST BASIS',      val: `$${totalBasis.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,  sub: null,                                             col: 'rgba(255,255,255,0.55)' },
-            { label: 'UNREALIZED P&L',  val: fmtPnl(totalPnl),    sub: totalPnlPct   != null ? fmtPct(totalPnlPct)   : null, col: totalPnl      >= 0 ? GREEN : RED },
-            { label: 'DAY CHANGE',      val: fmtPnl(dayChgDollar), sub: dayChgPct    != null ? fmtPct(dayChgPct)     : null, col: dayChgDollar  >= 0 ? GREEN : RED },
-          ].map(({ label, val, sub, col }) => (
-            <div key={label} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={MONO} className="text-[9px] text-white/40 tracking-widest mb-1">{label}</div>
-              <div style={{ ...DISP, color: col }} className="text-base font-bold leading-none">{val}</div>
-              {sub && <div style={{ ...MONO, color: col }} className="text-[10px] mt-1 opacity-80">{sub}</div>}
-            </div>
-          ))}
-        </div>
-      ) : (
-        heldTickers.length === 0 && (
-          <div className="rounded-xl p-4 text-center" style={{ ...MONO, color: 'rgba(255,255,255,0.3)', fontSize: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            Open Edit Positions below to add shares and see your live dashboard.
-          </div>
-        )
-      )}
-
-      {/* Top movers */}
-      {movers.length > 0 && (
-        <div>
-          <div style={MONO} className="text-[9px] text-white/35 tracking-widest mb-1.5">TODAY'S MOVERS</div>
-          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {movers.map(r => {
-              const dayChg$ = r.shares * r.price * r.dayPct / (100 + r.dayPct);
-              return (
-                <div key={r.ticker} className="shrink-0 rounded-xl px-3 py-2.5 min-w-[76px]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${r.dayPct >= 0 ? 'rgba(126,231,135,0.18)' : 'rgba(255,93,108,0.18)'}` }}>
-                  <div style={DISP} className="text-[12px] font-semibold">{r.ticker}</div>
-                  <div style={{ ...MONO, color: r.dayPct >= 0 ? GREEN : RED }} className="text-[10px] mt-0.5 font-medium">{fmtPct(r.dayPct)}</div>
-                  <div style={{ ...MONO, color: 'rgba(255,255,255,0.35)' }} className="text-[9px]">{fmtPnl(dayChg$)}</div>
-                </div>
-              );
-            })}
+      {/* Equity curve */}
+      <div style={{ background: '#111827', borderRadius: '16px', padding: '14px 16px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <span style={{ ...MONO, fontSize: '10px', color: 'rgba(255,255,255,0.30)', letterSpacing: '0.06em' }}>EQUITY CURVE · {range}</span>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <span style={{ ...MONO, fontSize: '9px', color: ecPort.length ? (ecPort[ecPort.length - 1]?.v >= 0 ? GREEN : RED) : 'rgba(255,255,255,0.25)' }}>PORTFOLIO</span>
+            <span style={{ ...MONO, fontSize: '9px', color: 'rgba(255,255,255,0.22)' }}>-- SPY</span>
           </div>
         </div>
-      )}
+        <EquityCurveChart portfolio={ecPort} spy={ecSpy} range={range} loading={cLoading && !ecPort.length} />
+      </div>
 
-      {/* Positions table */}
+      {/* Position cards */}
       {rows.length > 0 && (
-        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  {COLS.map(c => (
-                    <ColHdr key={c.id} {...c} sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((r, i) => {
-                  const isHL = highlighted === r.ticker;
-                  return (
-                    <tr key={r.ticker}
-                      onClick={() => setHighlighted(p => p === r.ticker ? null : r.ticker)}
-                      className="cursor-pointer hover:bg-white/[0.02] transition-colors"
-                      style={{
-                        background: isHL ? `${TEAL}0d` : i % 2 ? 'rgba(255,255,255,0.01)' : 'transparent',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
-                      }}>
-                      <td className="px-2 py-2.5 text-left">
-                        <span style={{ ...DISP, color: isHL ? TEAL : 'white' }} className="font-semibold text-[12px]">{r.ticker}</span>
-                      </td>
-                      <td className="px-2 py-2.5 text-right hidden sm:table-cell"
-                        style={{ ...MONO, color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{r.shares || '—'}</td>
-                      <td className="px-2 py-2.5 text-right hidden sm:table-cell"
-                        style={{ ...MONO, color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{r.cost ? `$${fmt(r.cost)}` : '—'}</td>
-                      <td className="px-2 py-2.5 text-right"
-                        style={{ ...MONO, color: 'rgba(255,255,255,0.75)', fontSize: '11px' }}>{r.price ? `$${fmt(r.price)}` : '—'}</td>
-                      <td className="px-2 py-2.5 text-right"
-                        style={{ ...MONO, color: 'white', fontSize: '11px', fontWeight: 600 }}>{r.mktVal > 0 ? `$${fmt(r.mktVal)}` : '—'}</td>
-                      <td className="px-2 py-2.5 text-right hidden md:table-cell"
-                        style={{ ...MONO, color: r.pnlAmt != null ? (r.pnlAmt >= 0 ? GREEN : RED) : 'rgba(255,255,255,0.25)', fontSize: '11px' }}>
-                        {r.pnlAmt != null ? fmtPnl(r.pnlAmt) : '—'}
-                      </td>
-                      <td className="px-2 py-2.5 text-right"
-                        style={{ ...MONO, color: r.pnlPct != null ? (r.pnlPct >= 0 ? GREEN : RED) : 'rgba(255,255,255,0.25)', fontSize: '11px' }}>
-                        {r.pnlPct != null ? fmtPct(r.pnlPct) : '—'}
-                      </td>
-                      <td className="px-2 py-2.5 text-right"
-                        style={{ ...MONO, color: r.dayPct != null ? (r.dayPct >= 0 ? GREEN : RED) : 'rgba(255,255,255,0.25)', fontSize: '11px' }}>
-                        {r.dayPct != null ? fmtPct(r.dayPct) : '—'}
-                      </td>
-                      <td className="px-2 py-2.5 text-right hidden lg:table-cell"
-                        style={{ ...MONO, color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>
-                        {r.cost ? `$${fmt(r.cost)}` : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ ...SANS, fontSize: '12px', color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>
+              {valued.length} position{valued.length !== 1 ? 's' : ''}
+            </span>
+            {flash && <span style={{ ...MONO, fontSize: '10px', color: GREEN }}>● updated</span>}
           </div>
-        </div>
-      )}
-
-      {/* Charts */}
-      {valued.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="sm:col-span-2 rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={MONO} className="text-[9px] text-white/35 tracking-widest mb-2 flex items-center gap-2">
-              EQUITY CURVE · {range}
-              {cLoading && <Loader2 size={8} className="animate-spin" style={{ color: TEAL }} />}
-            </div>
-            <EquityCurveChart portfolio={ecPort} spy={ecSpy} range={range} />
-          </div>
-          <div className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={MONO} className="text-[9px] text-white/35 tracking-widest mb-2">ALLOCATION</div>
-            <DonutChart rows={valued} totalValue={totalVal} highlighted={highlighted} onSliceClick={setHighlighted} />
-            <div className="mt-2 space-y-1">
-              {valued.slice(0, 7).map((r, i) => (
-                <div key={r.ticker} className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setHighlighted(p => p === r.ticker ? null : r.ticker)}>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: PALETTE[i % PALETTE.length] }} />
-                    <span style={{ ...MONO, color: highlighted === r.ticker ? TEAL : 'rgba(255,255,255,0.55)' }}
-                      className="text-[10px]">{r.ticker}</span>
-                  </div>
-                  <span style={{ ...MONO, color: 'rgba(255,255,255,0.3)' }} className="text-[10px]">
-                    {(r.mktVal / totalVal * 100).toFixed(1)}%
-                  </span>
-                </div>
-              ))}
-              {valued.length > 7 && (
-                <div style={{ ...MONO, color: 'rgba(255,255,255,0.2)' }} className="text-[9px] text-center">
-                  +{valued.length - 7} more
-                </div>
-              )}
-            </div>
-          </div>
+          {rows
+            .sort((a, b) => b.mktVal - a.mktVal)
+            .map(r => <PositionCard key={r.ticker} r={r} totalVal={totalVal} />)
+          }
         </div>
       )}
 
       {/* Collapsible edit */}
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(226,221,213,0.09)' }}>
+      <div style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', marginBottom: '8px' }}>
         <button onClick={() => setEditOpen(v => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 transition-colors"
-          style={{ background: 'rgba(226,221,213,0.02)' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(226,221,213,0.04)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(226,221,213,0.02)'}>
-          <div className="flex items-center gap-2">
-            <Briefcase size={12} style={{ color: 'rgba(255,255,255,0.5)' }} />
-            <span style={{ ...MONO, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.08em' }} className="text-[11px]">
-              EDIT POSITIONS
-            </span>
-          </div>
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 16px', background: 'rgba(255,255,255,0.02)', cursor: 'pointer', border: 'none', color: 'inherit', transition: 'background .15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}>
+          <span style={{ ...SANS, fontSize: '13px', color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>Edit Positions</span>
           {editOpen
-            ? <ChevronUp size={13} style={{ color: 'rgba(255,255,255,0.3)' }} />
-            : <ChevronDown size={13} style={{ color: 'rgba(255,255,255,0.3)' }} />}
+            ? <ChevronUp size={14} style={{ color: 'rgba(255,255,255,0.28)' }} />
+            : <ChevronRight size={14} style={{ color: 'rgba(255,255,255,0.28)' }} />}
         </button>
 
         {editOpen && (
-          <div className="p-4 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[12px] text-white/50 leading-relaxed">
-                Enter what {acct.label} actually holds. All six agents read these live.
+          <div style={{ padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#111827' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <p style={{ ...SANS, fontSize: '12px', color: 'rgba(255,255,255,0.45)', margin: 0 }}>
+                Enter what {acct.label} holds. Agents read these live.
               </p>
               <button onClick={handleSave} disabled={saving}
-                style={{ ...MONO, background: saved ? 'rgba(56,224,138,0.15)' : 'rgba(126,231,135,0.1)', border: `1px solid ${saved ? '#38e08a' : 'rgba(126,231,135,0.35)'}`, color: saved ? '#38e08a' : GREEN }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] transition-all hover:brightness-110 disabled:opacity-50 ml-4 shrink-0">
+                style={{ ...SANS, fontSize: '11px', fontWeight: 600, padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', flexShrink: 0, marginLeft: '12px', transition: 'all .15s',
+                  background: saved ? GREEN + '20' : GREEN + '12',
+                  border: `1px solid ${saved ? GREEN : GREEN + '40'}`,
+                  color: saved ? GREEN : GREEN + 'cc',
+                }}
+                className="flex items-center gap-1.5 disabled:opacity-50">
                 {saved ? <Check size={12} /> : saving ? <CloudUpload size={12} className="animate-pulse" /> : <Save size={12} />}
-                <span>{saved ? 'SAVED' : saving ? 'SAVING…' : 'SAVE'}</span>
+                {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </button>
             </div>
 
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {acctHoldings.map(t => {
                 const p = posMap[t] || {};
                 const q = quotes[t] || {};
                 const price = q.price > 0 ? q.price : 0;
                 const mktVal = (parseFloat(p.shares) || 0) * price;
                 const bookPct = totalVal > 0 && mktVal > 0 ? (mktVal / totalVal) * 100 : 0;
-                const isHeavy = bookPct > 25;
                 return (
-                  <div key={t} className="border rounded-xl overflow-hidden" style={{ background: '#0e0f18', borderColor: 'rgba(226,221,213,0.08)' }}>
+                  <div key={t} style={{ background: '#0d1424', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                     {bookPct > 0 && (
-                      <div className="h-0.5 w-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <div className="h-full transition-all duration-500"
-                          style={{ width: `${Math.min(bookPct, 100)}%`, background: isHeavy ? YLW : GREEN }} />
+                      <div style={{ height: '2px', background: 'rgba(255,255,255,0.04)' }}>
+                        <div style={{ height: '100%', width: `${Math.min(bookPct, 100)}%`, background: bookPct > 25 ? CY : GREEN, transition: 'width .5s' }} />
                       </div>
                     )}
-                    <div className="p-2.5 flex items-center gap-2">
-                      <span style={DISP} className="w-16 font-semibold text-sm pl-1 shrink-0">{t}</span>
+                    <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ ...MONO, fontWeight: 700, fontSize: '13px', width: '54px', flexShrink: 0 }}>{t}</span>
                       <input value={p.shares || ''} onChange={e => setPos(t, 'shares', e.target.value.replace(/[^0-9.]/g, ''))}
-                        inputMode="decimal" placeholder="shares" style={MONO}
-                        style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-                        className="flex-1 min-w-0 border rounded-lg px-2.5 py-2 text-sm outline-none transition-colors"
-                        onFocus={e => e.target.style.borderColor = `${GREEN}55`}
-                        onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
-                      <div className="relative flex-1 min-w-0">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 text-sm" style={MONO}>$</span>
+                        inputMode="decimal" placeholder="shares"
+                        style={{ flex: 1, minWidth: 0, ...MONO, fontSize: '13px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '7px', padding: '7px 10px', color: '#e2e8f0', outline: 'none', transition: 'border-color .15s' }}
+                        onFocus={e => e.target.style.borderColor = GREEN + '55'}
+                        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+                      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', ...MONO, fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>$</span>
                         <input value={p.cost || ''} onChange={e => setPos(t, 'cost', e.target.value.replace(/[^0-9.]/g, ''))}
                           inputMode="decimal" placeholder="avg"
-                          style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-                          className="w-full border rounded-lg pl-6 pr-2 py-2 text-sm outline-none transition-colors"
-                          onFocus={e => e.target.style.borderColor = `${GREEN}55`}
-                          onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+                          style={{ width: '100%', ...MONO, fontSize: '13px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '7px', paddingLeft: '22px', paddingRight: '8px', paddingTop: '7px', paddingBottom: '7px', color: '#e2e8f0', outline: 'none', transition: 'border-color .15s' }}
+                          onFocus={e => e.target.style.borderColor = GREEN + '55'}
+                          onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
                       </div>
                       <button onClick={() => removeTicker(t)}
-                        className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-white/35 hover:text-[#ff5d6c] hover:bg-[#ff5d6c]/10 transition-colors">
-                        <X size={15} />
+                        style={{ width: '28px', height: '28px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '7px', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.28)', cursor: 'pointer', transition: 'color .15s, background .15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = RED; e.currentTarget.style.background = RED + '15'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.28)'; e.currentTarget.style.background = 'transparent'; }}>
+                        <X size={13} />
                       </button>
                     </div>
                   </div>
@@ -617,32 +452,31 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
               })}
             </div>
 
-            <div className="mt-3 flex gap-2">
-              <div className="relative flex-1">
-                <Plus size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Plus size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.28)' }} />
                 <input value={newTicker} onChange={e => setNewTicker(e.target.value.toUpperCase())}
                   onKeyDown={e => e.key === 'Enter' && handleAdd()}
                   placeholder="add ticker (e.g. OKLO)"
-                  style={{ ...MONO, letterSpacing: '0.1em', background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-                  className="w-full border rounded-lg pl-9 pr-3 py-2.5 text-sm uppercase outline-none transition-colors"
-                  onFocus={e => e.target.style.borderColor = `${GREEN}55`}
-                  onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+                  style={{ width: '100%', ...MONO, fontSize: '13px', letterSpacing: '0.08em', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '9px', paddingLeft: '32px', paddingRight: '10px', paddingTop: '9px', paddingBottom: '9px', color: '#e2e8f0', outline: 'none', textTransform: 'uppercase', transition: 'border-color .15s' }}
+                  onFocus={e => e.target.style.borderColor = GREEN + '55'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
               </div>
               <button onClick={handleAdd} disabled={!newTicker.trim()}
-                style={{ ...MONO, background: newTicker.trim() ? GREEN : `${GREEN}28`, color: '#04120a', letterSpacing: '0.10em', fontWeight: 600 }}
-                className="px-4 py-2.5 rounded-lg text-[13px] transition-all hover:brightness-110 disabled:cursor-not-allowed">ADD</button>
+                style={{ ...SANS, fontWeight: 600, fontSize: '13px', padding: '9px 16px', borderRadius: '9px', cursor: 'pointer', transition: 'all .15s',
+                  background: newTicker.trim() ? GREEN : GREEN + '28',
+                  color: newTicker.trim() ? '#0a0e1a' : 'rgba(255,255,255,0.30)',
+                }}
+                className="disabled:cursor-not-allowed">ADD</button>
             </div>
 
-            <div className="mt-3 rounded-xl p-3 flex items-start gap-2.5"
-              style={{ background: `${GREEN}0a`, border: `1px solid ${GREEN}28` }}>
-              <Check size={14} style={{ color: GREEN }} className="mt-0.5 shrink-0" />
-              <p className="text-[12px] text-white/65 leading-relaxed">
-                Council sees: <span className="text-white/85">{positionsLine || 'no positions yet'}</span>
+            <div style={{ marginTop: '10px', padding: '10px 12px', borderRadius: '10px', background: GREEN + '0a', border: `1px solid ${GREEN}28`, display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+              <Check size={13} style={{ color: GREEN, marginTop: '1px', flexShrink: 0 }} />
+              <p style={{ ...SANS, fontSize: '12px', color: 'rgba(255,255,255,0.60)', margin: 0 }}>
+                Council sees: <span style={{ color: 'rgba(255,255,255,0.82)' }}>{positionsLine || 'no positions yet'}</span>
               </p>
             </div>
-            <p style={MONO} className="mt-2 text-[10px] text-white/30">
-              Auto-saves locally. Hit SAVE to sync across devices.
-            </p>
+            <p style={{ ...MONO, fontSize: '10px', color: 'rgba(255,255,255,0.25)', marginTop: '8px' }}>Auto-saves locally. Hit Save to sync across devices.</p>
           </div>
         )}
       </div>

@@ -6,7 +6,6 @@ import { extractJSON } from '../utils.js';
 import { callAgent, getQuotes } from '../api.js';
 import { useVoice } from '../hooks/useVoice.js';
 import { notifyDevices } from '../push.js';
-import ArcReactor from './ArcReactor.jsx';
 import { db, auth } from '../firebase.js';
 import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
@@ -308,7 +307,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <MessageSquare size={14} style={{ color: CY }} />
-          <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.70)', fontWeight: 600 }} className="text-[11px]">TALK TO YOUR PM · {acct.label.toUpperCase()}</span>
+          <span style={{ ...SANS, color: 'rgba(255,255,255,0.60)', fontWeight: 600, fontSize: '13px' }}>PM Chat · {acct.label}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setLiveSearch(v => !v)}
@@ -331,21 +330,23 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
         </div>
       </div>
 
-      <div className="rounded-2xl overflow-hidden flex flex-col" style={{ height: 'min(60vh, 560px)', background: 'rgba(226,221,213,0.015)', border: '1px solid rgba(226,221,213,0.09)' }}>
+      <div className="rounded-2xl overflow-hidden flex flex-col" style={{ height: 'min(60vh, 560px)', background: '#111827', border: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-3">
           {chat.map((m, i) => {
             if (m.role === 'user') return (
               <div key={i} className="flex justify-end">
-                <div className="max-w-[82%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-[13px]" style={{ ...MONO, background: 'rgba(200,146,42,0.12)', border: '1px solid rgba(200,146,42,0.28)', color: '#e2ddd5' }}>{m.text}</div>
+                <div className="max-w-[82%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-[13px]" style={{ ...SANS, background: '#00d395', color: '#061a12', fontWeight: 500 }}>{m.text}</div>
               </div>
             );
             if (m.role === 'pm') {
               const vs = m.verdict ? STANCE_STYLE[m.verdict === 'PASS' ? 'PASS_FINAL' : m.verdict] : null;
               return (
                 <div key={i} className="flex justify-start gap-2.5" style={{ animation: 'cardIn .4s ease both' }}>
-                  <div className="shrink-0 mt-0.5"><ArcReactor size={26} /></div>
+                  <div className="shrink-0 mt-0.5 flex items-center justify-center rounded-full" style={{ width: 26, height: 26, background: ICE + '20', border: `1px solid ${ICE}44`, flexShrink: 0 }}>
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: ICE, fontFamily: "'Inter', sans-serif" }}>PM</span>
+                  </div>
                   <div className="max-w-[82%]">
-                    <div className="rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-[13px]" style={{ ...SANS, color: 'rgba(226,221,213,0.85)', background: `${ICE}0c`, border: `1px solid ${ICE}28` }}>
+                    <div className="rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-[13px]" style={{ ...SANS, color: 'rgba(226,234,240,0.88)', background: '#1a2438', border: '1px solid rgba(255,255,255,0.08)' }}>
                       {speaking && i === chat.length - 1 && voiceOn && (
                         <span className="inline-flex items-center gap-1 mr-1.5 align-middle"><span className="blink inline-block w-1.5 h-1.5 rounded-full" style={{ background: CY }} /></span>
                       )}
@@ -353,7 +354,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
                     </div>
                     {vs && <div className="mt-1.5 inline-flex items-center gap-2">
                       <span style={{ ...MONO, background: vs.bg, color: vs.fg }} className="text-[9px] font-semibold px-2 py-0.5 rounded">{vs.label}</span>
-                      <span style={{ ...MONO, color: 'rgba(226,221,213,0.40)' }} className="text-[9px]">{m.conviction}/10 · {m.ticker || ''}</span>
+                      <span style={{ ...MONO, color: 'rgba(255,255,255,0.35)' }} className="text-[9px]">{m.conviction}/10 · {m.ticker || ''}</span>
                     </div>}
                   </div>
                 </div>
@@ -369,7 +370,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
               return (
                 <div key={i} className="flex justify-start gap-2.5" style={{ animation: 'cardIn .4s ease both' }}>
                   <div className="shrink-0 w-[26px]" />
-                  <div className="max-w-[88%] w-full rounded-xl px-3 py-2.5" style={{ background: 'rgba(226,221,213,0.02)', border: `1px solid ${ag.accent}44` }}>
+                  <div className="max-w-[88%] w-full rounded-xl px-3 py-2.5" style={{ background: '#111827', border: `1px solid ${ag.accent}44` }}>
                     <div style={MONO} className="text-[9px] tracking-widest mb-2 flex items-center gap-1.5">
                       <ag.icon size={9} style={{ color: ag.accent }} />
                       {m.done
@@ -383,7 +384,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
                         <span className="text-[11px] text-white/40">Consulting…</span>
                       </div>
                     ) : (
-                      <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(226,221,213,0.02)', border: `1px solid ${ag.accent}33` }}>
+                      <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${ag.accent}33` }}>
                         {stance && ss && <span style={{ ...MONO, color: ss.fg }} className="text-[8px] font-bold block mb-1">{ss.label}</span>}
                         {result?.headline && <p className="text-[11px] font-medium leading-snug" style={{ color: ag.accent }}>{result.headline}</p>}
                         {points.length > 0 && (
@@ -405,7 +406,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
             if (m.role === 'council') return (
               <div key={i} className="flex justify-start gap-2.5">
                 <div className="shrink-0 w-[26px]" />
-                <div className="max-w-[88%] w-full rounded-xl px-3 py-2.5" style={{ background: 'rgba(226,221,213,0.02)', border: '1px solid rgba(226,221,213,0.08)' }}>
+                <div className="max-w-[88%] w-full rounded-xl px-3 py-2.5" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)' }}>
                   <div style={{ ...MONO, color: 'rgba(226,221,213,0.40)', letterSpacing: '0.10em' }} className="text-[9px] tracking-widest mb-2">
                     {m.cooldown > 0
                       ? <span style={{ color: CY }}>RATE LIMIT COOLDOWN · {m.cooldown}s · ROUND 2 INCOMING</span>
@@ -450,8 +451,10 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
           })}
           {chatBusy && (
             <div className="flex justify-start gap-2.5">
-              <div className="shrink-0 mt-0.5"><ArcReactor size={26} /></div>
-              <div className="rounded-2xl rounded-bl-sm px-3.5 py-2.5" style={{ background: `${ICE}0c`, border: `1px solid ${ICE}28` }}>
+              <div className="shrink-0 mt-0.5 flex items-center justify-center rounded-full" style={{ width: 26, height: 26, background: ICE + '20', border: `1px solid ${ICE}44`, flexShrink: 0 }}>
+                <span style={{ fontSize: '9px', fontWeight: 700, color: ICE, fontFamily: "'Inter', sans-serif" }}>PM</span>
+              </div>
+              <div className="rounded-2xl rounded-bl-sm px-3.5 py-2.5" style={{ background: '#1a2438', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <Loader2 size={14} className="animate-spin" style={{ color: CY }} />
               </div>
             </div>
@@ -459,7 +462,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
           <div ref={chatEndRef} />
         </div>
 
-        <div className="p-2.5 flex items-center gap-2" style={{ borderTop: '1px solid rgba(226,221,213,0.08)' }}>
+        <div className="p-2.5 flex items-center gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <button onClick={() => toggleListen(t => sendChat(t))} disabled={!srSupported || chatBusy}
             title={srSupported ? 'Tap to speak' : 'Voice input needs Chrome'}
             style={{ background: listening ? '#e85c5c' : 'rgba(226,221,213,0.04)', borderColor: listening ? '#e85c5c' : 'rgba(226,221,213,0.12)', color: listening ? '#fff' : srSupported ? CY : 'rgba(226,221,213,0.30)' }}
@@ -468,12 +471,12 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY
           </button>
           <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()}
             disabled={chatBusy} placeholder={listening ? 'Listening…' : 'Ask your PM anything…'}
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+            style={{ ...SANS, background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)', color: '#e2e8f0', fontSize: '14px' }}
             className="flex-1 border rounded-xl px-3.5 py-3 text-sm outline-none transition-colors disabled:opacity-50"
-            onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+            onFocus={e => e.target.style.borderColor = `${CY}60`}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.10)'} />
           <button onClick={() => sendChat()} disabled={chatBusy || !chatInput.trim()}
-            style={{ background: chatBusy || !chatInput.trim() ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808' }}
+            style={{ background: chatBusy || !chatInput.trim() ? 'rgba(0,211,149,0.18)' : CY, color: '#061a12' }}
             className="glow-btn shrink-0 rounded-xl w-11 h-11 flex items-center justify-center transition-all disabled:cursor-not-allowed">
             <Send size={17} />
           </button>

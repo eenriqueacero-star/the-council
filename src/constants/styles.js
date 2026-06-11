@@ -1,5 +1,9 @@
-export const MONO = { fontFamily: "'JetBrains Mono', 'IBM Plex Mono', monospace" };
-export const DISP = { fontFamily: "'JetBrains Mono', 'IBM Plex Mono', monospace" };
-export const SANS = { fontFamily: "'Inter', system-ui, sans-serif" };
-export const CY   = '#c8922a';   // amber — interactive / human actions
-export const ICE  = '#7db8e8';   // steel blue — machine / AI outputs
+export const MONO = { fontFamily: "'JetBrains Mono', 'SF Mono', monospace" };
+export const SANS = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" };
+export const DISP = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" };
+export const CY   = '#00d395';   // primary green — gains, active states
+export const ICE  = '#60a5fa';   // AI/machine blue — PM outputs
+export const GREEN = '#00d395';
+export const RED   = '#ff4d4d';
+export const BG    = '#0a0e1a';
+export const SURF  = '#111827';

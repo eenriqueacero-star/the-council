@@ -46,10 +46,10 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
           <Coins size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(226,221,213,0.28)' }} />
           <input value={dcaAmount} onChange={e => setDcaAmount(e.target.value.replace(/[^0-9.]/g, ''))}
             inputMode="decimal" placeholder={`amount this round (default $${acct.dca || '—'})`}
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: '#e2e8f0' }}
             className="w-full border rounded-lg pl-9 pr-3 py-3 text-sm outline-none transition-colors"
             onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
         </div>
         <button onClick={allocateDCA} disabled={dca.status === 'running'}
           style={{ ...MONO, letterSpacing: '0.10em', background: dca.status === 'running' ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808', fontWeight: 600 }}
@@ -64,14 +64,14 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
       </div>
 
       {dca.status === 'running' && (
-        <div className="mt-5 border rounded-xl p-6 flex items-center gap-3" style={{ background: '#0e0f18', borderColor: `${CY}22`, ...MONO, color: CY }}>
+        <div className="mt-5 border rounded-xl p-6 flex items-center gap-3" style={{ background: '#111827', borderColor: `${CY}22`, ...MONO, color: CY }}>
           <Loader2 size={17} className="animate-spin" /><span className="text-sm">Scanning {acctHoldings.length} holdings for the best dip…</span>
         </div>
       )}
       {dca.status === 'done' && dca.result && (
         <div style={{ animation: 'cardIn .5s ease both' }} className="mt-5">
           {(dca.result.allocations || []).map((al, i) => (
-            <div key={i} className="lift mb-2 border rounded-xl p-4 flex items-center gap-4" style={{ background: '#0e0f18', borderColor: 'rgba(226,221,213,0.07)' }}>
+            <div key={i} className="lift mb-2 border rounded-xl p-4 flex items-center gap-4" style={{ background: '#111827', borderColor: 'rgba(255,255,255,0.06)' }}>
               <div className="text-center min-w-[64px]">
                 <div style={{ ...MONO, color: CY, fontWeight: 700 }} className="text-2xl">${al.amount}</div>
                 <div style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">{al.pct}%</div>

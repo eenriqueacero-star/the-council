@@ -1,29 +1,26 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
-import { MONO, DISP, CY } from '../constants/styles.js';
-import ArcReactor from './ArcReactor.jsx';
+import { SANS, CY } from '../constants/styles.js';
 
 export default function Header({ onSignOut }) {
   return (
-    <div className="boot flex items-center justify-between flex-wrap gap-3 pb-5" style={{ borderBottom: '1px solid rgba(226,221,213,0.08)' }}>
-      <div>
-        <div className="flex items-center gap-3">
-          <ArcReactor size={30} />
-          <h1 style={{ ...DISP, letterSpacing: '0.22em', fontWeight: 700 }} className="neon text-xl sm:text-2xl">THE COUNCIL</h1>
-        </div>
-        <p style={{ ...MONO, color: 'rgba(226,221,213,0.35)', letterSpacing: '0.16em' }} className="text-[10px] mt-1.5">MULTI-AGENT INVESTMENT INTELLIGENCE</p>
+    <div className="flex items-center justify-between px-4 py-3.5"
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex items-center gap-2.5">
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: CY, flexShrink: 0 }} className="blink" />
+        <span style={{ ...SANS, fontWeight: 700, fontSize: '15px', letterSpacing: '-0.02em', color: '#e2e8f0' }}>
+          The Council
+        </span>
       </div>
-      <div className="flex items-center gap-4">
-        <div style={{ ...MONO, color: 'rgba(226,221,213,0.32)' }} className="text-[10px] text-right leading-relaxed">
-          <div className="flex items-center justify-end gap-1.5 mb-0.5">
-            <span className="blink inline-block w-1.5 h-1.5 rounded-full" style={{ background: '#2fcb8a', boxShadow: '0 0 6px #2fcb8a' }} />
-            <span style={{ color: '#2fcb8a', letterSpacing: '0.12em' }}>ONLINE</span>
-          </div>
-          <div style={{ letterSpacing: '0.08em' }}>SELL PROTOCOL · 4-GATE ENGINE</div>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: CY }} />
+          <span style={{ ...SANS, fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>Live</span>
         </div>
         <button onClick={onSignOut} title="Sign out"
-          style={{ color: 'rgba(226,221,213,0.28)' }}
-          className="p-2 rounded-lg transition-colors hover:text-[rgba(226,221,213,0.7)] hover:bg-[rgba(226,221,213,0.04)]">
+          style={{ color: 'rgba(255,255,255,0.28)', padding: '6px', borderRadius: '8px', transition: 'color .15s' }}
+          onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.28)'}>
           <LogOut size={14} />
         </button>
       </div>

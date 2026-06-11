@@ -30,6 +30,7 @@ export const ACCOUNTS = {
   edwin: { label: 'Edwin', sub: 'Fidelity Youth', holdings: ['NVDA','NBIS','MU','AMD','SNDK','CRDO','APLD','ALAB','FLY'], dca: 60, dcaNote: '$60/week, Mondays' },
   dad:   { label: 'Dad',   sub: 'Fidelity',       holdings: ['NVDA','NBIS','MU','AMD','SNDK','CRDO','APLD','ALAB'],        dca: 50, dcaNote: '$50/month' },
   bro:   { label: 'Bro',   sub: 'Robinhood',      holdings: ['NVDA','NBIS','MU','AMD','SNDK','CRDO','APLD','ALAB'],        dca: 0,  dcaNote: 'no DCA' },
+  all:   { label: 'All',   sub: 'Combined',        holdings: [],                                                            dca: 0,  dcaNote: '3 accounts' },
 };
 
 export const AGENTS = [

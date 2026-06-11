@@ -14,12 +14,11 @@ function verifyAuth(req) {
 }
 
 const RANGE_CONFIG = {
-  '1H':  { resolution: '5',  offsetSec: 3600 },
-  '1D':  { resolution: '30', offsetSec: 86400 },
-  '1W':  { resolution: '60', offsetSec: 7 * 86400 },
-  '1M':  { resolution: 'D',  offsetSec: 30 * 86400 },
-  '1Y':  { resolution: 'D',  offsetSec: 365 * 86400 },
-  'All': { resolution: 'W',  offsetSec: 5 * 365 * 86400 },
+  '1W':  { resolution: 'D', offsetSec: 9  * 86400 },
+  '1M':  { resolution: 'D', offsetSec: 35 * 86400 },
+  '3M':  { resolution: 'D', offsetSec: 95 * 86400 },
+  '1Y':  { resolution: 'D', offsetSec: 370 * 86400 },
+  'All': { resolution: 'W', offsetSec: 5 * 365 * 86400 },
 };
 
 export default async function handler(req, res) {

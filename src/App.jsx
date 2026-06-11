@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { LogOut } from 'lucide-react';
+import { LogOut, Loader2 } from 'lucide-react';
 import { ACCOUNTS } from './constants/agents.js';
 import { MONO, SANS, CY } from './constants/styles.js';
 import Sidebar from './components/Sidebar.jsx';
@@ -18,10 +18,20 @@ import RoadmapTab from './components/RoadmapTab.jsx';
 const MORE_TABS = ['dca', 'alpha', 'roadmap'];
 const GOLD = '#c9a84c';
 
+function buildDefaults() {
+  const d = {};
+  Object.entries(ACCOUNTS).forEach(([k, a]) => {
+    d[k] = {};
+    a.holdings.forEach(t => (d[k][t] = { shares: '', cost: '' }));
+  });
+  return d;
+}
+
 export default function App() {
-  const [account, setAccount] = useState(() => localStorage.getItem('council_account') || 'edwin');
-  const [tab,     setTab]     = useState('chat');
-  const [apiDown, setApiDown] = useState(false);
+  const [account,   setAccount]   = useState('edwin');
+  const [tab,       setTab]       = useState('chat');
+  const [apiDown,   setApiDown]   = useState(false);
+  const [appLoaded, setAppLoaded] = useState(false); // true once Firestore data is in
 
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
@@ -34,50 +44,57 @@ export default function App() {
   const [councilAccounts, setCouncilAccounts] = useState([account]);
   useEffect(() => { setCouncilAccounts([account]); }, [account]);
 
-  const [positions, setPositions] = useState(() => {
-    const defaults = {};
-    Object.entries(ACCOUNTS).forEach(([k, a]) => {
-      defaults[k] = {};
-      a.holdings.forEach(t => (defaults[k][t] = { shares: '', cost: '' }));
-    });
-    try {
-      const saved = localStorage.getItem('council_positions');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        Object.entries(ACCOUNTS).forEach(([k, a]) => {
-          if (!parsed[k]) parsed[k] = defaults[k];
-          else a.holdings.forEach(t => { if (!parsed[k][t]) parsed[k][t] = { shares: '', cost: '' }; });
-        });
-        return parsed;
-      }
-    } catch {}
-    return defaults;
-  });
+  // null = loading from cloud, object = ready
+  const [positions, setPositions] = useState(null);
 
-  const posLoadedRef = useRef(false);
-  const saveTimerRef = useRef(null);
+  // Tracks whether the latest positions change was user-initiated (not a cloud load)
+  const userChangeRef = useRef(false);
+  const saveTimerRef  = useRef(null);
 
+  // Load everything from Firestore on auth
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, user => {
+    const unsub = onAuthStateChanged(auth, async user => {
       unsub();
-      if (!user) { posLoadedRef.current = true; return; }
-      getDoc(doc(db, 'users', user.uid, 'data', 'positions')).then(snap => {
-        if (snap.exists() && snap.data().positions) {
-          setPositions(prev => {
-            const cloud = snap.data().positions;
-            const merged = { ...prev };
-            Object.entries(cloud).forEach(([k, v]) => { merged[k] = { ...(prev[k] || {}), ...v }; });
-            return merged;
-          });
+      if (!user) {
+        setPositions(buildDefaults());
+        setAppLoaded(true);
+        return;
+      }
+
+      try {
+        const [prefSnap, posSnap] = await Promise.all([
+          getDoc(doc(db, 'users', user.uid, 'data', 'preferences')),
+          getDoc(doc(db, 'users', user.uid, 'data', 'positions')),
+        ]);
+
+        if (prefSnap.exists() && prefSnap.data().account) {
+          setAccount(prefSnap.data().account);
         }
-      }).catch(() => {}).finally(() => { posLoadedRef.current = true; });
+
+        if (posSnap.exists() && posSnap.data().positions) {
+          const cloud    = posSnap.data().positions;
+          const defaults = buildDefaults();
+          const merged   = { ...defaults };
+          Object.entries(cloud).forEach(([k, v]) => {
+            merged[k] = { ...(defaults[k] || {}), ...v };
+          });
+          setPositions(merged);
+        } else {
+          setPositions(buildDefaults());
+        }
+      } catch {
+        setPositions(buildDefaults());
+      }
+
+      setAppLoaded(true);
     });
     return unsub;
   }, []);
 
+  // Debounced save of positions to Firestore (user changes only)
   useEffect(() => {
-    try { localStorage.setItem('council_positions', JSON.stringify(positions)); } catch {}
-    if (!posLoadedRef.current) return;
+    if (!positions || !userChangeRef.current) return;
+    userChangeRef.current = false;
     clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       const uid = auth.currentUser?.uid;
@@ -86,10 +103,17 @@ export default function App() {
     }, 1500);
   }, [positions]);
 
-  useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
+  // Save account preference to Firestore whenever it changes (after initial load)
+  const prefSavedRef = useRef(false);
+  useEffect(() => {
+    if (!appLoaded) return;
+    if (!prefSavedRef.current) { prefSavedRef.current = true; return; } // skip first fire (initial load)
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    setDoc(doc(db, 'users', uid, 'data', 'preferences'), { account, updatedAt: Date.now() }).catch(() => {});
+  }, [account, appLoaded]);
 
   async function savePositions() {
-    try { localStorage.setItem('council_positions', JSON.stringify(positions)); } catch {}
     const uid = auth.currentUser?.uid;
     if (!uid) return;
     await setDoc(doc(db, 'users', uid, 'data', 'positions'), { positions, updatedAt: Date.now() });
@@ -99,33 +123,48 @@ export default function App() {
 
   function buildCombinedLine(selectedAccounts) {
     return selectedAccounts.map(k => {
-      const a = ACCOUNTS[k];
-      const pm = positions[k] || {};
+      const a       = ACCOUNTS[k];
+      const pm      = (positions || {})[k] || {};
       const holdings = Object.keys(pm).length ? Object.keys(pm) : a.holdings;
-      const line = holdings.map(t => { const p = pm[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
+      const line     = holdings.map(t => { const p = pm[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
       return selectedAccounts.length > 1 ? `${a.label}(${line})` : line;
     }).join(' | ');
   }
 
-  const acct         = ACCOUNTS[account];
-  const posMap       = positions[account] || {};
-  const acctHoldings = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
+  const acct          = ACCOUNTS[account];
+  const posMap        = (positions || {})[account] || {};
+  const acctHoldings  = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
   const positionsLine = acctHoldings
     .map(t => { const p = posMap[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; })
     .join(', ');
 
-  const setPos = (tkr, field, val) =>
+  function setPos(tkr, field, val) {
+    userChangeRef.current = true;
     setPositions(prev => ({ ...prev, [account]: { ...prev[account], [tkr]: { ...(prev[account]?.[tkr] || { shares: '', cost: '' }), [field]: val } } }));
-  const addTicker = t => {
+  }
+  function addTicker(t) {
     if (!t) return;
+    userChangeRef.current = true;
     setPositions(prev => ({ ...prev, [account]: { ...prev[account], [t]: prev[account]?.[t] || { shares: '', cost: '' } } }));
-  };
-  const removeTicker = t =>
+  }
+  function removeTicker(t) {
+    userChangeRef.current = true;
     setPositions(prev => { const next = { ...prev[account] }; delete next[t]; return { ...prev, [account]: next }; });
+  }
 
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown };
 
   const navTab = MORE_TABS.includes(tab) ? 'more' : tab;
+
+  // Loading gate — wait for Firestore before rendering the app
+  if (!appLoaded) {
+    return (
+      <div style={{ background: '#080808', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+        <span style={{ ...MONO, letterSpacing: '0.22em', fontWeight: 700, color: GOLD, fontSize: 13 }}>THE COUNCIL</span>
+        <Loader2 size={18} className="animate-spin" style={{ color: 'rgba(201,168,76,0.4)' }} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: '#080808', color: '#f0f0f0', minHeight: '100vh' }}>
@@ -237,7 +276,7 @@ export default function App() {
 
       {/* Mobile bottom nav */}
       <div className="lg:hidden">
-        <BottomNav tab={tab} setTab={setTab} />
+        <BottomNav tab={navTab} setTab={setTab} />
       </div>
     </div>
   );

@@ -8,18 +8,46 @@ import { getQuotes, getCandles } from '../api.js';
 
 const GOLD = '#c9a84c';
 const RED  = '#c0392b';
-const RANGES = ['1D', '1W', '1M', '1Y', 'All'];
+const RANGES = ['1W', '1M', '3M', '1Y', 'All'];
 
 function fmt(n)    { return isNaN(n) || n == null ? '—' : Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtPct(n) { if (isNaN(n) || n == null) return '—'; return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
 function fmtPnl(n) { if (isNaN(n) || n == null) return '—'; return (n >= 0 ? '+$' : '-$') + fmt(n); }
 function fmtTime(d){ return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); }
+function fmtK(n)   {
+  if (isNaN(n) || n == null) return '—';
+  if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
+  if (n >= 10000)   return `$${(n / 1000).toFixed(0)}k`;
+  if (n >= 1000)    return `$${(n / 1000).toFixed(1)}k`;
+  return `$${Math.round(n)}`;
+}
 function fmtX(ts, range) {
   const d = new Date(ts);
-  if (range === '1H' || range === '1D') return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-  if (range === '1W' || range === '1M') return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  if (range === '1Y' || range === 'All') return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
+function fmtHoverDate(ts) {
+  return new Date(ts).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function getMarketSession() {
+  try {
+    const et  = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const dow = et.getDay(); // 0=Sun, 6=Sat
+    const tod = et.getHours() * 60 + et.getMinutes();
+    if (dow === 0 || dow === 6) return 'overnight';
+    if (tod >= 570 && tod < 960)  return 'market';    // 9:30–16:00
+    if (tod >= 240 && tod < 570)  return 'premarket'; // 04:00–9:30
+    if (tod >= 960 && tod < 1200) return 'afterhours'; // 16:00–20:00
+    return 'overnight';
+  } catch { return 'market'; }
+}
+
+const SESSION_INFO = {
+  premarket:  { label: 'PRE-MARKET',  emoji: '🌅', color: 'rgba(232,201,122,0.75)' },
+  afterhours: { label: 'AFTER-HOURS', emoji: '🌆', color: 'rgba(125,184,232,0.70)' },
+  overnight:  { label: 'OVERNIGHT',   emoji: '🌙☁️', color: 'rgba(125,184,232,0.55)' },
+};
 
 function useCounter(target, duration = 900) {
   const [val, setVal] = useState(0);
@@ -29,8 +57,7 @@ function useCounter(target, duration = 900) {
     let raf;
     function tick(now) {
       const t = Math.min((now - start) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      setVal(target * ease);
+      setVal(target * (1 - Math.pow(1 - t, 3)));
       if (t < 1) raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
@@ -41,23 +68,23 @@ function useCounter(target, duration = 900) {
 
 function computeEquityCurve(candles, posMap) {
   const spy = candles?.SPY;
-  if (!spy?.t?.length) return { portfolio: [], spy: [] };
+  if (!spy?.t?.length) return [];
   const held = Object.entries(posMap).filter(([, p]) => parseFloat(p.shares) > 0);
-  if (!held.length) return { portfolio: [], spy: [] };
+  if (!held.length) return [];
 
   const lookups = {};
   for (const [tk] of held) {
     const d = candles[tk];
     if (d?.t?.length && d?.c?.length) {
+      const sortedTs = [...d.t].sort((a, b) => a - b);
       const m = {};
       d.t.forEach((ts, i) => { m[ts] = d.c[i]; });
-      lookups[tk] = { m, ts: d.t };
+      lookups[tk] = { m, sortedTs };
     }
   }
 
-  const portPts = [], spyPts = [];
-  for (let i = 0; i < spy.t.length; i++) {
-    const ts = spy.t[i];
+  const pts = [];
+  for (const ts of spy.t) {
     let pv = 0;
     for (const [tk, pd] of held) {
       const shares = parseFloat(pd.shares) || 0;
@@ -65,123 +92,134 @@ function computeEquityCurve(candles, posMap) {
       const lk = lookups[tk];
       if (!lk) continue;
       let close = lk.m[ts];
-      if (close === undefined) {
-        const prev = lk.ts.filter(t => t <= ts);
-        if (prev.length) close = lk.m[prev[prev.length - 1]];
+      if (close == null) {
+        let lo = 0, hi = lk.sortedTs.length - 1, found = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          if (lk.sortedTs[mid] <= ts) { found = mid; lo = mid + 1; }
+          else hi = mid - 1;
+        }
+        if (found >= 0) close = lk.m[lk.sortedTs[found]];
       }
       if (close != null) pv += shares * close;
     }
-    portPts.push({ t: ts * 1000, v: pv });
-    spyPts.push({ t: ts * 1000, v: spy.c[i] });
+    if (pv > 0) pts.push({ t: ts * 1000, v: pv });
   }
-
-  if (!portPts.length) return { portfolio: [], spy: [] };
-  const p0 = portPts[0].v || 1, s0 = spyPts[0].v || 1;
-  return {
-    portfolio: portPts.map(d => ({ t: d.t, v: p0 > 0 ? ((d.v - p0) / p0) * 100 : 0 })),
-    spy:       spyPts.map(d => ({ t: d.t, v: s0 > 0 ? ((d.v - s0) / s0) * 100 : 0 })),
-  };
+  return pts;
 }
 
 function calcPathLen(pts) {
   if (!pts || pts.length < 2) return 1000;
   let sum = 0;
   for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i][0] - pts[i-1][0];
-    const dy = pts[i][1] - pts[i-1][1];
+    const dx = pts[i][0] - pts[i-1][0], dy = pts[i][1] - pts[i-1][1];
     sum += Math.sqrt(dx*dx + dy*dy);
   }
   return Math.ceil(sum) + 1;
 }
 
-function EquityCurveChart({ portfolio, spy, range, loading }) {
-  if (loading) return <div className="skel" style={{ height: 140, borderRadius: 8 }} />;
+function EquityCurveChart({ data, range, loading, hoverIdx, onHover }) {
+  const [animated, setAnimated] = useState(true);
+  useEffect(() => {
+    setAnimated(true);
+    const t = setTimeout(() => setAnimated(false), 1500);
+    return () => clearTimeout(t);
+  }, []); // remounted via key on range/account change — don't add deps
 
-  if (!portfolio?.length || portfolio.length < 2) {
-    return (
-      <div className="flex items-center justify-center h-[130px]"
-        style={{ ...MONO, color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
-        No historical data for this range
-      </div>
-    );
-  }
+  if (loading) return <div className="skel" style={{ height: 160, borderRadius: 8 }} />;
+  if (!data?.length || data.length < 2) return (
+    <div style={{ height: 130, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      ...MONO, color: 'rgba(255,255,255,0.18)', fontSize: 11 }}>
+      No historical data · add shares or try a wider range
+    </div>
+  );
 
-  const W = 560, H = 136, PL = 40, PR = 8, PT = 10, PB = 26;
+  const W = 560, H = 160, PL = 56, PR = 8, PT = 8, PB = 26;
   const cW = W - PL - PR, cH = H - PT - PB;
 
-  const allV = [...portfolio.map(d => d.v), ...spy.map(d => d.v)];
-  const minV = Math.min(...allV), maxV = Math.max(...allV);
-  const vR = maxV - minV || 1;
+  const vals = data.map(d => d.v);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const pad  = (maxV - minV) * 0.12 || maxV * 0.06;
+  const vMin = minV - pad, vMax = maxV + pad;
+  const vR   = vMax - vMin;
 
-  const toX = i => PL + (i / (portfolio.length - 1)) * cW;
-  const toY = v => PT + cH - ((v - minV) / vR) * cH;
+  const toX = i => PL + (i / (data.length - 1)) * cW;
+  const toY = v => PT + cH - ((v - vMin) / vR) * cH;
 
-  const portPairs = portfolio.map((d, i) => [toX(i), toY(d.v)]);
-  const portLine  = portPairs.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const pathLen   = calcPathLen(portPairs);
+  const pairs  = data.map((d, i) => [toX(i), toY(d.v)]);
+  const ptLine = pairs.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const pathLen = calcPathLen(pairs);
+  const lineClr = data[data.length - 1].v >= data[0].v ? GOLD : RED;
+  const areaD = `M${PL},${(PT + cH).toFixed(1)} L${pairs.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' L')} L${(PL + cW).toFixed(1)},${(PT + cH).toFixed(1)} Z`;
 
-  const spyLine = spy.length > 1
-    ? spy.map((d, i) => { const x = PL + (i / (spy.length - 1)) * cW; return `${x.toFixed(1)},${toY(d.v).toFixed(1)}`; }).join(' ')
-    : null;
+  const n = data.length;
+  const xIdxs = n > 3 ? [0, Math.floor(n / 3), Math.floor(2 * n / 3), n - 1] : [0, n - 1];
+  const yVals  = [vMin + vR * 0.12, vMin + vR * 0.5, vMin + vR * 0.88];
 
-  const lastV   = portfolio[portfolio.length - 1].v;
-  const lineClr = lastV >= 0 ? GOLD : RED;
-  const showZero = 0 >= minV && 0 <= maxV;
+  const lineStyle = animated ? {
+    strokeDasharray: pathLen,
+    strokeDashoffset: pathLen,
+    animation: 'drawIn 1.2s cubic-bezier(.4,0,.2,1) forwards',
+  } : {};
 
-  const areaD = `M ${PL.toFixed(1)},${(PT + cH).toFixed(1)} L ${portPairs.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' L ')} L ${(PL + cW).toFixed(1)},${(PT + cH).toFixed(1)} Z`;
+  function handleMove(clientX, svgEl) {
+    const rect = svgEl.getBoundingClientRect();
+    const relX = (clientX - rect.left) / rect.width * W;
+    onHover?.(Math.max(0, Math.min(n - 1, Math.round((relX - PL) / cW * (n - 1)))));
+  }
 
-  const lblIdx = portfolio.length > 4
-    ? [0, Math.floor(portfolio.length / 3), Math.floor(2 * portfolio.length / 3), portfolio.length - 1]
-    : [0, portfolio.length - 1];
+  const hX = hoverIdx != null ? toX(hoverIdx) : null;
+  const hY = hoverIdx != null ? toY(data[hoverIdx].v) : null;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ overflow: 'visible' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full select-none"
+      style={{ overflow: 'visible', touchAction: 'none', cursor: 'crosshair' }}
+      onMouseMove={e => handleMove(e.clientX, e.currentTarget)}
+      onMouseLeave={() => onHover?.(null)}
+      onTouchMove={e => { e.preventDefault(); handleMove(e.touches[0].clientX, e.currentTarget); }}
+      onTouchEnd={() => onHover?.(null)}
+    >
       <defs>
-        <linearGradient id="ecGold" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={lineClr} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={lineClr} stopOpacity="0.02" />
+        <linearGradient id="ecGold2" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor={lineClr} stopOpacity="0.24" />
+          <stop offset="100%" stopColor={lineClr} stopOpacity="0.01" />
         </linearGradient>
       </defs>
-      {[minV, (minV + maxV) / 2, maxV].map((v, i) => (
-        <line key={i} x1={PL} y1={toY(v)} x2={W - PR} y2={toY(v)}
+
+      {[0.25, 0.5, 0.75].map(f => (
+        <line key={f} x1={PL} y1={PT + cH * f} x2={W - PR} y2={PT + cH * f}
           stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
       ))}
-      {showZero && (
-        <line x1={PL} y1={toY(0)} x2={W - PR} y2={toY(0)}
-          stroke="rgba(201,168,76,0.14)" strokeWidth="1" strokeDasharray="3,4" />
-      )}
-      <path d={areaD} fill="url(#ecGold)" />
-      {spyLine && (
-        <polyline points={spyLine} fill="none"
-          stroke="rgba(255,255,255,0.17)" strokeWidth="1.5" strokeDasharray="4,3" />
-      )}
-      <polyline points={portLine} fill="none" stroke={lineClr} strokeWidth="2.5" strokeLinejoin="round"
-        style={{
-          strokeDasharray: pathLen,
-          strokeDashoffset: pathLen,
-          animation: `drawIn 1.2s cubic-bezier(.4,0,.2,1) forwards`,
-        }} />
-      {lblIdx.map(i => portfolio[i] && (
-        <text key={i} x={toX(i)} y={H - 4} textAnchor="middle"
-          fill="rgba(255,255,255,0.22)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
-          {fmtX(portfolio[i].t, range)}
+
+      {yVals.map((v, i) => (
+        <text key={i} x={PL - 5} y={toY(v) + 3} textAnchor="end"
+          fill="rgba(255,255,255,0.22)"
+          style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
+          {fmtK(v)}
         </text>
       ))}
-      {[minV, maxV].map((v, i) => (
-        <text key={i} x={PL - 4} y={toY(v) + 3} textAnchor="end"
-          fill="rgba(255,255,255,0.22)" style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
-          {v >= 0 ? '+' : ''}{v.toFixed(1)}%
+
+      <path d={areaD} fill="url(#ecGold2)" />
+
+      <polyline points={ptLine} fill="none" stroke={lineClr} strokeWidth="2.5"
+        strokeLinejoin="round" strokeLinecap="round" style={lineStyle} />
+
+      {xIdxs.map((i, li) => (
+        <text key={i} x={toX(i)} y={H - 4}
+          textAnchor={li === 0 ? 'start' : li === xIdxs.length - 1 ? 'end' : 'middle'}
+          fill="rgba(255,255,255,0.22)"
+          style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>
+          {fmtX(data[i].t, range)}
         </text>
       ))}
-      <line x1={PL + 2} y1={PT + 7} x2={PL + 14} y2={PT + 7} stroke={lineClr} strokeWidth="2" />
-      <text x={PL + 18} y={PT + 10} fill="rgba(255,255,255,0.28)"
-        style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>PORTFOLIO</text>
-      {spyLine && <>
-        <line x1={PL + 84} y1={PT + 7} x2={PL + 96} y2={PT + 7}
-          stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" strokeDasharray="4,3" />
-        <text x={PL + 100} y={PT + 10} fill="rgba(255,255,255,0.28)"
-          style={{ fontSize: '9px', fontFamily: "'JetBrains Mono', monospace" }}>SPY</text>
-      </>}
+
+      {hoverIdx != null && hX != null && hY != null && (
+        <>
+          <line x1={hX} y1={PT} x2={hX} y2={PT + cH}
+            stroke="rgba(201,168,76,0.35)" strokeWidth="1" strokeDasharray="3,3" />
+          <circle cx={hX} cy={hY} r="5.5" fill={lineClr} stroke="#080808" strokeWidth="2" />
+        </>
+      )}
     </svg>
   );
 }
@@ -193,7 +231,6 @@ function PositionCard({ row, delay }) {
   return (
     <div className="gold-card" style={{ marginBottom: 8, cursor: 'pointer', animation: `staggerIn 0.3s ease both`, animationDelay: delay }}
       onClick={() => setExpanded(v => !v)}>
-      {/* Allocation bar at bottom edge */}
       {row.allocPct > 0 && (
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'rgba(201,168,76,0.06)' }}>
           <div style={{ height: '100%', width: `${Math.min(row.allocPct, 100)}%`, background: row.allocPct > 25 ? GOLD : 'rgba(201,168,76,0.4)', borderRadius: '0 0 2px 2px', transition: 'width 0.5s ease' }} />
@@ -218,10 +255,10 @@ function PositionCard({ row, delay }) {
         <div style={{ padding: '0 16px 14px', paddingTop: 12, borderTop: '1px solid rgba(201,168,76,0.08)' }}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'SHARES',    val: row.shares || '—',                              col: '#f0f0f0' },
-              { label: 'AVG COST',  val: row.cost   ? `$${fmt(row.cost)}`   : '—',      col: '#f0f0f0' },
-              { label: 'MKT VALUE', val: row.mktVal > 0 ? `$${fmt(row.mktVal)}` : '—',  col: '#f0f0f0' },
-              { label: 'P&L %',     val: fmtPct(row.pnlPct),                             col: row.pnlPct != null ? (row.pnlPct >= 0 ? GOLD : RED) : 'rgba(255,255,255,0.3)' },
+              { label: 'SHARES',    val: row.shares || '—',                               col: '#f0f0f0' },
+              { label: 'AVG COST',  val: row.cost   ? `$${fmt(row.cost)}`    : '—',       col: '#f0f0f0' },
+              { label: 'MKT VALUE', val: row.mktVal > 0 ? `$${fmt(row.mktVal)}` : '—',   col: '#f0f0f0' },
+              { label: 'P&L %',     val: fmtPct(row.pnlPct), col: row.pnlPct != null ? (row.pnlPct >= 0 ? GOLD : RED) : 'rgba(255,255,255,0.3)' },
             ].map(({ label, val, col }) => (
               <div key={label}>
                 <div style={{ ...MONO, fontSize: 9, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.1em', marginBottom: 4 }}>{label}</div>
@@ -242,7 +279,7 @@ function PositionCard({ row, delay }) {
 }
 
 export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTicker, removeTicker, positionsLine, onSave }) {
-  const [range, setRange]         = useState('1D');
+  const [range, setRange]         = useState('1M');
   const [quotes, setQuotes]       = useState({});
   const [candles, setCandles]     = useState({});
   const [qLoading, setQL]         = useState(false);
@@ -253,6 +290,14 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
   const [newTicker, setNewTicker] = useState('');
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
+  const [hoverIdx,  setHoverIdx]  = useState(null);
+  const [session,   setSession]   = useState(() => getMarketSession());
+
+  // Recheck session every 30s (transitions between pre-market / market / etc.)
+  useEffect(() => {
+    const id = setInterval(() => setSession(getMarketSession()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   const heldTickers = acctHoldings.filter(t => parseFloat(posMap[t]?.shares) > 0);
   const heldKey     = heldTickers.join(',');
@@ -270,7 +315,7 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
   }
 
   useEffect(() => {
-    setQuotes({}); setCandles({});
+    setQuotes({}); setCandles({}); setHoverIdx(null);
     const tickers = acctHoldings.filter(t => parseFloat(posMap[t]?.shares) > 0);
     doRefresh(tickers, range);
   }, [acct.label, range, heldKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -312,8 +357,22 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
     ...r, allocPct: totalVal > 0 && r.mktVal > 0 ? (r.mktVal / totalVal) * 100 : 0,
   }));
 
-  const { portfolio: ecPort, spy: ecSpy } = computeEquityCurve(candles, posMap);
+  const ecData     = computeEquityCurve(candles, posMap);
   const displayVal = useCounter(totalVal, 900);
+
+  // Hero hover logic — Robinhood-style scrubbing
+  const hoverPt       = hoverIdx != null && ecData[hoverIdx] ? ecData[hoverIdx] : null;
+  const isHovering    = hoverPt != null;
+  const rangeStart    = ecData.length > 0 ? ecData[0].v : null;
+  const heroDisplayVal = isHovering ? hoverPt.v : displayVal;
+  const heroGainAmt    = isHovering && rangeStart != null ? hoverPt.v - rangeStart : totalPnl;
+  const heroGainPct    = isHovering && rangeStart > 0
+    ? (hoverPt.v - rangeStart) / rangeStart * 100
+    : totalPnlPct;
+  const heroGainLabel  = isHovering ? `from ${range} start` : 'all-time';
+  const heroTopLabel   = isHovering
+    ? fmtHoverDate(hoverPt.t)
+    : `${acct.label.toUpperCase()} · PORTFOLIO VALUE`;
 
   async function handleSave() {
     setSaving(true); setSaved(false);
@@ -329,6 +388,11 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
     if (!t) return; addTicker(t); setNewTicker('');
   }
 
+  function handleRangeChange(r) {
+    setRange(r);
+    setHoverIdx(null);
+  }
+
   const isLoading = qLoading || cLoading;
 
   return (
@@ -339,25 +403,30 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
         <div className="gold-card p-6" style={{ animation: 'cardIn .5s ease both' }}>
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
-              <div style={{ ...MONO, fontSize: 9, color: 'rgba(201,168,76,0.48)', letterSpacing: '0.14em', marginBottom: 10 }}>
-                {acct.label.toUpperCase()} · PORTFOLIO VALUE
+              <div style={{ ...MONO, fontSize: 9, letterSpacing: '0.14em', marginBottom: 10,
+                color: isHovering ? 'rgba(255,255,255,0.38)' : 'rgba(201,168,76,0.48)',
+                transition: 'color 0.15s' }}>
+                {heroTopLabel}
               </div>
               <div style={{ ...DISP, fontSize: 44, fontWeight: 900, color: '#f0f0f0', lineHeight: 1, letterSpacing: '-0.02em' }}>
-                ${Math.round(displayVal).toLocaleString('en-US')}
+                ${Math.round(heroDisplayVal).toLocaleString('en-US')}
               </div>
               <div className="flex items-center gap-3 mt-3 flex-wrap">
-                <span style={{ ...MONO, fontSize: 13, fontWeight: 700, color: totalPnl >= 0 ? GOLD : RED }}>
-                  {fmtPnl(totalPnl)} all-time
+                <span style={{ ...MONO, fontSize: 13, fontWeight: 700, color: (heroGainAmt ?? 0) >= 0 ? GOLD : RED }}>
+                  {fmtPnl(heroGainAmt)} {heroGainLabel}
                 </span>
-                {totalPnlPct != null && (
-                  <span style={{ ...MONO, fontSize: 11, color: totalPnl >= 0 ? GOLD : RED, opacity: 0.72 }}>
-                    ({fmtPct(totalPnlPct)})
+                {heroGainPct != null && (
+                  <span style={{ ...MONO, fontSize: 11, color: (heroGainAmt ?? 0) >= 0 ? GOLD : RED, opacity: 0.72 }}>
+                    ({fmtPct(heroGainPct)})
                   </span>
                 )}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ ...MONO, fontSize: 9, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.12em', marginBottom: 6 }}>TODAY</div>
+              <div style={{ ...MONO, fontSize: 9, letterSpacing: '0.12em', marginBottom: 6,
+                color: session !== 'market' && SESSION_INFO[session] ? SESSION_INFO[session].color : 'rgba(255,255,255,0.28)' }}>
+                {session !== 'market' && SESSION_INFO[session] ? SESSION_INFO[session].label : 'TODAY'}
+              </div>
               <div style={{ ...MONO, fontSize: 20, fontWeight: 700, color: dayChgDollar >= 0 ? GOLD : RED }}>
                 {fmtPnl(dayChgDollar)}
               </div>
@@ -366,7 +435,19 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
                   {fmtPct(dayChgPct)}
                 </div>
               )}
-              <div className="flex items-center gap-2 mt-4 justify-end">
+              {/* Session badge */}
+              {session !== 'market' && SESSION_INFO[session] && (
+                <div className="flex items-center gap-1.5 mt-3 justify-end">
+                  <span style={{ fontSize: 13 }} role="img" aria-label={SESSION_INFO[session].label}>
+                    {SESSION_INFO[session].emoji}
+                  </span>
+                  <span style={{ ...MONO, color: SESSION_INFO[session].color, fontSize: 9, letterSpacing: '0.10em' }}>
+                    {SESSION_INFO[session].label}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mt-2 justify-end">
                 {lastUpdated && (
                   <span style={{ ...MONO, color: flash ? GOLD : 'rgba(255,255,255,0.2)', transition: 'color 0.5s', fontSize: 9 }}>
                     {fmtTime(lastUpdated)}{flash && ' ●'}
@@ -393,7 +474,7 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
       {/* Range pills */}
       <div className="flex gap-1.5 flex-wrap">
         {RANGES.map(r => (
-          <button key={r} onClick={() => setRange(r)}
+          <button key={r} onClick={() => handleRangeChange(r)}
             style={{
               ...MONO, fontSize: 11, padding: '5px 13px', borderRadius: 20,
               background: range === r ? 'rgba(201,168,76,0.12)' : 'transparent',
@@ -410,13 +491,18 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
       {valued.length > 0 && (
         <div className="gold-card p-4">
           <div className="flex items-center gap-2 mb-3">
-            <span style={{ ...MONO, fontSize: 9, color: 'rgba(201,168,76,0.48)', letterSpacing: '0.14em' }}>EQUITY CURVE · {range}</span>
+            <span style={{ ...MONO, fontSize: 9, color: 'rgba(201,168,76,0.48)', letterSpacing: '0.14em' }}>
+              PORTFOLIO VALUE · {range}
+            </span>
             {cLoading && <Loader2 size={9} className="animate-spin" style={{ color: GOLD }} />}
           </div>
           <EquityCurveChart
-            key={`${range}-${ecPort[0]?.t ?? 0}`}
-            portfolio={ecPort} spy={ecSpy} range={range}
-            loading={cLoading && !ecPort.length}
+            key={range + acct.label + heldKey}
+            data={ecData}
+            range={range}
+            loading={cLoading && !ecData.length}
+            hoverIdx={hoverIdx}
+            onHover={setHoverIdx}
           />
         </div>
       )}
@@ -532,7 +618,7 @@ export default function PositionsTab({ acct, posMap, acctHoldings, setPos, addTi
               </p>
             </div>
             <p style={{ ...MONO, color: 'rgba(255,255,255,0.22)', fontSize: 10 }} className="mt-2">
-              Auto-saves locally. Hit SAVE to sync across devices.
+              Auto-syncs to cloud. Same on all devices.
             </p>
           </div>
         )}

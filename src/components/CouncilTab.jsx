@@ -233,16 +233,16 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
 
   return (
     <div className="mt-6">
-      <label style={{ ...MONO, color: 'rgba(226,221,213,0.50)', letterSpacing: '0.10em' }} className="block text-[11px]">ENTER TICKER TO CONVENE THE COUNCIL</label>
+      <label style={{ ...MONO, color: 'rgba(240,240,240,0.50)', letterSpacing: '0.10em' }} className="block text-[11px]">ENTER TICKER TO CONVENE THE COUNCIL</label>
       <div className="mt-2 flex gap-2 flex-wrap sm:flex-nowrap">
         <div className="relative flex-1 min-w-[180px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(226,221,213,0.30)' }} />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(240,240,240,0.30)' }} />
           <input value={ticker} onChange={e => setTicker(e.target.value)} onKeyDown={e => e.key === 'Enter' && convene()}
             placeholder="e.g. AAPL"
-            style={{ ...MONO, letterSpacing: '0.15em', background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+            style={{ ...MONO, letterSpacing: '0.15em', background: 'rgba(240,240,240,0.03)', borderColor: 'rgba(240,240,240,0.10)', color: '#f0f0f0' }}
             className="w-full border rounded-lg pl-9 pr-3 py-3 text-lg uppercase outline-none transition-colors"
             onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+            onBlur={e => e.target.style.borderColor = 'rgba(240,240,240,0.10)'} />
         </div>
         <button onClick={convene} disabled={running || !ticker.trim()}
           style={{ ...MONO, letterSpacing: '0.10em', fontWeight: 600, background: running || !ticker.trim() ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808' }}
@@ -253,19 +253,19 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
 
       <div className="mt-2 flex gap-2 items-center">
         <div className="relative flex-1">
-          <Wallet size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(226,221,213,0.30)' }} />
+          <Wallet size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(240,240,240,0.30)' }} />
           <input value={capital} onChange={e => setCapital(e.target.value.replace(/[^0-9.]/g, ''))} onKeyDown={e => e.key === 'Enter' && convene()}
             inputMode="decimal" placeholder="available capital (optional)"
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
+            style={{ ...MONO, background: 'rgba(240,240,240,0.03)', borderColor: 'rgba(240,240,240,0.10)', color: '#f0f0f0' }}
             className="w-full border rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none transition-colors"
             onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
-          {capital.trim() && <span style={{ ...MONO, color: '#2fcb8a' }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px]">${Number(capital).toLocaleString()}</span>}
+            onBlur={e => e.target.style.borderColor = 'rgba(240,240,240,0.10)'} />
+          {capital.trim() && <span style={{ ...MONO, color: '#c9a84c' }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px]">${Number(capital).toLocaleString()}</span>}
         </div>
       </div>
 
       <div className="mt-2 flex items-center gap-2 flex-wrap">
-        <span style={{ ...MONO, color: 'rgba(226,221,213,0.35)', letterSpacing: '0.10em' }} className="text-[10px]">ACCOUNTS:</span>
+        <span style={{ ...MONO, color: 'rgba(240,240,240,0.35)', letterSpacing: '0.10em' }} className="text-[10px]">ACCOUNTS:</span>
         {Object.entries(ACCOUNTS).map(([key, a]) => {
           const sel = councilAccounts?.includes(key);
           return (
@@ -275,30 +275,30 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                 if (sel && councilAccounts.length === 1) return;
                 setCouncilAccounts(sel ? councilAccounts.filter(k => k !== key) : [...councilAccounts, key]);
               }}
-              style={{ ...MONO, background: sel ? 'rgba(200,146,42,0.12)' : 'rgba(226,221,213,0.03)', border: `1px solid ${sel ? `${CY}55` : 'rgba(226,221,213,0.10)'}`, color: sel ? CY : 'rgba(226,221,213,0.40)' }}
+              style={{ ...MONO, background: sel ? 'rgba(200,146,42,0.12)' : 'rgba(240,240,240,0.03)', border: `1px solid ${sel ? `${CY}55` : 'rgba(240,240,240,0.10)'}`, color: sel ? CY : 'rgba(240,240,240,0.40)' }}
               className="text-[10px] px-2.5 py-1 rounded-lg transition-all disabled:opacity-40 hover:brightness-110">
               {a.label}
             </button>
           );
         })}
-        {isMulti && <span style={{ ...MONO, color: 'rgba(226,221,213,0.30)' }} className="text-[10px]">combined analysis</span>}
+        {isMulti && <span style={{ ...MONO, color: 'rgba(240,240,240,0.30)' }} className="text-[10px]">combined analysis</span>}
       </div>
 
       <div className="mt-2 flex items-center gap-3">
         <button onClick={() => setLiveSearch(v => !v)}
-          style={{ ...MONO, borderColor: liveSearch ? `${ICE}66` : 'rgba(226,221,213,0.12)', color: liveSearch ? ICE : 'rgba(226,221,213,0.40)' }}
+          style={{ ...MONO, borderColor: liveSearch ? `${ICE}66` : 'rgba(240,240,240,0.12)', color: liveSearch ? ICE : 'rgba(240,240,240,0.40)' }}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] transition-colors">
           <Search size={11} />
           <span>{liveSearch ? 'LIVE SEARCH ON' : 'LIVE SEARCH OFF'}</span>
         </button>
-        <span style={{ ...MONO, color: 'rgba(226,221,213,0.25)' }} className="text-[10px]">off saves ~6¢/run</span>
+        <span style={{ ...MONO, color: 'rgba(240,240,240,0.25)' }} className="text-[10px]">off saves ~6¢/run</span>
       </div>
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
-        <span style={{ ...MONO, color: 'rgba(226,221,213,0.30)', letterSpacing: '0.10em' }} className="text-[10px]">QUICK:</span>
+        <span style={{ ...MONO, color: 'rgba(240,240,240,0.30)', letterSpacing: '0.10em' }} className="text-[10px]">QUICK:</span>
         {quickPicks.map(q => (
           <button key={q} onClick={() => setTicker(q)} disabled={running}
-            style={{ ...MONO, borderColor: 'rgba(226,221,213,0.10)', color: 'rgba(226,221,213,0.55)' }}
+            style={{ ...MONO, borderColor: 'rgba(240,240,240,0.10)', color: 'rgba(240,240,240,0.55)' }}
             className="text-[11px] px-2.5 py-1 rounded border transition-colors disabled:opacity-40 hover:border-[rgba(200,146,42,0.45)] hover:text-[#c8922a]">{q}</button>
         ))}
         <button onClick={runDemo} disabled={running}
@@ -328,9 +328,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
             return (
               <div key={ri} className={!isLastDone ? 'opacity-60 mb-2' : 'mb-2'}>
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
-                  <span style={{ ...MONO, color: 'rgba(226,221,213,0.40)', letterSpacing: '0.10em' }} className="text-[10px]">{label}</span>
-                  <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
+                  <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.08)' }} />
+                  <span style={{ ...MONO, color: 'rgba(240,240,240,0.40)', letterSpacing: '0.10em' }} className="text-[10px]">{label}</span>
+                  <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.08)' }} />
                 </div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {AGENTS.map(a => {
@@ -339,12 +339,12 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                     const ss = r && STANCE_STYLE[r.stance];
                     return (
                       <div key={a.id} onClick={() => r && !r._error && openDrawer(a, r)}
-                        style={{ background: '#0e0f18', borderColor: (r && !r._error) ? `${a.accent}38` : 'rgba(232,92,92,0.25)', cursor: (r && !r._error) ? 'pointer' : 'default' }}
-                        className="lift border rounded-xl p-4 transition-all">
+                        style={{ background: '#111111', borderColor: (r && !r._error) ? `${a.accent}38` : 'rgba(192,57,43,0.25)', cursor: (r && !r._error) ? 'pointer' : 'default' }}
+                        className="gold-card lift p-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2.5">
                             <div className="rounded-lg p-2" style={{ background: `${a.accent}1a`, border: `1px solid ${a.accent}2a` }}><Icon size={15} style={{ color: a.accent }} /></div>
-                            <div><div style={{ ...MONO, fontWeight: 600 }} className="text-[13px] leading-tight">{a.name}</div><div style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px] mt-0.5">{a.role}</div></div>
+                            <div><div style={{ ...MONO, fontWeight: 600 }} className="text-[13px] leading-tight">{a.name}</div><div style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px] mt-0.5">{a.role}</div></div>
                           </div>
                           {ss && <span style={{ ...MONO, background: ss.bg, color: ss.fg }} className="text-[9px] font-semibold px-2 py-1 rounded whitespace-nowrap">{ss.label}</span>}
                         </div>
@@ -352,32 +352,32 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                           <div className="mt-3">
                             <div className="flex items-center justify-between gap-2 mb-2">
                               <p className="text-[13px] font-medium leading-snug" style={{ color: a.accent }}>{r.headline}</p>
-                              {typeof r.score === 'number' && <span style={{ ...MONO, color: 'rgba(226,221,213,0.40)' }} className="text-[10px] whitespace-nowrap">{r.score}/10</span>}
+                              {typeof r.score === 'number' && <span style={{ ...MONO, color: 'rgba(240,240,240,0.40)' }} className="text-[10px] whitespace-nowrap">{r.score}/10</span>}
                             </div>
                             <ul className="space-y-1.5">
                               {(r.points || []).map((p, j) => (
-                                <li key={j} className="flex gap-2 text-[12px] leading-snug" style={{ color: 'rgba(226,221,213,0.65)' }}>
+                                <li key={j} className="flex gap-2 text-[12px] leading-snug" style={{ color: 'rgba(240,240,240,0.65)' }}>
                                   <span style={{ color: a.accent }} className="mt-[3px]">▸</span><span>{p}</span>
                                 </li>
                               ))}
                             </ul>
                           </div>
                         )}
-                        {r?._error && <div className="mt-3 flex items-center gap-2" style={{ ...MONO, color: '#e85c5c' }}><AlertTriangle size={12} /><span className="text-[11px]">{r.errorCode || 'ERR-NET'}</span></div>}
-                        {r && !r._error && <div style={{ ...MONO, color: 'rgba(226,221,213,0.20)' }} className="mt-3 text-[9px] text-right">tap to hear ›</div>}
+                        {r?._error && <div className="mt-3 flex items-center gap-2" style={{ ...MONO, color: '#c0392b' }}><AlertTriangle size={12} /><span className="text-[11px]">{r.errorCode || 'ERR-NET'}</span></div>}
+                        {r && !r._error && <div style={{ ...MONO, color: 'rgba(240,240,240,0.20)' }} className="mt-3 text-[9px] text-right">tap to hear ›</div>}
                       </div>
                     );
                   })}
                 </div>
                 {(showLiveRound || ri < debateHistory.length - 1) && (
                   <div className="flex items-center gap-3 my-5">
-                    <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.05)' }} />
-                    <div className="flex items-center gap-1.5" style={{ ...MONO, color: 'rgba(226,221,213,0.22)', letterSpacing: '0.10em' }}>
+                    <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.05)' }} />
+                    <div className="flex items-center gap-1.5" style={{ ...MONO, color: 'rgba(240,240,240,0.22)', letterSpacing: '0.10em' }}>
                       <Swords size={11} />
                       <span className="text-[10px]">AGENTS REBUTTING</span>
                       <Swords size={11} />
                     </div>
-                    <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.05)' }} />
+                    <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.05)' }} />
                   </div>
                 )}
               </div>
@@ -386,22 +386,22 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
 
           {cooldown > 0 && (
             <div className="flex items-center gap-3 my-5">
-              <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.05)' }} />
+              <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.05)' }} />
               <div className="flex items-center gap-1.5" style={{ ...MONO, color: CY, letterSpacing: '0.10em' }}>
                 <Clock size={11} />
                 <span className="text-[10px]">RATE LIMIT COOLDOWN · {cooldown}s · ROUND 2 INCOMING</span>
                 <Clock size={11} />
               </div>
-              <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.05)' }} />
+              <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.05)' }} />
             </div>
           )}
 
           {showLiveRound && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
-                <span style={{ ...MONO, color: 'rgba(226,221,213,0.40)', letterSpacing: '0.10em' }} className="text-[10px]">{liveLabel}</span>
-                <div className="h-px flex-1" style={{ background: 'rgba(226,221,213,0.08)' }} />
+                <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.08)' }} />
+                <span style={{ ...MONO, color: 'rgba(240,240,240,0.40)', letterSpacing: '0.10em' }} className="text-[10px]">{liveLabel}</span>
+                <div className="h-px flex-1" style={{ background: 'rgba(240,240,240,0.08)' }} />
               </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {AGENTS.map(a => {
@@ -409,27 +409,27 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                   const Icon = a.icon; const r = st.result; const ss = r && STANCE_STYLE[r.stance];
                   return (
                     <div key={a.id} onClick={() => st.status === 'done' && r && openDrawer(a, r)}
-                      style={{ animation: st.status === 'done' ? 'cardIn .5s cubic-bezier(.2,.7,.2,1) both' : undefined, background: '#0e0f18', borderColor: st.status === 'done' ? `${a.accent}38` : 'rgba(226,221,213,0.07)', cursor: st.status === 'done' ? 'pointer' : 'default' }}
-                      className="lift relative border rounded-xl p-4 overflow-hidden transition-all">
+                      style={{ animation: st.status === 'done' ? 'cardIn .5s cubic-bezier(.2,.7,.2,1) both' : undefined, background: '#111111', borderColor: st.status === 'done' ? `${a.accent}38` : 'rgba(240,240,240,0.07)', cursor: st.status === 'done' ? 'pointer' : 'default' }}
+                      className="gold-card lift p-4 relative">
                       {st.status === 'running' && <div className="absolute left-0 right-0 h-12 scanline" style={{ background: `linear-gradient(${a.accent}18, transparent)` }} />}
                       <div className="flex items-start justify-between gap-2 relative">
                         <div className="flex items-center gap-2.5">
                           <div className="rounded-lg p-2" style={{ background: `${a.accent}1a`, border: `1px solid ${a.accent}2a` }}><Icon size={15} style={{ color: a.accent }} /></div>
-                          <div><div style={{ ...MONO, fontWeight: 600 }} className="text-[13px] leading-tight">{a.name}</div><div style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px] mt-0.5">{a.role}</div></div>
+                          <div><div style={{ ...MONO, fontWeight: 600 }} className="text-[13px] leading-tight">{a.name}</div><div style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px] mt-0.5">{a.role}</div></div>
                         </div>
                         {st.status === 'done' && ss && <span style={{ ...MONO, background: ss.bg, color: ss.fg }} className="text-[9px] font-semibold px-2 py-1 rounded whitespace-nowrap">{ss.label}</span>}
                       </div>
-                      {st.status === 'running' && <div className="mt-4 flex items-center gap-2" style={{ ...MONO, color: 'rgba(226,221,213,0.40)' }}><Loader2 size={13} className="animate-spin" /><span className="text-[11px]">{st.debating ? 'rebutting…' : 'analyzing…'}</span></div>}
-                      {st.status === 'error'   && <div className="mt-4 flex items-center gap-2" style={{ ...MONO, color: '#e85c5c' }}><AlertTriangle size={13} /><span className="text-[11px]">{st.errorCode || 'ERR-NET'} — retry</span></div>}
+                      {st.status === 'running' && <div className="mt-4 flex items-center gap-2" style={{ ...MONO, color: 'rgba(240,240,240,0.40)' }}><Loader2 size={13} className="animate-spin" /><span className="text-[11px]">{st.debating ? 'rebutting…' : 'analyzing…'}</span></div>}
+                      {st.status === 'error'   && <div className="mt-4 flex items-center gap-2" style={{ ...MONO, color: '#c0392b' }}><AlertTriangle size={13} /><span className="text-[11px]">{st.errorCode || 'ERR-NET'} — retry</span></div>}
                       {st.status === 'done' && r && (
                         <div className="mt-3 relative">
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <p className="text-[13px] font-medium leading-snug" style={{ color: a.accent }}>{r.headline}</p>
-                            {typeof r.score === 'number' && <span style={{ ...MONO, color: 'rgba(226,221,213,0.40)' }} className="text-[10px] whitespace-nowrap">{r.score}/10</span>}
+                            {typeof r.score === 'number' && <span style={{ ...MONO, color: 'rgba(240,240,240,0.40)' }} className="text-[10px] whitespace-nowrap">{r.score}/10</span>}
                           </div>
                           <ul className="space-y-1.5">
                             {(r.points || []).map((p, j) => (
-                              <li key={j} className="flex gap-2 text-[12px] leading-snug" style={{ color: 'rgba(226,221,213,0.65)' }}>
+                              <li key={j} className="flex gap-2 text-[12px] leading-snug" style={{ color: 'rgba(240,240,240,0.65)' }}>
                                 <span style={{ color: a.accent }} className="mt-[3px]">▸</span><span>{p}</span>
                               </li>
                             ))}
@@ -448,16 +448,16 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
       {active && (
         <div ref={synthRef} className="mt-5">
           {synthesis.status === 'running' && (
-            <div className="border rounded-xl p-6 flex items-center gap-3" style={{ ...MONO, background: '#0e0f18', borderColor: `${CY}28`, color: CY }}>
+            <div className="border rounded-xl p-6 flex items-center gap-3" style={{ ...MONO, background: '#111111', borderColor: `${CY}28`, color: CY }}>
               <Loader2 size={16} className="animate-spin" /><span className="text-sm">Portfolio Manager reviewing the full debate…</span>
             </div>
           )}
           {synthesis.status === 'error' && (
-            <div className="border rounded-xl p-5 flex items-center gap-3" style={{ ...MONO, background: '#0e0f18', borderColor: 'rgba(232,92,92,0.28)', color: '#e85c5c' }}>
+            <div className="border rounded-xl p-5 flex items-center gap-3" style={{ ...MONO, background: '#111111', borderColor: 'rgba(192,57,43,0.28)', color: '#c0392b' }}>
               <AlertTriangle size={16} />
               <div>
                 <div className="text-sm font-semibold">{synthesis.errorCode || 'ERR-NET'} — PM synthesis failed</div>
-                <div className="text-[11px] mt-0.5" style={{ color: 'rgba(226,221,213,0.40)' }}>
+                <div className="text-[11px] mt-0.5" style={{ color: 'rgba(240,240,240,0.40)' }}>
                   {synthesis.errorCode === 'ERR-401' ? 'Session expired — refresh the page.' :
                    synthesis.errorCode === 'ERR-429' ? 'Rate limit — wait 30 seconds and retry.' :
                    synthesis.errorCode === 'ERR-CFG' ? 'GROQ_API_KEY not set in Vercel env vars.' :
@@ -467,51 +467,51 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
             </div>
           )}
           {synthesis.status === 'done' && synthesis.result && vStyle && (
-            <div style={{ animation: 'cardIn .5s cubic-bezier(.2,.7,.2,1) both', background: '#0c0d14', borderColor: `${vStyle.fg}44`, boxShadow: `0 0 24px ${vStyle.fg}14` }}
+            <div style={{ animation: 'cardIn .5s cubic-bezier(.2,.7,.2,1) both', background: '#0d0d0d', borderColor: `${vStyle.fg}44`, boxShadow: `0 0 24px ${vStyle.fg}14` }}
               className="border rounded-xl p-5 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Crown size={14} style={{ color: CY }} />
-                <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.70)', fontWeight: 600 }} className="text-[11px]">PORTFOLIO MANAGER · FINAL RULING</span>
+                <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(240,240,240,0.70)', fontWeight: 600 }} className="text-[11px]">PORTFOLIO MANAGER · FINAL RULING</span>
               </div>
               <div className="flex items-center gap-5 flex-wrap">
                 <div style={{ background: vStyle.bg, border: `1px solid ${vStyle.fg}44` }} className="rounded-xl px-6 py-4 text-center">
                   <div style={{ ...MONO, color: vStyle.fg, letterSpacing: '0.08em', fontWeight: 700 }} className="text-3xl">{vStyle.label}</div>
-                  <div style={{ ...MONO, color: 'rgba(226,221,213,0.40)', letterSpacing: '0.10em' }} className="text-[10px] mt-1">{active} · {acctLabel}</div>
+                  <div style={{ ...MONO, color: 'rgba(240,240,240,0.40)', letterSpacing: '0.10em' }} className="text-[10px] mt-1">{active} · {acctLabel}</div>
                 </div>
                 <div className="flex-1 min-w-[160px]">
-                  <div className="flex items-center justify-between text-[11px] mb-1" style={{ ...MONO, color: 'rgba(226,221,213,0.45)' }}><span>CONVICTION</span><span>{synthesis.result.conviction}/10</span></div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(226,221,213,0.08)' }}>
+                  <div className="flex items-center justify-between text-[11px] mb-1" style={{ ...MONO, color: 'rgba(240,240,240,0.45)' }}><span>CONVICTION</span><span>{synthesis.result.conviction}/10</span></div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(240,240,240,0.08)' }}>
                     <div style={{ width: `${(synthesis.result.conviction / 10) * 100}%`, background: vStyle.fg, transition: 'width .8s ease' }} className="h-full rounded-full" />
                   </div>
-                  <div className="mt-3 flex items-start gap-2 text-[12px]" style={{ ...MONO, color: 'rgba(226,221,213,0.60)' }}>
-                    <TrendingUp size={13} className="mt-0.5 shrink-0" style={{ color: 'rgba(226,221,213,0.40)' }} /><span>{synthesis.result.sizing}</span>
+                  <div className="mt-3 flex items-start gap-2 text-[12px]" style={{ ...MONO, color: 'rgba(240,240,240,0.60)' }}>
+                    <TrendingUp size={13} className="mt-0.5 shrink-0" style={{ color: 'rgba(240,240,240,0.40)' }} /><span>{synthesis.result.sizing}</span>
                   </div>
                 </div>
               </div>
-              <p className="mt-4 text-[14px] leading-relaxed" style={{ ...SANS, color: 'rgba(226,221,213,0.80)' }}>{synthesis.result.summary}</p>
+              <p className="mt-4 text-[14px] leading-relaxed" style={{ ...SANS, color: 'rgba(240,240,240,0.80)' }}>{synthesis.result.summary}</p>
               {(synthesis.result.entry || synthesis.result.stopLoss || synthesis.result.takeProfit) && (
-                <div className="mt-4 rounded-xl p-4" style={{ background: 'rgba(226,221,213,0.02)', border: '1px solid rgba(226,221,213,0.07)' }}>
-                  <div style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.35)' }} className="text-[10px] mb-3">TRADE PLAN</div>
+                <div className="mt-4 rounded-xl p-4" style={{ background: 'rgba(240,240,240,0.02)', border: '1px solid rgba(240,240,240,0.07)' }}>
+                  <div style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(240,240,240,0.35)' }} className="text-[10px] mb-3">TRADE PLAN</div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {synthesis.result.entry && (<div><div className="flex items-center gap-1 mb-1"><Target size={10} style={{ color: ICE }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">AGGRESSIVE ENTRY</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: ICE }}>{synthesis.result.entry}</div></div>)}
-                    {synthesis.result.conservativeEntry && (<div><div className="flex items-center gap-1 mb-1"><Target size={10} style={{ color: `${ICE}80` }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">CONSERVATIVE ENTRY</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: `${ICE}cc` }}>{synthesis.result.conservativeEntry}</div></div>)}
-                    {synthesis.result.stopLoss && (<div><div className="flex items-center gap-1 mb-1"><TrendingDown size={10} style={{ color: '#e85c5c' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">STOP LOSS</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#e85c5c' }}>{synthesis.result.stopLoss}</div></div>)}
-                    {synthesis.result.invalidation && (<div><div className="flex items-center gap-1 mb-1"><X size={10} style={{ color: '#e85c5c' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">INVALIDATION</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: 'rgba(232,92,92,0.75)' }}>{synthesis.result.invalidation}</div></div>)}
-                    {synthesis.result.takeProfit && (<div><div className="flex items-center gap-1 mb-1"><TrendingUp size={10} style={{ color: '#2fcb8a' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">TAKE PROFIT</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#2fcb8a' }}>{synthesis.result.takeProfit}</div></div>)}
-                    {synthesis.result.positionSize && (<div><div className="flex items-center gap-1 mb-1"><Wallet size={10} style={{ color: CY }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">POSITION SIZE</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: CY }}>{synthesis.result.positionSize}</div></div>)}
-                    {synthesis.result.timeframe && (<div><div className="flex items-center gap-1 mb-1"><Clock size={10} style={{ color: 'rgba(226,221,213,0.40)' }} /><span style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">TIMEFRAME</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: 'rgba(226,221,213,0.70)' }}>{synthesis.result.timeframe}</div></div>)}
+                    {synthesis.result.entry && (<div><div className="flex items-center gap-1 mb-1"><Target size={10} style={{ color: ICE }} /><span style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px]">AGGRESSIVE ENTRY</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: ICE }}>{synthesis.result.entry}</div></div>)}
+                    {synthesis.result.conservativeEntry && (<div><div className="flex items-center gap-1 mb-1"><Target size={10} style={{ color: `${ICE}80` }} /><span style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px]">CONSERVATIVE ENTRY</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: `${ICE}cc` }}>{synthesis.result.conservativeEntry}</div></div>)}
+                    {synthesis.result.stopLoss && (<div><div className="flex items-center gap-1 mb-1"><TrendingDown size={10} style={{ color: '#c0392b' }} /><span style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px]">STOP LOSS</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#c0392b' }}>{synthesis.result.stopLoss}</div></div>)}
+                    {synthesis.result.invalidation && (<div><div className="flex items-center gap-1 mb-1"><X size={10} style={{ color: '#c0392b' }} /><span style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px]">INVALIDATION</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: 'rgba(192,57,43,0.75)' }}>{synthesis.result.invalidation}</div></div>)}
+                    {synthesis.result.takeProfit && (<div><div className="flex items-center gap-1 mb-1"><TrendingUp size={10} style={{ color: '#c9a84c' }} /><span style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px]">TAKE PROFIT</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: '#c9a84c' }}>{synthesis.result.takeProfit}</div></div>)}
+                    {synthesis.result.positionSize && (<div><div className="flex items-center gap-1 mb-1"><Wallet size={10} style={{ color: CY }} /><span style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px]">POSITION SIZE</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: CY }}>{synthesis.result.positionSize}</div></div>)}
+                    {synthesis.result.timeframe && (<div><div className="flex items-center gap-1 mb-1"><Clock size={10} style={{ color: 'rgba(240,240,240,0.40)' }} /><span style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[9px]">TIMEFRAME</span></div><div className="text-[13px] font-medium" style={{ ...MONO, color: 'rgba(240,240,240,0.70)' }}>{synthesis.result.timeframe}</div></div>)}
                   </div>
-                  {synthesis.result.mindChanger && (<div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(226,221,213,0.07)' }}><span style={{ ...MONO, color: 'rgba(226,221,213,0.30)', letterSpacing: '0.08em' }} className="text-[9px]">WOULD FLIP VERDICT: </span><span className="text-[12px]" style={{ ...SANS, color: 'rgba(226,221,213,0.55)' }}>{synthesis.result.mindChanger}</span></div>)}
+                  {synthesis.result.mindChanger && (<div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(240,240,240,0.07)' }}><span style={{ ...MONO, color: 'rgba(240,240,240,0.30)', letterSpacing: '0.08em' }} className="text-[9px]">WOULD FLIP VERDICT: </span><span className="text-[12px]" style={{ ...SANS, color: 'rgba(240,240,240,0.55)' }}>{synthesis.result.mindChanger}</span></div>)}
                 </div>
               )}
               <div className="mt-4 grid sm:grid-cols-2 gap-3">
-                <div className="rounded-lg p-3" style={{ background: 'rgba(47,203,138,0.05)', border: '1px solid rgba(47,203,138,0.16)' }}>
-                  <div style={{ ...MONO, color: '#2fcb8a', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">BULL</div>
-                  <ul className="space-y-1">{(synthesis.result.bull || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(226,221,213,0.70)' }}><span style={{ color: '#2fcb8a' }}>+</span>{b}</li>)}</ul>
+                <div className="rounded-lg p-3" style={{ background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.16)' }}>
+                  <div style={{ ...MONO, color: '#c9a84c', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">BULL</div>
+                  <ul className="space-y-1">{(synthesis.result.bull || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(240,240,240,0.70)' }}><span style={{ color: '#c9a84c' }}>+</span>{b}</li>)}</ul>
                 </div>
-                <div className="rounded-lg p-3" style={{ background: 'rgba(232,92,92,0.05)', border: '1px solid rgba(232,92,92,0.16)' }}>
-                  <div style={{ ...MONO, color: '#e85c5c', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">RISKS</div>
-                  <ul className="space-y-1">{(synthesis.result.risks || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(226,221,213,0.70)' }}><span style={{ color: '#e85c5c' }}>!</span>{b}</li>)}</ul>
+                <div className="rounded-lg p-3" style={{ background: 'rgba(192,57,43,0.05)', border: '1px solid rgba(192,57,43,0.16)' }}>
+                  <div style={{ ...MONO, color: '#c0392b', letterSpacing: '0.10em' }} className="text-[10px] mb-1.5">RISKS</div>
+                  <ul className="space-y-1">{(synthesis.result.risks || []).map((b, i) => <li key={i} className="text-[12px] flex gap-1.5" style={{ ...SANS, color: 'rgba(240,240,240,0.70)' }}><span style={{ color: '#c0392b' }}>!</span>{b}</li>)}</ul>
                 </div>
               </div>
             </div>
@@ -520,10 +520,10 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
       )}
 
       {!active && (
-        <div className="mt-12 text-center py-10 border border-dashed rounded-xl" style={{ borderColor: 'rgba(226,221,213,0.08)' }}>
+        <div className="mt-12 text-center py-10 border border-dashed rounded-xl" style={{ borderColor: 'rgba(240,240,240,0.08)' }}>
           <Crown size={28} className="mx-auto mb-3" style={{ color: CY, opacity: 0.22 }} />
-          <p style={{ ...SANS, color: 'rgba(226,221,213,0.45)' }} className="text-sm">Type a ticker and convene the council for {acctLabel}.</p>
-          <p style={{ ...MONO, color: 'rgba(226,221,213,0.25)' }} className="text-[11px] mt-2">6 specialists analyze → debate → PM delivers the ruling.</p>
+          <p style={{ ...SANS, color: 'rgba(240,240,240,0.45)' }} className="text-sm">Type a ticker and convene the council for {acctLabel}.</p>
+          <p style={{ ...MONO, color: 'rgba(240,240,240,0.25)' }} className="text-[11px] mt-2">6 specialists analyze → debate → PM delivers the ruling.</p>
         </div>
       )}
 
@@ -531,15 +531,15 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
         <>
           <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.55)' }} onClick={() => { stopSpeaking(); setDrawer(null); }} />
           <div className="fixed right-0 top-0 bottom-0 z-50 flex flex-col w-full max-w-sm"
-            style={{ background: '#0c0d14', borderLeft: `1px solid ${drawer.agent.accent}28`, animation: 'slideInRight .25s ease' }}>
-            <div className="flex items-center justify-between p-5" style={{ borderBottom: '1px solid rgba(226,221,213,0.07)' }}>
+            style={{ background: '#0d0d0d', borderLeft: `1px solid ${drawer.agent.accent}28`, animation: 'slideInRight .25s ease' }}>
+            <div className="flex items-center justify-between p-5" style={{ borderBottom: '1px solid rgba(240,240,240,0.07)' }}>
               <div className="flex items-center gap-3">
                 <div className="rounded-xl p-2.5" style={{ background: `${drawer.agent.accent}1a`, border: `1px solid ${drawer.agent.accent}33` }}>
                   <drawer.agent.icon size={16} style={{ color: drawer.agent.accent }} />
                 </div>
                 <div>
                   <div style={{ ...MONO, fontWeight: 700 }} className="text-[14px] leading-tight">{drawer.agent.name}</div>
-                  <div style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[10px] mt-0.5">{drawer.agent.role}</div>
+                  <div style={{ ...MONO, color: 'rgba(240,240,240,0.35)' }} className="text-[10px] mt-0.5">{drawer.agent.role}</div>
                 </div>
               </div>
               <button onClick={() => { stopSpeaking(); setDrawer(null); }} className="text-white/30 hover:text-white/70 transition-colors p-1">
@@ -554,22 +554,22 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                     {ss && <span style={{ ...MONO, background: ss.bg, color: ss.fg, fontSize: 11 }} className="font-bold px-3 py-1.5 rounded-lg">{ss.label}</span>}
                     {typeof drawer.result.score === 'number' && (
                       <div className="text-right">
-                        <div style={{ ...MONO, color: 'rgba(226,221,213,0.35)', letterSpacing: '0.10em' }} className="text-[10px] mb-1">CONVICTION</div>
-                        <div style={{ ...MONO, color: drawer.agent.accent }} className="text-lg font-bold">{drawer.result.score}<span style={{ color: 'rgba(226,221,213,0.30)' }} className="text-xs">/10</span></div>
+                        <div style={{ ...MONO, color: 'rgba(240,240,240,0.35)', letterSpacing: '0.10em' }} className="text-[10px] mb-1">CONVICTION</div>
+                        <div style={{ ...MONO, color: drawer.agent.accent }} className="text-lg font-bold">{drawer.result.score}<span style={{ color: 'rgba(240,240,240,0.30)' }} className="text-xs">/10</span></div>
                       </div>
                     )}
                   </div>
                 );
               })()}
               <div>
-                <div style={{ ...MONO, color: 'rgba(226,221,213,0.30)', letterSpacing: '0.10em' }} className="text-[9px] mb-1.5">HEADLINE</div>
+                <div style={{ ...MONO, color: 'rgba(240,240,240,0.30)', letterSpacing: '0.10em' }} className="text-[9px] mb-1.5">HEADLINE</div>
                 <p className="text-[15px] font-medium leading-snug" style={{ color: drawer.agent.accent }}>{drawer.result.headline}</p>
               </div>
               <div>
-                <div style={{ ...MONO, color: 'rgba(226,221,213,0.30)', letterSpacing: '0.10em' }} className="text-[9px] mb-2">ANALYSIS</div>
+                <div style={{ ...MONO, color: 'rgba(240,240,240,0.30)', letterSpacing: '0.10em' }} className="text-[9px] mb-2">ANALYSIS</div>
                 <ul className="space-y-3">
                   {(drawer.result.points || []).map((pt, i) => (
-                    <li key={i} className="flex gap-3 text-[13px] leading-relaxed" style={{ ...SANS, color: 'rgba(226,221,213,0.75)' }}>
+                    <li key={i} className="flex gap-3 text-[13px] leading-relaxed" style={{ ...SANS, color: 'rgba(240,240,240,0.75)' }}>
                       <span style={{ color: drawer.agent.accent }} className="mt-[2px] text-[10px]">▸</span>
                       <span>{pt}</span>
                     </li>
@@ -577,7 +577,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                 </ul>
               </div>
             </div>
-            <div className="p-5" style={{ borderTop: '1px solid rgba(226,221,213,0.07)' }}>
+            <div className="p-5" style={{ borderTop: '1px solid rgba(240,240,240,0.07)' }}>
               <button onClick={() => speaking ? stopSpeaking() : speakAgent(drawer.agent, drawer.result)}
                 style={{ ...MONO, background: speaking ? `${drawer.agent.accent}22` : `${drawer.agent.accent}18`, border: `1px solid ${drawer.agent.accent}40`, color: drawer.agent.accent }}
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl transition-all hover:brightness-110">

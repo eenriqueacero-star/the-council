@@ -65,19 +65,19 @@ Respond ONLY with JSON in a \`\`\`json block: {"stance":"PASS"|"FAIL"|"CAUTION",
 ];
 
 export const STANCE_STYLE = {
-  PASS:       { bg: 'rgba(47,203,138,0.12)',  fg: '#2fcb8a', label: 'PASS' },
-  FAIL:       { bg: 'rgba(232,92,92,0.12)',   fg: '#e85c5c', label: 'FAIL' },
-  CAUTION:    { bg: 'rgba(200,146,42,0.12)',  fg: '#c8922a', label: 'CAUTION' },
-  BEARISH:    { bg: 'rgba(232,92,92,0.12)',   fg: '#e85c5c', label: 'BEAR CASE' },
-  BUY:        { bg: 'rgba(47,203,138,0.14)',  fg: '#2fcb8a', label: 'BUY' },
-  WATCH:      { bg: 'rgba(200,146,42,0.14)',  fg: '#c8922a', label: 'WATCH' },
-  PASS_FINAL: { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'PASS' },
+  PASS:       { bg: 'rgba(201,168,76,0.12)',  fg: '#c9a84c', label: 'PASS' },
+  FAIL:       { bg: 'rgba(192,57,43,0.12)',   fg: '#c0392b', label: 'FAIL' },
+  CAUTION:    { bg: 'rgba(201,168,76,0.10)',  fg: '#c9a84c', label: 'CAUTION' },
+  BEARISH:    { bg: 'rgba(192,57,43,0.12)',   fg: '#c0392b', label: 'BEAR CASE' },
+  BUY:        { bg: 'rgba(201,168,76,0.14)',  fg: '#c9a84c', label: 'BUY' },
+  WATCH:      { bg: 'rgba(201,168,76,0.10)',  fg: '#c9a84c', label: 'WATCH' },
+  PASS_FINAL: { bg: 'rgba(192,57,43,0.14)',   fg: '#c0392b', label: 'PASS' },
 };
 
 export const WD_STYLE = {
-  HOLD:  { bg: 'rgba(47,203,138,0.12)',  fg: '#2fcb8a', label: 'HOLD' },
-  WATCH: { bg: 'rgba(200,146,42,0.12)',  fg: '#c8922a', label: 'WATCH' },
-  SELL:  { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'SELL SIGNAL' },
+  HOLD:  { bg: 'rgba(201,168,76,0.10)',  fg: '#c9a84c', label: 'HOLD' },
+  WATCH: { bg: 'rgba(201,168,76,0.08)',  fg: '#c9a84c', label: 'WATCH' },
+  SELL:  { bg: 'rgba(192,57,43,0.14)',   fg: '#c0392b', label: 'SELL SIGNAL' },
 };
 
 // ---- Demo data (Phase C will remove these) ----

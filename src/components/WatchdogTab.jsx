@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Radar, Loader2, AlertTriangle, Check, Eye, X, Play } from 'lucide-react';
-import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
+import { MONO, SANS, CY, ICE } from '../constants/styles.js';
 import { PROTOCOLS, WD_STYLE, DEMO_WD } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent } from '../api.js';
+
+const GOLD = '#c9a84c';
+const RED  = '#c0392b';
 
 export default function WatchdogTab({ acct, acctHoldings, flagApiDown, wdRunning, setWdRunning }) {
   const [wd, setWd]       = useState({});
@@ -45,28 +48,28 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
     <div className="mt-6">
       <div className="flex items-center gap-2 mb-1">
         <Radar size={14} style={{ color: ICE }} />
-        <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.70)', fontWeight: 600 }} className="text-[11px]">SELL-PROTOCOL WATCHDOG · {acct.label.toUpperCase()}</span>
+        <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(240,240,240,0.55)', fontWeight: 600, fontSize: 11 }}>SELL-PROTOCOL WATCHDOG · {acct.label.toUpperCase()}</span>
       </div>
-      <p style={{ ...SANS, color: 'rgba(226,221,213,0.52)' }} className="text-[13px] leading-relaxed mt-1">Scans every holding against your sell protocol — a SELL flag only fires on a confirmed weekly downtrend (lower highs/lower lows) with red candles, never on news or valuation alone.</p>
+      <p style={{ ...SANS, color: 'rgba(240,240,240,0.45)', fontSize: 13 }} className="leading-relaxed mt-1">Scans every holding against your sell protocol — a SELL flag only fires on a confirmed weekly downtrend (lower highs/lower lows) with red candles, never on news or valuation alone.</p>
 
       <div className="mt-4 flex gap-2 items-center">
         <button onClick={scanWatchdog} disabled={wdRunning}
-          style={{ ...MONO, letterSpacing: '0.10em', background: wdRunning ? `${ICE}33` : ICE, color: '#060c16', fontWeight: 600 }}
-          className="glow-btn px-5 py-3 rounded-lg flex items-center justify-center gap-2 transition-all hover:brightness-110 whitespace-nowrap disabled:cursor-not-allowed text-[13px]">
+          style={{ ...MONO, letterSpacing: '0.10em', background: wdRunning ? `${ICE}28` : ICE, color: '#060c16', fontWeight: 600, fontSize: 13 }}
+          className="glow-btn px-5 py-3 rounded-lg flex items-center justify-center gap-2 transition-all hover:brightness-110 whitespace-nowrap disabled:cursor-not-allowed">
           {wdRunning ? <><Loader2 size={15} className="animate-spin" /> SCANNING…</> : <><Radar size={14} /> SCAN ALL {acctHoldings.length} HOLDINGS</>}
         </button>
         <button onClick={runWatchdogDemo} disabled={wdRunning}
-          style={{ ...MONO, borderColor: `${CY}28`, color: CY }}
-          className="text-[11px] px-3 py-3 rounded-lg border transition-colors disabled:opacity-40 flex items-center gap-1.5">
+          style={{ ...MONO, borderColor: `rgba(201,168,76,0.22)`, color: GOLD, fontSize: 11 }}
+          className="px-3 py-3 rounded-lg border transition-colors disabled:opacity-40 flex items-center gap-1.5">
           <Play size={10} /> DEMO
         </button>
       </div>
 
       {wdRan && (wdFlagged > 0 || wdWatch > 0) && !wdRunning && (
         <div className="mt-4 rounded-xl p-3 flex items-center gap-3"
-          style={{ background: wdFlagged ? 'rgba(232,92,92,0.08)' : 'rgba(200,146,42,0.08)', border: `1px solid ${wdFlagged ? 'rgba(232,92,92,0.25)' : 'rgba(200,146,42,0.25)'}` }}>
-          <AlertTriangle size={14} style={{ color: wdFlagged ? '#e85c5c' : CY }} />
-          <span style={{ ...SANS, color: 'rgba(226,221,213,0.80)' }} className="text-[13px]">
+          style={{ background: wdFlagged ? 'rgba(192,57,43,0.08)' : 'rgba(201,168,76,0.08)', border: `1px solid ${wdFlagged ? 'rgba(192,57,43,0.25)' : 'rgba(201,168,76,0.22)'}` }}>
+          <AlertTriangle size={14} style={{ color: wdFlagged ? RED : GOLD }} />
+          <span style={{ ...SANS, color: 'rgba(240,240,240,0.78)', fontSize: 13 }}>
             {wdFlagged > 0 ? `${wdFlagged} holding(s) tripping the sell protocol` : `${wdWatch} holding(s) weakening — watch closely`}
             {wdFlagged > 0 && wdWatch > 0 ? `, ${wdWatch} more on watch.` : '.'}
           </span>
@@ -82,21 +85,21 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
             const Icon = sty ? iconMap[r.status] : Loader2;
             return (
               <div key={h}
-                style={{ animation: st.status === 'done' ? 'cardIn .4s ease both' : undefined, background: '#0e0f18', borderColor: sty ? `${sty.fg}33` : 'rgba(226,221,213,0.07)' }}
-                className="lift border rounded-xl p-3.5 flex items-start gap-3">
-                <div className="rounded-lg p-2 mt-0.5 shrink-0" style={{ background: sty ? sty.bg : 'rgba(226,221,213,0.04)' }}>
+                style={{ animation: st.status === 'done' ? 'cardIn .4s ease both' : undefined }}
+                className="gold-card lift flex items-start gap-3 p-3.5">
+                <div className="rounded-lg p-2 mt-0.5 shrink-0" style={{ background: sty ? sty.bg : 'rgba(255,255,255,0.04)' }}>
                   {st.status === 'running'
-                    ? <Loader2 size={14} className="animate-spin" style={{ color: 'rgba(226,221,213,0.30)' }} />
-                    : sty ? <Icon size={14} style={{ color: sty.fg }} /> : <Loader2 size={14} style={{ color: 'rgba(226,221,213,0.25)' }} />}
+                    ? <Loader2 size={14} className="animate-spin" style={{ color: 'rgba(240,240,240,0.28)' }} />
+                    : sty ? <Icon size={14} style={{ color: sty.fg }} /> : <Loader2 size={14} style={{ color: 'rgba(240,240,240,0.22)' }} />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span style={{ ...MONO, fontWeight: 700 }} className="text-[13px]">{h}</span>
-                    {sty && <span style={{ ...MONO, background: sty.bg, color: sty.fg, letterSpacing: '0.08em' }} className="text-[9px] font-semibold px-2 py-0.5 rounded whitespace-nowrap">{sty.label}</span>}
+                    <span style={{ ...MONO, fontWeight: 700, fontSize: 13 }}>{h}</span>
+                    {sty && <span style={{ ...MONO, background: sty.bg, color: sty.fg, letterSpacing: '0.08em', fontSize: 9 }} className="font-semibold px-2 py-0.5 rounded whitespace-nowrap">{sty.label}</span>}
                   </div>
-                  {st.status === 'running' && <div style={{ ...MONO, color: 'rgba(226,221,213,0.28)' }} className="text-[11px] mt-1">checking weekly…</div>}
-                  {st.status === 'error'   && <div style={{ ...MONO, color: '#e85c5c' }} className="text-[11px] mt-1">scan error</div>}
-                  {r && <p style={{ ...SANS, color: 'rgba(226,221,213,0.60)' }} className="text-[12px] leading-snug mt-1">{r.note}</p>}
+                  {st.status === 'running' && <div style={{ ...MONO, color: 'rgba(240,240,240,0.26)', fontSize: 11 }} className="mt-1">checking weekly…</div>}
+                  {st.status === 'error'   && <div style={{ ...MONO, color: RED, fontSize: 11 }} className="mt-1">scan error</div>}
+                  {r && <p style={{ ...SANS, color: 'rgba(240,240,240,0.58)', fontSize: 12 }} className="leading-snug mt-1">{r.note}</p>}
                 </div>
               </div>
             );
@@ -105,9 +108,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
       )}
 
       {!wdRan && (
-        <div className="mt-8 text-center py-10 border border-dashed rounded-xl" style={{ borderColor: 'rgba(226,221,213,0.08)' }}>
+        <div className="mt-8 text-center py-10 rounded-xl" style={{ border: '1px dashed rgba(201,168,76,0.12)' }}>
           <Radar size={28} className="mx-auto mb-3" style={{ color: ICE, opacity: 0.22 }} />
-          <p style={{ ...SANS, color: 'rgba(226,221,213,0.42)' }} className="text-sm">Scan {acct.label}'s {acctHoldings.length} holdings against the sell protocol.</p>
+          <p style={{ ...SANS, color: 'rgba(240,240,240,0.38)', fontSize: 14 }}>Scan {acct.label}'s {acctHoldings.length} holdings against the sell protocol.</p>
         </div>
       )}
     </div>

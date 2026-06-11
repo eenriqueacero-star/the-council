@@ -1,8 +1,9 @@
-export const MONO = { fontFamily: "'IBM Plex Mono', 'JetBrains Mono', monospace" };
-export const DISP = { fontFamily: "'Chakra Petch', sans-serif" };
-export const SANS = { fontFamily: "'IBM Plex Sans', 'Inter', sans-serif" };
-export const CY   = '#38e0d4';   // cyan — interactive accent
-export const ICE  = '#7db8e8';   // steel blue — AI outputs
-export const GOLD = '#f5c451';   // gold
-export const GRN  = '#00C805';   // green
-export const RED  = '#FF4444';   // red
+export const FONT = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
+export const MONO = { fontFamily: "ui-monospace, 'SF Mono', 'Fira Code', monospace" };
+export const DISP = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
+export const SANS = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
+export const CY   = '#000000';
+export const ICE  = '#3B82F6';
+export const GRN  = '#00C805';
+export const RED  = '#FF3B30';
+export const GOLD = '#F59E0B';

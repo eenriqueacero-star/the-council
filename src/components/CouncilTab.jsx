@@ -13,6 +13,44 @@ import { loadTickerHistory } from '../utils/rulingContext.js';
 
 const MAX_ROUNDS = 2;
 
+function ConsensusBar({ roundResults }) {
+  const valid  = AGENTS.map(a => roundResults[a.id]).filter(r => r && !r._error);
+  const bull    = valid.filter(r => ['PASS', 'BUY'].includes(r.stance)).length;
+  const bear    = valid.filter(r => ['FAIL', 'BEARISH'].includes(r.stance)).length;
+  const caution = valid.filter(r => r.stance === 'CAUTION').length;
+  const total   = valid.length;
+  if (total === 0) return null;
+
+  let signal, signalColor, sizing;
+  if      (bull >= 5)                  { signal = 'STRONG BULL'; signalColor = '#2fcb8a'; sizing = 'Size normal'; }
+  else if (bull >= 4 && bear <= 1)     { signal = 'LEAN BULL';   signalColor = '#2fcb8a'; sizing = 'Size normal'; }
+  else if (bear >= 5)                  { signal = 'STRONG BEAR'; signalColor = '#e85c5c'; sizing = 'Lean PASS'; }
+  else if (bear >= 4 && bull <= 1)     { signal = 'LEAN BEAR';   signalColor = '#e85c5c'; sizing = 'Size small'; }
+  else                                 { signal = 'DIVIDED';      signalColor = '#c8922a'; sizing = 'Size small — split council'; }
+
+  return (
+    <div className="mt-4 mb-1 rounded-xl p-4" style={{ background: '#0e0f18', border: '1px solid rgba(226,221,213,0.07)', animation: 'cardIn .4s ease both' }}>
+      <div className="flex items-center justify-between mb-2">
+        <span style={{ ...MONO, color: 'rgba(226,221,213,0.35)', letterSpacing: '0.10em' }} className="text-[10px]">CONSENSUS METER</span>
+        <span style={{ ...MONO, color: signalColor, fontWeight: 700, letterSpacing: '0.08em' }} className="text-[11px]">{signal}</span>
+      </div>
+      <div className="flex rounded-full overflow-hidden gap-px" style={{ height: 6 }}>
+        {bull    > 0 && <div style={{ flex: bull,    background: '#2fcb8a', transition: 'flex .6s ease' }} />}
+        {caution > 0 && <div style={{ flex: caution, background: '#c8922a', transition: 'flex .6s ease' }} />}
+        {bear    > 0 && <div style={{ flex: bear,    background: '#e85c5c', transition: 'flex .6s ease' }} />}
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex gap-3">
+          {bull    > 0 && <span style={{ ...MONO, color: '#2fcb8a' }} className="text-[10px]">{bull} BULL</span>}
+          {caution > 0 && <span style={{ ...MONO, color: '#c8922a' }} className="text-[10px]">{caution} CAUTION</span>}
+          {bear    > 0 && <span style={{ ...MONO, color: '#e85c5c' }} className="text-[10px]">{bear} BEAR</span>}
+        </div>
+        <span style={{ ...MONO, color: 'rgba(226,221,213,0.28)' }} className="text-[10px]">{sizing}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function CouncilTab({ account, acct, positionsLine, flagApiDown, running, setRunning, ticker, setTicker, capital, setCapital, active, setActive, agentState, setAgentState, synthesis, setSynthesis, councilAccounts, setCouncilAccounts, councilPositionsLine }) {
   const synthRef = useRef(null);
   const [liveSearch, setLiveSearch] = useState(false);
@@ -422,6 +460,10 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
         </div>
       )}
 
+      {debateHistory.length > 0 && !showLiveRound && (
+        <ConsensusBar roundResults={debateHistory[debateHistory.length - 1]} />
+      )}
+
       {active && (
         <div ref={synthRef} className="mt-5">
           {synthesis.status === 'running' && (
@@ -554,7 +596,8 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
                 </ul>
               </div>
             </div>
-            <div className="p-5" style={{ borderTop: '1px solid rgba(226,221,213,0.07)' }}>
+            <div className="p-5" style={{ borderTop: '1px solid rgba(226,221,213,0.07)' }}
+            >
               <button onClick={() => speaking ? stopSpeaking() : speakAgent(drawer.agent, drawer.result)}
                 style={{ ...MONO, background: speaking ? `${drawer.agent.accent}22` : `${drawer.agent.accent}18`, border: `1px solid ${drawer.agent.accent}40`, color: drawer.agent.accent }}
                 className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl transition-all hover:brightness-110">

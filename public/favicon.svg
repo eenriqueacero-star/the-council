@@ -1,85 +1,75 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+
   <!-- Background -->
   <rect width="512" height="512" rx="90" fill="#080808"/>
-  <rect width="512" height="512" rx="90" fill="none" stroke="rgba(201,168,76,0.18)" stroke-width="3"/>
 
-  <!-- ── HOODED CLOAK SILHOUETTE ── -->
-  <!-- Outer cloak: pointed hood, flaring shoulders, sweeping to base -->
-  <path d="
-    M256,38
-    C228,38 196,56 176,84
-    L152,136 L140,200 L136,268
-    C134,286 142,302 158,310
-    L128,490 L384,490
-    L354,310
-    C370,302 378,286 376,268
-    L372,200 L360,136
-    L336,84
-    C316,56 284,38 256,38 Z
-  " fill="#0f0f0f"/>
+  <!-- Outermost glow ring -->
+  <circle cx="256" cy="256" r="214" fill="none" stroke="#c9a84c" stroke-width="2.5" opacity="0.12"/>
 
-  <!-- Hood interior shadow for depth -->
-  <path d="
-    M256,46
-    C230,46 200,63 182,90
-    L160,140 L148,202 L144,266
-    C142,282 149,296 163,303
-    L256,293 L349,303
-    C363,296 370,282 368,266
-    L364,202 L352,140
-    L330,90
-    C312,63 282,46 256,46 Z
-  " fill="#0b0b0b"/>
+  <!-- Primary seal ring -->
+  <circle cx="256" cy="256" r="206" fill="none" stroke="#c9a84c" stroke-width="5.5"/>
 
-  <!-- Cloak edge glow lines -->
-  <path d="M128,490 L152,310" fill="none" stroke="rgba(201,168,76,0.10)" stroke-width="2"/>
-  <path d="M384,490 L360,310" fill="none" stroke="rgba(201,168,76,0.10)" stroke-width="2"/>
+  <!-- Inner accent ring -->
+  <circle cx="256" cy="256" r="194" fill="none" stroke="#c9a84c" stroke-width="1.5" opacity="0.32"/>
 
-  <!-- ── FACE / MASK ── -->
-  <!-- Face oval beneath hood -->
-  <ellipse cx="256" cy="252" rx="100" ry="92" fill="#090909"/>
+  <!-- Cardinal point diamonds (seated on the primary ring at N/S/E/W) -->
+  <!-- North (256, 50) -->
+  <polygon points="256,41 265,50 256,59 247,50" fill="#c9a84c"/>
+  <!-- South (256, 462) -->
+  <polygon points="256,453 265,462 256,471 247,462" fill="#c9a84c"/>
+  <!-- East (462, 256) -->
+  <polygon points="453,256 462,247 471,256 462,265" fill="#c9a84c"/>
+  <!-- West (50, 256) -->
+  <polygon points="41,256 50,247 59,256 50,265" fill="#c9a84c"/>
 
-  <!-- Bandit eye-mask band -->
-  <rect x="144" y="218" width="224" height="62" rx="14" fill="#060606"/>
-  <rect x="144" y="218" width="224" height="62" rx="14" fill="none" stroke="rgba(201,168,76,0.06)" stroke-width="1"/>
+  <!-- Ordinal tick marks at 45° (NE/SE/SW/NW) — small dash tangent to ring -->
+  <!-- NE: (256+206·cos45°, 256-206·sin45°) ≈ (401,111) -->
+  <line x1="394" y1="104" x2="408" y2="118" stroke="#c9a84c" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+  <!-- SE: (401,401) -->
+  <line x1="394" y1="408" x2="408" y2="394" stroke="#c9a84c" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+  <!-- SW: (111,401) -->
+  <line x1="104" y1="394" x2="118" y2="408" stroke="#c9a84c" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+  <!-- NW: (111,111) -->
+  <line x1="118" y1="104" x2="104" y2="118" stroke="#c9a84c" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
 
-  <!-- ── GOLD EYES ── -->
-  <!-- Left eye -->
-  <ellipse cx="206" cy="249" rx="34" ry="24" fill="rgba(201,168,76,0.18)"/>
-  <ellipse cx="206" cy="249" rx="26" ry="18" fill="#c9a84c"/>
-  <ellipse cx="206" cy="249" rx="18" ry="12" fill="#d9b85c"/>
-  <ellipse cx="199" cy="244" rx="8" ry="6"  fill="#f0e090" opacity="0.65"/>
-  <!-- Slit pupil -->
-  <ellipse cx="206" cy="249" rx="6"  ry="15" fill="#0a0800" opacity="0.8"/>
+  <!-- ════════════  S W O R D  ════════════ -->
 
-  <!-- Right eye -->
-  <ellipse cx="306" cy="249" rx="34" ry="24" fill="rgba(201,168,76,0.18)"/>
-  <ellipse cx="306" cy="249" rx="26" ry="18" fill="#c9a84c"/>
-  <ellipse cx="306" cy="249" rx="18" ry="12" fill="#d9b85c"/>
-  <ellipse cx="299" cy="244" rx="8" ry="6"  fill="#f0e090" opacity="0.65"/>
-  <!-- Slit pupil -->
-  <ellipse cx="306" cy="249" rx="6"  ry="15" fill="#0a0800" opacity="0.8"/>
+  <!-- Blade glow (slightly wider, very faint — creates ambient luminance) -->
+  <path d="M256,108 L278,312 L234,312 Z" fill="#c9a84c" opacity="0.08"/>
 
-  <!-- ── GOLD SWORD ── -->
+  <!-- Blade body (double-edged triangle, tip up) -->
+  <path d="M256,108 L270,312 L242,312 Z" fill="#c9a84c"/>
+
+  <!-- Fuller — center groove highlight -->
+  <line x1="256" y1="120" x2="256" y2="308"
+        stroke="#f5ecc8" stroke-width="1.5" stroke-linecap="round" opacity="0.28"/>
+
+  <!-- Bevel edge details — thin lines along each edge of the blade -->
+  <line x1="256" y1="108" x2="242" y2="312"
+        stroke="#916820" stroke-width="1" stroke-linecap="round" opacity="0.45"/>
+  <line x1="256" y1="108" x2="270" y2="312"
+        stroke="#916820" stroke-width="1" stroke-linecap="round" opacity="0.45"/>
+
   <!-- Crossguard -->
-  <rect x="214" y="316" width="84" height="18" rx="9" fill="#c9a84c"/>
-  <rect x="214" y="316" width="84" height="7"  rx="3.5" fill="#e8c97a" opacity="0.5"/>
-  <!-- Crossguard end gems -->
-  <circle cx="214" cy="325" r="7" fill="#c9a84c"/>
-  <circle cx="298" cy="325" r="7" fill="#c9a84c"/>
-  <circle cx="214" cy="325" r="4" fill="#e8c97a" opacity="0.5"/>
-  <circle cx="298" cy="325" r="4" fill="#e8c97a" opacity="0.5"/>
+  <rect x="206" y="309" width="100" height="17" rx="8.5" fill="#c9a84c"/>
+  <!-- Crossguard top-edge highlight -->
+  <rect x="206" y="309" width="100" height="6"  rx="3"   fill="#e8c97a" opacity="0.40"/>
+  <!-- Crossguard end caps -->
+  <circle cx="206" cy="317.5" r="8.5" fill="#c9a84c"/>
+  <circle cx="306" cy="317.5" r="8.5" fill="#c9a84c"/>
 
-  <!-- Blade: tapers to a point -->
-  <path d="M248,334 L242,474 L256,496 L270,474 L264,334 Z" fill="#c9a84c"/>
-  <!-- Fuller (center groove) -->
-  <line x1="256" y1="338" x2="256" y2="470" stroke="#e8c97a" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
-  <!-- Edge bevels -->
-  <line x1="248" y1="334" x2="242" y2="474" stroke="#b08830" stroke-width="1" opacity="0.55"/>
-  <line x1="264" y1="334" x2="270" y2="474" stroke="#b08830" stroke-width="1" opacity="0.55"/>
+  <!-- Grip / handle -->
+  <rect x="249" y="326" width="14" height="46" rx="7" fill="#c9a84c"/>
+  <!-- Grip wrapping bands -->
+  <rect x="248" y="334" width="16" height="3" rx="1.5" fill="#0a0800" opacity="0.38"/>
+  <rect x="248" y="343" width="16" height="3" rx="1.5" fill="#0a0800" opacity="0.38"/>
+  <rect x="248" y="352" width="16" height="3" rx="1.5" fill="#0a0800" opacity="0.38"/>
+  <rect x="248" y="361" width="16" height="3" rx="1.5" fill="#0a0800" opacity="0.38"/>
 
   <!-- Pommel -->
-  <ellipse cx="256" cy="499" rx="16" ry="11" fill="#c9a84c"/>
-  <ellipse cx="256" cy="499" rx="10" ry="7"  fill="#d9b85c"/>
-  <ellipse cx="252" cy="496" rx="4"  ry="3"  fill="#f0e090" opacity="0.6"/>
+  <circle cx="256" cy="388" r="22"   fill="#c9a84c"/>
+  <circle cx="256" cy="388" r="14.5" fill="#d4ad52"/>
+  <!-- Pommel facet highlight -->
+  <ellipse cx="251" cy="383" rx="6" ry="4.5" fill="#f0e090" opacity="0.50"/>
+
 </svg>

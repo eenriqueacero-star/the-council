@@ -1,19 +1,19 @@
 import { Activity, Telescope, Shield, Globe, Swords, Wallet } from 'lucide-react';
 
 export const ROADMAP = [
-  { tier: 'BUILT', color: '#38e08a', items: [
+  { tier: 'BUILT', color: '#c9a84c', items: [
     { name: '6-Agent Council', desc: '6 specialists → PM ruling on any buy idea' },
     { name: 'Account Selector', desc: 'Edwin / Dad / Bro — sizing judged per account' },
     { name: 'Capital Input', desc: 'State available cash; Position Sizer returns dollars + shares' },
     { name: 'Smart DCA Allocator', desc: 'Routes weekly/monthly DCA into the best dip, not spread thin' },
     { name: 'Sell-Protocol Watchdog', desc: 'Scans all holdings; flags only confirmed weekly downtrends' },
   ]},
-  { tier: 'HIGH VALUE — NEXT', color: '#f5c451', items: [
+  { tier: 'HIGH VALUE — NEXT', color: '#e8c97a', items: [
     { name: 'Council on Holdings (HOLD/TRIM)', desc: 'Same 6 agents pointed at what you already own, not just new buys' },
     { name: 'Scout Mode', desc: 'Council auto-runs on your watchlist; surfaces only 7+ that pass the gates' },
     { name: 'Alpha Tracker vs SPY', desc: 'Logs every ruling, grades it later vs SPY — is the council making money?' },
   ]},
-  { tier: 'STRONG EDGE', color: '#38e0d4', items: [
+  { tier: 'STRONG EDGE', color: '#7db8e8', items: [
     { name: 'Earnings Radar', desc: 'Countdown to every holding\'s earnings + auto pre-earnings council review 3 days out' },
     { name: 'Correlation Heatmap', desc: 'Visual of how clustered the AI-infra bets really are — concentration at a glance' },
     { name: 'Devil\'s Advocate Stress Test', desc: 'Bear agent goes max-aggressive on any holding to pressure-test the thesis' },

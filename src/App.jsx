@@ -34,17 +34,13 @@ export default function App() {
 
   const [positions, setPositions] = useState(() => {
     const defaults = {};
-    Object.entries(ACCOUNTS).forEach(([k, a]) => {
-      defaults[k] = {};
-      a.holdings.forEach(t => (defaults[k][t] = { shares: '', cost: '' }));
-    });
+    Object.entries(ACCOUNTS).forEach(([k]) => { defaults[k] = {}; });
     try {
       const saved = localStorage.getItem('council_positions');
       if (saved) {
         const parsed = JSON.parse(saved);
-        Object.entries(ACCOUNTS).forEach(([k, a]) => {
-          if (!parsed[k]) parsed[k] = defaults[k];
-          else a.holdings.forEach(t => { if (!parsed[k][t]) parsed[k][t] = { shares: '', cost: '' }; });
+        Object.entries(ACCOUNTS).forEach(([k]) => {
+          if (!parsed[k]) parsed[k] = {};
         });
         return parsed;
       }
@@ -55,11 +51,9 @@ export default function App() {
   const posLoadedRef = useRef(false);
   const saveTimerRef = useRef(null);
 
-  // Wait for Firebase Auth to restore session before loading positions from Firestore.
-  // auth.currentUser is always null on mount — it resolves async.
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, user => {
-      unsub(); // one-shot: unsubscribe after first auth state is known
+      unsub();
       if (!user) { posLoadedRef.current = true; return; }
       getDoc(doc(db, 'users', user.uid, 'data', 'positions')).then(snap => {
         if (snap.exists() && snap.data().positions) {
@@ -127,17 +121,14 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: "'JetBrains Mono', monospace", background: '#080910', color: '#e2ddd5', minHeight: '100vh' }} className="relative overflow-hidden">
-      {/* Single ambient amber glow — top only */}
       <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -8%, rgba(200,146,42,0.07), transparent 52%)' }} />
 
-      {/* Boot sequence overlay */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#080910', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', animation: 'bootFade 2s ease forwards', pointerEvents: 'none' }}>
         <ArcReactor size={80} />
         <div style={{ ...DISP, color: CY, letterSpacing: '0.28em', fontWeight: 700 }} className="text-sm neon">THE COUNCIL</div>
         <div style={{ ...MONO, animation: 'bootText 1.3s steps(30) forwards', color: 'rgba(226,221,213,0.35)' }} className="text-[10px] tracking-[0.18em] overflow-hidden whitespace-nowrap">CALIBRATING 6 AGENTS · LOADING PROTOCOLS · ONLINE</div>
       </div>
 
-      {/* HUD corner brackets */}
       <div className="pointer-events-none fixed inset-0 z-20">
         {[['top-3 left-3', 0], ['top-3 right-3', 1], ['bottom-3 left-3', 2], ['bottom-3 right-3', 3]].map(([pos, i]) => (
           <div key={i} className={`absolute ${pos} w-5 h-5`} style={{

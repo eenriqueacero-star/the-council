@@ -15,6 +15,7 @@ import DCATab from './components/DCATab.jsx';
 import WatchdogTab from './components/WatchdogTab.jsx';
 import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
+import ChangelogTab from './components/ChangelogTab.jsx';
 
 export default function App() {
   const [account, setAccount] = useState(() => localStorage.getItem('council_account') || 'edwin');
@@ -120,23 +121,33 @@ export default function App() {
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown };
 
   return (
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", background: '#080910', color: '#e2ddd5', minHeight: '100vh' }} className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -8%, rgba(200,146,42,0.07), transparent 52%)' }} />
+    <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", background: '#070a0c', color: '#e8eef0', minHeight: '100vh' }} className="relative overflow-hidden">
+      {/* Animated grid */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.4]" style={{ backgroundImage: 'linear-gradient(rgba(56,224,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(56,224,212,0.04) 1px, transparent 1px)', backgroundSize: '44px 44px', animation: 'gridmove 8s linear infinite' }} />
+      {/* Radial glow */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -10%, rgba(245,196,81,0.10), transparent 55%)' }} />
+      {/* Floating orbs */}
+      <div className="orb pointer-events-none absolute -top-20 -left-20 w-72 h-72 rounded-full" style={{ background: 'radial-gradient(circle, rgba(56,224,212,0.10), transparent 70%)', filter: 'blur(8px)' }} />
+      <div className="orb pointer-events-none absolute top-1/3 -right-24 w-80 h-80 rounded-full" style={{ background: 'radial-gradient(circle, rgba(176,131,255,0.09), transparent 70%)', filter: 'blur(8px)', animationDelay: '3s' }} />
+      {/* CRT scanline */}
+      <div className="crtline" />
 
-      <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#080910', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', animation: 'bootFade 2s ease forwards', pointerEvents: 'none' }}>
-        <ArcReactor size={80} />
-        <div style={{ ...DISP, color: CY, letterSpacing: '0.28em', fontWeight: 700 }} className="text-sm neon">THE COUNCIL</div>
-        <div style={{ ...MONO, animation: 'bootText 1.3s steps(30) forwards', color: 'rgba(226,221,213,0.35)' }} className="text-[10px] tracking-[0.18em] overflow-hidden whitespace-nowrap">CALIBRATING 6 AGENTS · LOADING PROTOCOLS · ONLINE</div>
+      {/* Boot sequence overlay */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#070a0c', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', animation: 'bootFade 2s ease forwards', pointerEvents: 'none' }}>
+        <ArcReactor size={96} />
+        <div style={{ ...DISP, color: CY }} className="text-sm tracking-[0.42em] neon">THE COUNCIL</div>
+        <div style={{ ...MONO, animation: 'bootText 1.3s steps(30) forwards' }} className="text-white/45 text-[10px] tracking-[0.22em] overflow-hidden whitespace-nowrap">CALIBRATING 6 AGENTS · LOADING PROTOCOLS · ONLINE</div>
       </div>
 
+      {/* HUD corner brackets */}
       <div className="pointer-events-none fixed inset-0 z-20">
         {[['top-3 left-3', 0], ['top-3 right-3', 1], ['bottom-3 left-3', 2], ['bottom-3 right-3', 3]].map(([pos, i]) => (
-          <div key={i} className={`absolute ${pos} w-5 h-5`} style={{
-            borderTop:    i < 2  ? `1px solid ${CY}` : 'none',
-            borderBottom: i >= 2 ? `1px solid ${CY}` : 'none',
-            borderLeft:   i % 2 === 0 ? `1px solid ${CY}` : 'none',
-            borderRight:  i % 2 === 1 ? `1px solid ${CY}` : 'none',
-            opacity: 0.28,
+          <div key={i} className={`absolute ${pos} w-6 h-6`} style={{
+            borderTop:    i < 2  ? `1.5px solid ${CY}` : 'none',
+            borderBottom: i >= 2 ? `1.5px solid ${CY}` : 'none',
+            borderLeft:   i % 2 === 0 ? `1.5px solid ${CY}` : 'none',
+            borderRight:  i % 2 === 1 ? `1.5px solid ${CY}` : 'none',
+            opacity: 0.4, filter: `drop-shadow(0 0 4px ${CY})`,
           }} />
         ))}
       </div>
@@ -173,8 +184,9 @@ export default function App() {
         {tab === 'watchdog'  && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
         {tab === 'alpha'     && <AlphaTrackerTab account={account} />}
         {tab === 'roadmap'   && <RoadmapTab />}
+        {tab === 'changelog' && <ChangelogTab />}
 
-        <p className="mt-8 text-[10px] text-center leading-relaxed" style={{ ...MONO, color: 'rgba(226,221,213,0.20)' }}>THE COUNCIL · LIVE AI AGENTS · NOT FINANCIAL ADVICE — YOU EXECUTE, YOU DECIDE</p>
+        <p className="mt-8 text-[10px] text-white/25 text-center leading-relaxed" style={MONO}>THE COUNCIL · LIVE AI AGENTS · NOT FINANCIAL ADVICE — YOU EXECUTE, YOU DECIDE</p>
       </div>
     </div>
   );

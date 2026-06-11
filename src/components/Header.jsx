@@ -3,19 +3,17 @@ import { LogOut } from 'lucide-react';
 
 export default function Header({ onSignOut }) {
   return (
-    <header
-      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-white md:pl-[240px]"
-      style={{ height: 52, borderBottom: '1px solid #EEEEEE', paddingLeft: 16, paddingRight: 16 }}
-    >
-      <span style={{ fontSize: 14, fontWeight: 700, color: '#000000', letterSpacing: '0.02em' }}>THE COUNCIL</span>
-      <button
-        onClick={onSignOut}
-        title="Sign out"
-        className="flex items-center justify-center rounded-full transition-colors hover:bg-gray-100"
-        style={{ width: 36, height: 36, color: '#757575' }}
-      >
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '1px solid #EEEEEE', marginBottom: 4 }}>
+      <div>
+        <h1 style={{ fontWeight: 700, fontSize: 20, letterSpacing: '-0.02em', color: '#000000', margin: 0 }}>The Council</h1>
+        <p style={{ fontSize: 12, color: '#AAAAAA', margin: '2px 0 0' }}>AI Investment Intelligence</p>
+      </div>
+      <button onClick={onSignOut} title="Sign out"
+        style={{ color: '#AAAAAA', background: 'transparent', border: 'none', cursor: 'pointer', padding: 8, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onMouseEnter={e => (e.currentTarget.style.color = '#000000')}
+        onMouseLeave={e => (e.currentTarget.style.color = '#AAAAAA')}>
         <LogOut size={16} />
       </button>
-    </header>
+    </div>
   );
 }

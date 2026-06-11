@@ -3,6 +3,7 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ACCOUNTS } from './constants/agents.js';
+import { SANS } from './constants/styles.js';
 import Header from './components/Header.jsx';
 import AccountSelector from './components/AccountSelector.jsx';
 import TabNav from './components/TabNav.jsx';
@@ -16,15 +17,17 @@ import RoadmapTab from './components/RoadmapTab.jsx';
 
 export default function App() {
   const [account, setAccount] = useState(() => localStorage.getItem('council_account') || 'edwin');
-  const [tab, setTab] = useState('chat');
+  const [tab,     setTab]     = useState('chat');
   const [apiDown, setApiDown] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [wdRunning, setWdRunning] = useState(false);
-  const [ticker, setTicker] = useState('');
-  const [capital, setCapital] = useState('');
-  const [active, setActive] = useState(null);
+
+  const [running,    setRunning]    = useState(false);
+  const [wdRunning,  setWdRunning]  = useState(false);
+  const [ticker,     setTicker]     = useState('');
+  const [capital,    setCapital]    = useState('');
+  const [active,     setActive]     = useState(null);
   const [agentState, setAgentState] = useState({});
-  const [synthesis, setSynthesis] = useState({ status: 'idle', result: null });
+  const [synthesis,  setSynthesis]  = useState({ status: 'idle', result: null });
+
   const [councilAccounts, setCouncilAccounts] = useState([account]);
   useEffect(() => { setCouncilAccounts([account]); }, [account]);
 
@@ -87,7 +90,7 @@ export default function App() {
 
   function buildCombinedLine(selectedAccounts) {
     return selectedAccounts.map(k => {
-      const a = ACCOUNTS[k];
+      const a  = ACCOUNTS[k];
       const pm = positions[k] || {};
       const holdings = Object.keys(pm).length ? Object.keys(pm) : a.holdings;
       const line = holdings.map(t => { const p = pm[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
@@ -95,10 +98,12 @@ export default function App() {
     }).join(' | ');
   }
 
-  const acct = ACCOUNTS[account];
-  const posMap = positions[account] || {};
-  const acctHoldings = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
-  const positionsLine = acctHoldings.map(t => { const p = posMap[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
+  const acct          = ACCOUNTS[account];
+  const posMap        = positions[account] || {};
+  const acctHoldings  = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
+  const positionsLine = acctHoldings
+    .map(t => { const p = posMap[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; })
+    .join(', ');
 
   const setPos = (tkr, field, val) =>
     setPositions(prev => ({ ...prev, [account]: { ...prev[account], [tkr]: { ...(prev[account]?.[tkr] || { shares: '', cost: '' }), [field]: val } } }));
@@ -112,19 +117,45 @@ export default function App() {
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown };
 
   return (
-    <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif", background: '#FFFFFF', color: '#000000', minHeight: '100vh' }}>
-      <Header onSignOut={() => signOut(auth)} />
-      <div className="md:pl-[240px]">
+    <div style={{ fontFamily: SANS.fontFamily, background: '#FFFFFF', color: '#000000', minHeight: '100vh' }}>
+      <div className="md:flex" style={{ minHeight: '100vh' }}>
         <TabNav tab={tab} setTab={setTab} />
-        <div className="max-w-3xl mx-auto px-4 pb-[83px] md:pb-8 pt-4">
-          <AccountSelector account={account} setAccount={setAccount} positions={positions} running={running} wdRunning={wdRunning} />
-          <div style={{ display: tab === 'chat' ? undefined : 'none' }}><ChatTab {...shared} /></div>
-          {tab === 'council' && <CouncilTab {...shared} running={running} setRunning={setRunning} ticker={ticker} setTicker={setTicker} capital={capital} setCapital={setCapital} active={active} setActive={setActive} agentState={agentState} setAgentState={setAgentState} synthesis={synthesis} setSynthesis={setSynthesis} councilAccounts={councilAccounts} setCouncilAccounts={setCouncilAccounts} councilPositionsLine={buildCombinedLine(councilAccounts)} />}
-          {tab === 'positions' && <PositionsTab {...shared} setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions} />}
-          {tab === 'dca' && <DCATab {...shared} />}
-          {tab === 'watchdog' && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
-          {tab === 'alpha' && <AlphaTrackerTab account={account} />}
-          {tab === 'roadmap' && <RoadmapTab />}
+
+        <div className="flex-1 min-w-0 pb-20 md:pb-0">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5">
+            <Header onSignOut={() => signOut(auth)} />
+            <AccountSelector account={account} setAccount={setAccount} positions={positions} running={running} wdRunning={wdRunning} />
+
+            <div style={{ display: tab === 'chat' ? undefined : 'none' }}>
+              <ChatTab {...shared} />
+            </div>
+            {tab === 'council'   && (
+              <CouncilTab {...shared}
+                running={running} setRunning={setRunning}
+                ticker={ticker} setTicker={setTicker}
+                capital={capital} setCapital={setCapital}
+                active={active} setActive={setActive}
+                agentState={agentState} setAgentState={setAgentState}
+                synthesis={synthesis} setSynthesis={setSynthesis}
+                councilAccounts={councilAccounts}
+                setCouncilAccounts={setCouncilAccounts}
+                councilPositionsLine={buildCombinedLine(councilAccounts)}
+              />
+            )}
+            {tab === 'positions' && (
+              <PositionsTab {...shared}
+                setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions}
+              />
+            )}
+            {tab === 'dca'      && <DCATab {...shared} />}
+            {tab === 'watchdog' && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
+            {tab === 'alpha'    && <AlphaTrackerTab account={account} />}
+            {tab === 'roadmap'  && <RoadmapTab />}
+
+            <p className="mt-10 text-xs text-center" style={{ color: '#CCCCCC' }}>
+              THE COUNCIL · NOT FINANCIAL ADVICE
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -1,17 +1,17 @@
-export const BG = '#FFFFFF';
-export const SURFACE = '#F7F7F7';
-export const BORDER = '#EEEEEE';
-export const TEXT = '#000000';
-export const TEXT2 = '#757575';
-export const TEXT3 = '#AAAAAA';
-export const GREEN = '#00C805';
-export const RED = '#FF3B30';
-export const ACCENT = '#000000';
+const SF  = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', sans-serif";
+const SFM = "'SF Mono', 'SFMono-Regular', ui-monospace, 'JetBrains Mono', monospace";
 
-// Font style objects for inline use
-export const SANS = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
-export const MONO = { fontFamily: "'SF Mono', 'Menlo', monospace" };
-// Keep DISP, CY, ICE as aliases for backward compat
-export const DISP = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
-export const CY = '#000000';    // was cyan accent, now black
-export const ICE = '#000000';   // was ice blue, now black
+export const SANS = { fontFamily: SF };
+export const DISP = { fontFamily: SF };
+export const MONO = { fontFamily: SFM };
+
+export const BG   = '#FFFFFF';
+export const SURF = '#F7F7F7';
+export const BORD = '#EEEEEE';
+export const TXT  = '#000000';
+export const SEC  = '#757575';
+export const TERT = '#AAAAAA';
+export const GRN  = '#00C805';
+export const RED  = '#FF3B30';
+export const CY   = '#000000';
+export const ICE  = '#757575';

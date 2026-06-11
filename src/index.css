@@ -1,42 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * { -webkit-tap-highlight-color: transparent; }
 
-@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-@keyframes expandRow { from{max-height:0;opacity:0} to{max-height:200px;opacity:1} }
-@keyframes fadeIn { from{opacity:0.4} to{opacity:1} }
-@keyframes cardIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-@keyframes spin { to{transform:rotate(360deg)} }
-@keyframes spinRev { to{transform:rotate(-360deg)} }
-@keyframes corePulse { 0%,100%{opacity:.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.12)} }
-@keyframes scan { 0%{transform:translateY(-100%)} 100%{transform:translateY(400%)} }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
-
-.skeleton {
-  background: linear-gradient(90deg, #F0F0F0 25%, #E8E8E8 50%, #F0F0F0 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 4px;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 
-.spin-slow{animation:spin 16s linear infinite;transform-box:fill-box;transform-origin:center}
-.spin-rev{animation:spinRev 10s linear infinite;transform-box:fill-box;transform-origin:center}
-.core-pulse{animation:corePulse 2.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
-.scanline{animation:scan 1.6s linear infinite}
-.blink{animation:blink 1.4s ease-in-out infinite}
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: calc(400px + 100%) 0; }
+}
 
-.lift{transition:transform .18s ease,box-shadow .18s ease}
-@media(hover:hover){.lift:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.no-scrollbar::-webkit-scrollbar{display:none}
-.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+.fade-in  { animation: fadeIn 0.25s ease both; }
+.shimmer  {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 37%, #f0f0f0 63%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+  .fade-in, .shimmer { animation: none !important; }
 }

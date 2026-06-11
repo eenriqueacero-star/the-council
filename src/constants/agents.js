@@ -79,27 +79,3 @@ export const WD_STYLE = {
   WATCH: { bg: 'rgba(200,146,42,0.12)',  fg: '#c8922a', label: 'WATCH' },
   SELL:  { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'SELL SIGNAL' },
 };
-
-// ---- Demo data (Phase C will remove these) ----
-export const DEMO_TICKER = 'AAPL';
-export const DEMO_RESULTS = {
-  technical: { stance: 'CAUTION', score: 6, headline: 'Uptrend intact, momentum cooling',   points: ['Weekly still higher-highs/higher-lows','Stalling under recent resistance','No confirmed downtrend - HOLD logic'] },
-  catalyst:  { stance: 'PASS',    score: 7, headline: 'Earnings + WWDC inside 60 days',     points: ['Next earnings ~late July (in window)','AI/Siri refresh is the thesis','Services growth still the engine'] },
-  risk:      { stance: 'PASS',    score: 8, headline: 'Actually diversifies your book',      points: ['Outside your ~80% AI-infra cluster','Low beta, clean balance sheet','Starter: 3-5% of new capital'] },
-  macro:     { stance: 'CAUTION', score: 5, headline: 'CPI midweek, choppy tape',            points: ['Rate-hike odds elevated post-jobs','Oil firm on Middle East risk','Mega-cap holds up better than high-beta'] },
-  bear:      { stance: 'BEARISH', score: 6, headline: 'Growth premium, thin catalysts',      points: ['Hardware revenue near-flat','China demand + regulatory overhang','Priced for an AI win not yet shipped'] },
-  sizer:     { stance: 'CAUTION', score: 6, headline: 'Starter only - keep powder dry',      points: ['Starter ~$80-100 (approx 0.4 sh @ ~$205)','approx 4-5% of your $2,000 available','Scale toward ~10% after weekly confirms'] },
-};
-export const DEMO_SYNTH = { verdict: 'WATCH', conviction: 6, sizing: 'Starter 3-5% only; add after CPI clears', summary: 'AAPL is a quality, lower-risk name that would diversify your AI-heavy book — but conviction lands at 6, under your 7 threshold, and CPI midweek is a macro headwind. Gates 3 and 4 aren\'t cleanly passed. Watch it, don\'t chase it.', bull: ['Diversifies concentration risk','Catalyst window is open'], risks: ['Conviction below 7-gate','Macro headwind day (CPI)'] };
-export const DEMO_DCA = { allocations: [{ ticker: 'AMD', amount: 35, pct: 58, reason: 'Hardest hit Friday (-10.9%), sitting on 20-day support, weekly uptrend intact' },{ ticker: 'MU', amount: 25, pct: 42, reason: 'HBM4 catalyst locked, oversold after -13% but thesis unchanged' }], summary: "Concentrating this week's $60 into the two best dips rather than spreading thin across 9 names. Both still in weekly uptrends — buying weakness, not catching knives. Skipped FLY (tripping sell protocol)." };
-export const DEMO_WD = [
-  { ticker: 'NVDA', status: 'HOLD',  note: 'Higher highs intact; one red week is not a trend' },
-  { ticker: 'NBIS', status: 'HOLD',  note: 'Parabolic but structure unbroken; high beta' },
-  { ticker: 'MU',   status: 'HOLD',  note: 'Sharp pullback, weekly uptrend still up' },
-  { ticker: 'AMD',  status: 'HOLD',  note: 'Near 20-day support, no lower low yet' },
-  { ticker: 'SNDK', status: 'WATCH', note: 'Parabolic - watch for first weekly lower high' },
-  { ticker: 'CRDO', status: 'HOLD',  note: 'Relative strength, barely dipped in selloff' },
-  { ticker: 'APLD', status: 'WATCH', note: 'Volatile; testing support, not broken' },
-  { ticker: 'ALAB', status: 'HOLD',  note: 'Off ATH but uptrend intact' },
-  { ticker: 'FLY',  status: 'SELL',  note: 'Lower highs/lower lows since IPO peak, below secondary price — protocol tripped' },
-];

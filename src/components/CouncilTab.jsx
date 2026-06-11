@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Search, ChevronRight, Loader2, AlertTriangle, Crown, TrendingUp, Wallet, Play, Swords, Target, TrendingDown, Clock, Volume2, VolumeX, X } from 'lucide-react';
+import { Search, ChevronRight, Loader2, AlertTriangle, Crown, TrendingUp, Wallet, Swords, Target, TrendingDown, Clock, Volume2, VolumeX, X } from 'lucide-react';
 import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
-import { AGENTS, ACCOUNTS, STANCE_STYLE, DEMO_TICKER, DEMO_RESULTS, DEMO_SYNTH } from '../constants/agents.js';
+import { AGENTS, ACCOUNTS, STANCE_STYLE } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent, getQuotes } from '../api.js';
 import { useVoice } from '../hooks/useVoice.js';
@@ -213,24 +213,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
     }
   }
 
-  function runDemo() {
-    if (running) return;
-    setTicker(DEMO_TICKER); setCapital('2000'); setActive(DEMO_TICKER); setRunning(true); setSynthesis({ status: 'idle', result: null });
-    setDebateHistory([]); setCurrentRound(1);
-    const init = {}; AGENTS.forEach(a => (init[a.id] = { status: 'running', result: null })); setAgentState(init);
-    const order = ['risk', 'catalyst', 'technical', 'macro', 'bear', 'sizer'];
-    order.forEach((id, i) => setTimeout(() => setAgentState(prev => ({ ...prev, [id]: { status: 'done', result: DEMO_RESULTS[id] } })), 700 + i * 600));
-    const total = 700 + order.length * 600;
-    setTimeout(() => {
-      const demoRound = {};
-      AGENTS.forEach(a => { demoRound[a.id] = DEMO_RESULTS[a.id]; });
-      setDebateHistory([demoRound]);
-      setSynthesis({ status: 'running', result: null });
-      synthRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, total + 200);
-    setTimeout(() => { setSynthesis({ status: 'done', result: DEMO_SYNTH }); setRunning(false); }, total + 1500);
-  }
-
   return (
     <div className="mt-6">
       <label style={{ ...MONO, color: 'rgba(226,221,213,0.50)', letterSpacing: '0.10em' }} className="block text-[11px]">ENTER TICKER TO CONVENE THE COUNCIL</label>
@@ -301,11 +283,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","c
             style={{ ...MONO, borderColor: 'rgba(226,221,213,0.10)', color: 'rgba(226,221,213,0.55)' }}
             className="text-[11px] px-2.5 py-1 rounded border transition-colors disabled:opacity-40 hover:border-[rgba(200,146,42,0.45)] hover:text-[#c8922a]">{q}</button>
         ))}
-        <button onClick={runDemo} disabled={running}
-          style={{ ...MONO, borderColor: `${ICE}33`, color: ICE }}
-          className="ml-auto text-[11px] px-3 py-1 rounded border transition-colors disabled:opacity-40 flex items-center gap-1.5">
-          <Play size={11} /> SEE DEMO
-        </button>
       </div>
 
       {running && (() => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Coins, Loader2, Play } from 'lucide-react';
+import { Coins, Loader2 } from 'lucide-react';
 import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
-import { PROTOCOLS, DEMO_DCA } from '../constants/agents.js';
+import { PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent } from '../api.js';
 
@@ -27,12 +27,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
     }
   }
 
-  function runDCADemo() {
-    setDcaAmount('60');
-    setDca({ status: 'running', result: null });
-    setTimeout(() => setDca({ status: 'done', result: DEMO_DCA }), 1400);
-  }
-
   return (
     <div className="mt-6">
       <div className="flex items-center gap-2 mb-1">
@@ -55,11 +49,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
           style={{ ...MONO, letterSpacing: '0.10em', background: dca.status === 'running' ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808', fontWeight: 600 }}
           className="glow-btn px-5 py-3 rounded-lg flex items-center justify-center gap-2 transition-all hover:brightness-110 whitespace-nowrap disabled:cursor-not-allowed text-[13px]">
           {dca.status === 'running' ? <><Loader2 size={15} className="animate-spin" /> ALLOCATING…</> : 'ALLOCATE'}
-        </button>
-        <button onClick={runDCADemo} disabled={dca.status === 'running'}
-          style={{ ...MONO, borderColor: `${ICE}28`, color: ICE }}
-          className="text-[11px] px-3 py-3 rounded-lg border transition-colors disabled:opacity-40 flex items-center gap-1.5">
-          <Play size={10} /> DEMO
         </button>
       </div>
 

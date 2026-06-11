@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Radar, Loader2, AlertTriangle, Check, Eye, X, Play } from 'lucide-react';
+import { Radar, Loader2, AlertTriangle, Check, Eye, X } from 'lucide-react';
 import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
-import { PROTOCOLS, WD_STYLE, DEMO_WD } from '../constants/agents.js';
+import { PROTOCOLS, WD_STYLE } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent } from '../api.js';
 
@@ -34,13 +34,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
     setWdRunning(false);
   }
 
-  function runWatchdogDemo() {
-    setWdRan(true);
-    const init = {}; acctHoldings.forEach(h => (init[h] = { status: 'running' })); setWd(init);
-    DEMO_WD.filter(d => acctHoldings.includes(d.ticker)).forEach((d, i) =>
-      setTimeout(() => setWd(prev => ({ ...prev, [d.ticker]: { status: 'done', result: { status: d.status, note: d.note } } })), 500 + i * 450));
-  }
-
   return (
     <div className="mt-6">
       <div className="flex items-center gap-2 mb-1">
@@ -54,11 +47,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
           style={{ ...MONO, letterSpacing: '0.10em', background: wdRunning ? `${ICE}33` : ICE, color: '#060c16', fontWeight: 600 }}
           className="glow-btn px-5 py-3 rounded-lg flex items-center justify-center gap-2 transition-all hover:brightness-110 whitespace-nowrap disabled:cursor-not-allowed text-[13px]">
           {wdRunning ? <><Loader2 size={15} className="animate-spin" /> SCANNING…</> : <><Radar size={14} /> SCAN ALL {acctHoldings.length} HOLDINGS</>}
-        </button>
-        <button onClick={runWatchdogDemo} disabled={wdRunning}
-          style={{ ...MONO, borderColor: `${CY}28`, color: CY }}
-          className="text-[11px] px-3 py-3 rounded-lg border transition-colors disabled:opacity-40 flex items-center gap-1.5">
-          <Play size={10} /> DEMO
         </button>
       </div>
 

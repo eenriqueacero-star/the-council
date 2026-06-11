@@ -3,8 +3,6 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase.js';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ACCOUNTS } from './constants/agents.js';
-import { MONO, DISP, CY } from './constants/styles.js';
-import ArcReactor from './components/ArcReactor.jsx';
 import Header from './components/Header.jsx';
 import AccountSelector from './components/AccountSelector.jsx';
 import TabNav from './components/TabNav.jsx';
@@ -18,17 +16,15 @@ import RoadmapTab from './components/RoadmapTab.jsx';
 
 export default function App() {
   const [account, setAccount] = useState(() => localStorage.getItem('council_account') || 'edwin');
-  const [tab,     setTab]     = useState('chat');
+  const [tab, setTab] = useState('chat');
   const [apiDown, setApiDown] = useState(false);
-
-  const [running,   setRunning]   = useState(false);
+  const [running, setRunning] = useState(false);
   const [wdRunning, setWdRunning] = useState(false);
-  const [ticker,     setTicker]     = useState('');
-  const [capital,    setCapital]    = useState('');
-  const [active,     setActive]     = useState(null);
+  const [ticker, setTicker] = useState('');
+  const [capital, setCapital] = useState('');
+  const [active, setActive] = useState(null);
   const [agentState, setAgentState] = useState({});
-  const [synthesis,  setSynthesis]  = useState({ status: 'idle', result: null });
-
+  const [synthesis, setSynthesis] = useState({ status: 'idle', result: null });
   const [councilAccounts, setCouncilAccounts] = useState([account]);
   useEffect(() => { setCouncilAccounts([account]); }, [account]);
 
@@ -39,9 +35,7 @@ export default function App() {
       const saved = localStorage.getItem('council_positions');
       if (saved) {
         const parsed = JSON.parse(saved);
-        Object.entries(ACCOUNTS).forEach(([k]) => {
-          if (!parsed[k]) parsed[k] = {};
-        });
+        Object.entries(ACCOUNTS).forEach(([k]) => { if (!parsed[k]) parsed[k] = {}; });
         return parsed;
       }
     } catch {}
@@ -93,7 +87,7 @@ export default function App() {
 
   function buildCombinedLine(selectedAccounts) {
     return selectedAccounts.map(k => {
-      const a  = ACCOUNTS[k];
+      const a = ACCOUNTS[k];
       const pm = positions[k] || {};
       const holdings = Object.keys(pm).length ? Object.keys(pm) : a.holdings;
       const line = holdings.map(t => { const p = pm[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
@@ -101,12 +95,10 @@ export default function App() {
     }).join(' | ');
   }
 
-  const acct        = ACCOUNTS[account];
-  const posMap      = positions[account] || {};
+  const acct = ACCOUNTS[account];
+  const posMap = positions[account] || {};
   const acctHoldings = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
-  const positionsLine = acctHoldings
-    .map(t => { const p = posMap[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; })
-    .join(', ');
+  const positionsLine = acctHoldings.map(t => { const p = posMap[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
 
   const setPos = (tkr, field, val) =>
     setPositions(prev => ({ ...prev, [account]: { ...prev[account], [tkr]: { ...(prev[account]?.[tkr] || { shares: '', cost: '' }), [field]: val } } }));
@@ -120,61 +112,20 @@ export default function App() {
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown };
 
   return (
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", background: '#080910', color: '#e2ddd5', minHeight: '100vh' }} className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -8%, rgba(200,146,42,0.07), transparent 52%)' }} />
-
-      <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#080910', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', animation: 'bootFade 2s ease forwards', pointerEvents: 'none' }}>
-        <ArcReactor size={80} />
-        <div style={{ ...DISP, color: CY, letterSpacing: '0.28em', fontWeight: 700 }} className="text-sm neon">THE COUNCIL</div>
-        <div style={{ ...MONO, animation: 'bootText 1.3s steps(30) forwards', color: 'rgba(226,221,213,0.35)' }} className="text-[10px] tracking-[0.18em] overflow-hidden whitespace-nowrap">CALIBRATING 6 AGENTS · LOADING PROTOCOLS · ONLINE</div>
-      </div>
-
-      <div className="pointer-events-none fixed inset-0 z-20">
-        {[['top-3 left-3', 0], ['top-3 right-3', 1], ['bottom-3 left-3', 2], ['bottom-3 right-3', 3]].map(([pos, i]) => (
-          <div key={i} className={`absolute ${pos} w-5 h-5`} style={{
-            borderTop:    i < 2  ? `1px solid ${CY}` : 'none',
-            borderBottom: i >= 2 ? `1px solid ${CY}` : 'none',
-            borderLeft:   i % 2 === 0 ? `1px solid ${CY}` : 'none',
-            borderRight:  i % 2 === 1 ? `1px solid ${CY}` : 'none',
-            opacity: 0.28,
-          }} />
-        ))}
-      </div>
-
-      <div className="relative max-w-5xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
-        <Header onSignOut={() => signOut(auth)} />
-
-        <AccountSelector account={account} setAccount={setAccount} positions={positions} running={running} wdRunning={wdRunning} />
-
+    <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif", background: '#FFFFFF', color: '#000000', minHeight: '100vh' }}>
+      <Header onSignOut={() => signOut(auth)} />
+      <div className="md:pl-[240px]">
         <TabNav tab={tab} setTab={setTab} />
-
-        <div style={{ display: tab === 'chat' ? undefined : 'none' }}>
-          <ChatTab {...shared} />
+        <div className="max-w-3xl mx-auto px-4 pb-[83px] md:pb-8 pt-4">
+          <AccountSelector account={account} setAccount={setAccount} positions={positions} running={running} wdRunning={wdRunning} />
+          <div style={{ display: tab === 'chat' ? undefined : 'none' }}><ChatTab {...shared} /></div>
+          {tab === 'council' && <CouncilTab {...shared} running={running} setRunning={setRunning} ticker={ticker} setTicker={setTicker} capital={capital} setCapital={setCapital} active={active} setActive={setActive} agentState={agentState} setAgentState={setAgentState} synthesis={synthesis} setSynthesis={setSynthesis} councilAccounts={councilAccounts} setCouncilAccounts={setCouncilAccounts} councilPositionsLine={buildCombinedLine(councilAccounts)} />}
+          {tab === 'positions' && <PositionsTab {...shared} setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions} />}
+          {tab === 'dca' && <DCATab {...shared} />}
+          {tab === 'watchdog' && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
+          {tab === 'alpha' && <AlphaTrackerTab account={account} />}
+          {tab === 'roadmap' && <RoadmapTab />}
         </div>
-        {tab === 'council'   && (
-          <CouncilTab {...shared}
-            running={running} setRunning={setRunning}
-            ticker={ticker} setTicker={setTicker}
-            capital={capital} setCapital={setCapital}
-            active={active} setActive={setActive}
-            agentState={agentState} setAgentState={setAgentState}
-            synthesis={synthesis} setSynthesis={setSynthesis}
-            councilAccounts={councilAccounts}
-            setCouncilAccounts={setCouncilAccounts}
-            councilPositionsLine={buildCombinedLine(councilAccounts)}
-          />
-        )}
-        {tab === 'positions' && (
-          <PositionsTab {...shared}
-            setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions}
-          />
-        )}
-        {tab === 'dca'       && <DCATab {...shared} />}
-        {tab === 'watchdog'  && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
-        {tab === 'alpha'     && <AlphaTrackerTab account={account} />}
-        {tab === 'roadmap'   && <RoadmapTab />}
-
-        <p className="mt-8 text-[10px] text-center leading-relaxed" style={{ ...MONO, color: 'rgba(226,221,213,0.20)' }}>THE COUNCIL · LIVE AI AGENTS · NOT FINANCIAL ADVICE — YOU EXECUTE, YOU DECIDE</p>
       </div>
     </div>
   );

@@ -1,41 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 * { -webkit-tap-highlight-color: transparent; }
 
-@keyframes cardIn   { from { opacity:0; transform: translateY(14px) scale(.98);} to {opacity:1; transform:none;} }
-@keyframes dealIn   { from { opacity:0; transform: translateY(10px); box-shadow: 0 0 0 1px rgba(200,146,42,0.35); } 40% { box-shadow: 0 0 0 1px rgba(200,146,42,0); } to { opacity:1; transform:none; } }
-@keyframes scan     { 0%{ transform: translateY(-100%);} 100%{ transform: translateY(400%);} }
-@keyframes bootIn   { from { opacity:0; transform: translateY(-10px);} to {opacity:1; transform:none;} }
-@keyframes glowPulse { 0%,100%{ box-shadow:0 0 12px rgba(200,146,42,0.22);} 50%{ box-shadow:0 0 24px rgba(200,146,42,0.48);} }
-@keyframes neon     { 0%,100%{ text-shadow:0 0 8px rgba(200,146,42,0.28),0 0 20px rgba(200,146,42,0.10);} 50%{ text-shadow:0 0 14px rgba(200,146,42,0.52),0 0 30px rgba(200,146,42,0.22);} }
-@keyframes sheen    { 0%{ transform: translateX(-140%) skewX(-18deg);} 60%,100%{ transform: translateX(260%) skewX(-18deg);} }
-@keyframes blink    { 0%,100%{ opacity:1;} 50%{ opacity:.15;} }
-@keyframes spin     { to { transform: rotate(360deg); } }
-@keyframes spinRev  { to { transform: rotate(-360deg); } }
-@keyframes corePulse { 0%,100%{ opacity:.6; transform:scale(1);} 50%{ opacity:1; transform:scale(1.12);} }
-@keyframes bootFade { 0%,72%{ opacity:1;} 100%{ opacity:0; visibility:hidden;} }
-@keyframes bootText { from{ clip-path: inset(0 100% 0 0);} to{ clip-path: inset(0 0 0 0);} }
+@keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+@keyframes expandRow { from{max-height:0;opacity:0} to{max-height:200px;opacity:1} }
+@keyframes fadeIn { from{opacity:0.4} to{opacity:1} }
+@keyframes cardIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+@keyframes spin { to{transform:rotate(360deg)} }
+@keyframes spinRev { to{transform:rotate(-360deg)} }
+@keyframes corePulse { 0%,100%{opacity:.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.12)} }
+@keyframes scan { 0%{transform:translateY(-100%)} 100%{transform:translateY(400%)} }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
 
-.spin-slow   { animation: spin 16s linear infinite; transform-box: fill-box; transform-origin:center; }
-.spin-rev    { animation: spinRev 10s linear infinite; transform-box: fill-box; transform-origin:center; }
-.core-pulse  { animation: corePulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin:center; }
-.scanline    { animation: scan 1.6s linear infinite; }
-.boot        { animation: bootIn .6s cubic-bezier(.2,.7,.2,1) both; }
-.neon        { animation: neon 3.6s ease-in-out infinite; }
-.blink       { animation: blink 1.4s ease-in-out infinite; }
-.lift        { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
-@media (hover:hover){ .lift:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.55); } }
-.glow-btn  { position: relative; overflow: hidden; }
-.glow-btn:not(:disabled) { animation: glowPulse 2.6s ease-in-out infinite; }
-.glow-btn::after { content:''; position:absolute; top:-50%; bottom:-50%; left:0; width:36%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent); transform: translateX(-140%) skewX(-18deg); }
-@media (hover:hover){ .glow-btn:not(:disabled):hover::after { animation: sheen 1.05s ease; } }
-.hud::before, .hud::after { content:''; position:absolute; width:10px; height:10px; pointer-events:none; opacity:.28; }
-.hud::before { top:5px; left:5px; border-top:1.5px solid currentColor; border-left:1.5px solid currentColor; }
-.hud::after  { bottom:5px; right:5px; border-bottom:1.5px solid currentColor; border-right:1.5px solid currentColor; }
-.no-scrollbar::-webkit-scrollbar { display:none; }
-.no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
-@media (prefers-reduced-motion: reduce){ .scanline,.neon,.glow-btn,.blink,.boot,.spin-slow,.spin-rev,.core-pulse { animation:none !important; } }
+.skeleton {
+  background: linear-gradient(90deg, #F0F0F0 25%, #E8E8E8 50%, #F0F0F0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+.spin-slow{animation:spin 16s linear infinite;transform-box:fill-box;transform-origin:center}
+.spin-rev{animation:spinRev 10s linear infinite;transform-box:fill-box;transform-origin:center}
+.core-pulse{animation:corePulse 2.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.scanline{animation:scan 1.6s linear infinite}
+.blink{animation:blink 1.4s ease-in-out infinite}
+
+.lift{transition:transform .18s ease,box-shadow .18s ease}
+@media(hover:hover){.lift:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}}
+
+.no-scrollbar::-webkit-scrollbar{display:none}
+.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase.js';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { LogOut, Loader2 } from 'lucide-react';
 import { ACCOUNTS } from './constants/agents.js';
 import { MONO, SANS, CY } from './constants/styles.js';
@@ -47,48 +47,58 @@ export default function App() {
   // null = loading from cloud, object = ready
   const [positions, setPositions] = useState(null);
 
-  // Tracks whether the latest positions change was user-initiated (not a cloud load)
+  // Tracks whether the latest positions change was user-initiated (not a cloud update)
   const userChangeRef = useRef(false);
   const saveTimerRef  = useRef(null);
+  const posUnsubRef   = useRef(null); // real-time listener cleanup
 
-  // Load everything from Firestore on auth
+  // Subscribe to Firestore on auth — positions update in real-time across all devices
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async user => {
-      unsub();
+    const unsubAuth = onAuthStateChanged(auth, async user => {
+      // Tear down any previous positions listener
+      if (posUnsubRef.current) { posUnsubRef.current(); posUnsubRef.current = null; }
+
       if (!user) {
         setPositions(buildDefaults());
         setAppLoaded(true);
         return;
       }
 
+      // Load preferences once (account selection)
       try {
-        const [prefSnap, posSnap] = await Promise.all([
-          getDoc(doc(db, 'users', user.uid, 'data', 'preferences')),
-          getDoc(doc(db, 'users', user.uid, 'data', 'positions')),
-        ]);
-
+        const prefSnap = await getDoc(doc(db, 'users', user.uid, 'data', 'preferences'));
         if (prefSnap.exists() && prefSnap.data().account) {
           setAccount(prefSnap.data().account);
         }
+      } catch {}
 
-        if (posSnap.exists() && posSnap.data().positions) {
-          const cloud    = posSnap.data().positions;
-          const defaults = buildDefaults();
-          const merged   = { ...defaults };
-          Object.entries(cloud).forEach(([k, v]) => {
-            merged[k] = { ...(defaults[k] || {}), ...v };
-          });
-          setPositions(merged);
-        } else {
-          setPositions(buildDefaults());
-        }
-      } catch {
-        setPositions(buildDefaults());
-      }
-
-      setAppLoaded(true);
+      // Real-time positions listener — fires immediately with current data,
+      // then again whenever any device writes a new value
+      posUnsubRef.current = onSnapshot(
+        doc(db, 'users', user.uid, 'data', 'positions'),
+        snap => {
+          if (snap.exists() && snap.data().positions) {
+            const cloud    = snap.data().positions;
+            const defaults = buildDefaults();
+            const merged   = { ...defaults };
+            Object.entries(cloud).forEach(([k, v]) => {
+              merged[k] = { ...(defaults[k] || {}), ...v };
+            });
+            // userChangeRef stays false — this is a cloud push, not a user edit
+            setPositions(merged);
+          } else {
+            setPositions(buildDefaults());
+          }
+          setAppLoaded(true);
+        },
+        () => { setPositions(buildDefaults()); setAppLoaded(true); }
+      );
     });
-    return unsub;
+
+    return () => {
+      unsubAuth();
+      if (posUnsubRef.current) posUnsubRef.current();
+    };
   }, []);
 
   // Debounced save of positions to Firestore (user changes only)

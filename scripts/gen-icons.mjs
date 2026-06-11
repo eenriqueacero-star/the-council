@@ -1,129 +1,83 @@
-// Generates PWA icons + iOS splash screens at build time. Pure Node — no deps.
-import { deflateSync } from 'zlib';
-import { writeFileSync, mkdirSync } from 'fs';
+/**
+ * Generates all PWA icons + iOS splash screens from public/favicon.svg
+ * Run: node scripts/gen-icons.mjs
+ */
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
-const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'icons');
+const require = createRequire(import.meta.url);
+const { Resvg } = require('@resvg/resvg-js');
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const OUT  = join(ROOT, 'public', 'icons');
+const SVG  = readFileSync(join(ROOT, 'public', 'favicon.svg'), 'utf8');
+
 mkdirSync(OUT, { recursive: true });
 
-const CRC_TABLE = (() => {
-  const t = new Int32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c;
-  }
-  return t;
-})();
-
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+function renderAt(size) {
+  const resvg = new Resvg(SVG, {
+    fitTo: { mode: 'width', value: size },
+    font:  { loadSystemFonts: false },
+  });
+  return resvg.render().asPng();
 }
 
-function chunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length);
-  const t = Buffer.from(type, 'ascii');
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(Buffer.concat([t, data])));
-  return Buffer.concat([len, t, data, crc]);
+// Build a splash SVG: solid black + centered logo + wordmark
+function splashSvg(w, h) {
+  const logoSize = Math.round(Math.min(w, h) * 0.28);
+  const lx       = Math.round((w - logoSize) / 2);
+  const ly       = Math.round(h * 0.34);
+  const fontSize = Math.round(logoSize * 0.11);
+  const spacing  = Math.round(logoSize * 0.022);
+  const ty       = ly + logoSize + Math.round(logoSize * 0.18);
+
+  // Strip outer <svg …> tag so we can embed the artwork as a group
+  const inner = SVG
+    .replace(/<svg[^>]*>/, '')
+    .replace(/<\/svg>\s*$/, '');
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}">
+  <rect width="${w}" height="${h}" fill="#080808"/>
+  <g transform="translate(${lx},${ly}) scale(${(logoSize / 512).toFixed(6)})">
+    ${inner}
+  </g>
+  <text x="${w / 2}" y="${ty}"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="${fontSize}"
+    letter-spacing="${spacing}"
+    fill="rgba(201,168,76,0.52)">THE COUNCIL</text>
+</svg>`;
 }
 
-function makePng(w, h, pixel) {
-  const raw = Buffer.alloc(h * (w * 4 + 1));
-  for (let y = 0; y < h; y++) {
-    const row = y * (w * 4 + 1);
-    for (let x = 0; x < w; x++) {
-      const [r, g, b, a] = pixel(x, y);
-      const o = row + 1 + x * 4;
-      raw[o] = r; raw[o + 1] = g; raw[o + 2] = b; raw[o + 3] = a;
-    }
-  }
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0);
-  ihdr.writeUInt32BE(h, 4);
-  ihdr[8] = 8; ihdr[9] = 6; // 8-bit RGBA
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw, { level: 6 })),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
+function renderSplash(w, h) {
+  const resvg = new Resvg(splashSvg(w, h), {
+    fitTo: { mode: 'original' },
+    font:  { loadSystemFonts: false },
+  });
+  return resvg.render().asPng();
 }
 
-const GOLD = [245, 196, 81];
-const CYAN = [63, 224, 255];
-const BG   = [7, 10, 12];
-
-const clamp = t => Math.min(1, Math.max(0, t));
-const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * clamp(t)));
-
-function appIcon(size) {
-  const c = size / 2;
-  return (x, y) => {
-    const dx = x + 0.5 - c, dy = y + 0.5 - c;
-    const r = Math.sqrt(dx * dx + dy * dy) / size;
-    let rgb = mix(BG, GOLD, Math.max(0, 1 - r / 0.45) ** 2 * 0.30);
-    rgb = mix(rgb, CYAN, Math.max(0, 1 - Math.abs(r - 0.40) / 0.030));
-    rgb = mix(rgb, CYAN, Math.max(0, 1 - Math.abs(r - 0.29) / 0.016) * 0.65);
-    rgb = mix(rgb, GOLD, clamp((0.15 - r) / 0.03));
-    return [...rgb, 255];
-  };
+// ── App icons ──
+for (const size of [180, 192, 512]) {
+  writeFileSync(join(OUT, `icon-${size}.png`), renderAt(size));
+  console.log(`✓  icon-${size}.png`);
 }
 
-function badgeIcon(size) {
-  const c = size / 2;
-  return (x, y) => {
-    const dx = x + 0.5 - c, dy = y + 0.5 - c;
-    const r = Math.sqrt(dx * dx + dy * dy) / size;
-    const ring = Math.max(0, 1 - Math.abs(r - 0.34) / 0.06);
-    const core = clamp((0.16 - r) / 0.04);
-    const a = Math.round(255 * Math.max(ring, core));
-    return [255, 255, 255, a];
-  };
-}
+// Badge (monochrome, used for notifications on some platforms)
+writeFileSync(join(OUT, 'badge-96.png'), renderAt(96));
+console.log('✓  badge-96.png');
 
-function splashPixel(w, h) {
-  const cx = w / 2, cy = h * 0.42;
-  const sz = Math.min(w, h) * 0.44;
-  return (x, y) => {
-    const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
-    const r = Math.sqrt(dx * dx + dy * dy) / sz;
-    if (r > 0.47) return [...BG, 255];
-    let rgb = mix(BG, GOLD, Math.max(0, 1 - r / 0.45) ** 2 * 0.30);
-    rgb = mix(rgb, CYAN, Math.max(0, 1 - Math.abs(r - 0.40) / 0.030));
-    rgb = mix(rgb, CYAN, Math.max(0, 1 - Math.abs(r - 0.29) / 0.016) * 0.65);
-    rgb = mix(rgb, GOLD, clamp((0.15 - r) / 0.03));
-    return [...rgb, 255];
-  };
-}
-
-// --- Icons (always generated first, never skipped) ---
-for (const s of [180, 192, 512]) writeFileSync(join(OUT, `icon-${s}.png`), makePng(s, s, appIcon(s)));
-writeFileSync(join(OUT, 'badge-96.png'), makePng(96, 96, badgeIcon(96)));
-console.log('icons written to public/icons/');
-
-// --- Splash screens (isolated so failures cannot affect icons above) ---
-// iPhone SE 2/3 · XR/11 · X/XS/11Pro/12mini/13mini · 12/13/14 · 11ProMax/XSMax · 12/13/14ProMax · 14Pro/15/15Pro · 14ProMax/15Plus/15ProMax
+// ── Splash screens ──
 const SPLASHES = [
-  [750,  1334],
-  [828,  1792],
-  [1125, 2436],
-  [1170, 2532],
-  [1242, 2688],
-  [1284, 2778],
-  [1179, 2556],
-  [1290, 2796],
+  [750, 1334], [828, 1792], [1125, 2436], [1170, 2532],
+  [1242, 2688], [1284, 2778], [1179, 2556], [1290, 2796],
 ];
-
-try {
-  for (const [w, h] of SPLASHES) {
-    writeFileSync(join(OUT, `splash-${w}x${h}.png`), makePng(w, h, splashPixel(w, h)));
-  }
-  console.log('splash screens written to public/icons/');
-} catch (e) {
-  console.warn('splash generation failed (non-fatal):', e.message);
+for (const [w, h] of SPLASHES) {
+  writeFileSync(join(OUT, `splash-${w}x${h}.png`), renderSplash(w, h));
+  console.log(`✓  splash-${w}x${h}.png`);
 }
+
+console.log('\nAll icons written to public/icons/');

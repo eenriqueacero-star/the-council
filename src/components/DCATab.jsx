@@ -1,25 +1,23 @@
 import React, { useState } from 'react';
 import { Coins, Loader2 } from 'lucide-react';
-import { MONO, DISP, SANS, CY, ICE } from '../constants/styles.js';
+import { MONO, SANS } from '../constants/styles.js';
 import { PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent } from '../api.js';
 
 export default function DCATab({ acct, acctHoldings, positionsLine, flagApiDown }) {
   const [dcaAmount, setDcaAmount] = useState('');
-  const [dca, setDca] = useState({ status: 'idle', result: null });
+  const [dca,       setDca]       = useState({ status: 'idle', result: null });
 
   async function allocateDCA() {
     if (dca.status === 'running') return;
     const amt = (dcaAmount.trim() ? Number(dcaAmount) : acct.dca) || 0;
-    if (!amt) { setDca({ status: 'done', result: { allocations: [], summary: 'No DCA amount set for this account. Enter an amount above to allocate.' } }); return; }
+    if (!amt) { setDca({ status: 'done', result: { allocations: [], summary: 'No DCA amount set. Enter an amount above.' } }); return; }
     setDca({ status: 'running', result: null });
-    const sys = `You are the DCA ALLOCATOR. ${PROTOCOLS}
-The investor makes a recurring DCA buy into the ${acct.label} account (current positions: ${positionsLine}). Available this round: $${amt}. Search recent price action for these holdings and allocate the dollars toward the 1-2 best "buy the dip" setups — most oversold / closest to weekly support while still in an uptrend. Concentrate, don't spread thin. NEVER add to a name tripping the sell protocol (note it if so).
-Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amount":<dollars>,"pct":<0-100>,"reason":"<one line>"}],"summary":"<2 sentences>"}`;
+    const sys = `You are the DCA ALLOCATOR. ${PROTOCOLS}\nThe investor makes a recurring DCA buy into the ${acct.label} account (current positions: ${positionsLine}). Available this round: $${amt}. Search recent price action and allocate toward the 1-2 best "buy the dip" setups. Concentrate, don't spread thin. NEVER add to a name tripping the sell protocol.\nRespond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amount":<dollars>,"pct":<0-100>,"reason":"<one line>"}],"summary":"<2 sentences>"}`;
     try {
       const txt = await callAgent(sys, `Allocate this round's $${amt} for ${acct.label}. Today is ${new Date().toDateString()}. Return ONLY the JSON.`, true);
-      const p = extractJSON(txt);
+      const p   = extractJSON(txt);
       setDca({ status: 'done', result: p || { allocations: [], summary: 'Could not parse allocation.' } });
     } catch {
       flagApiDown();
@@ -28,61 +26,66 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
   }
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center gap-2 mb-1">
-        <Coins size={14} style={{ color: CY }} />
-        <span style={{ ...MONO, letterSpacing: '0.10em', color: 'rgba(226,221,213,0.70)', fontWeight: 600 }} className="text-[11px]">SMART DCA ALLOCATOR · {acct.label.toUpperCase()}</span>
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <Coins size={15} style={{ color: '#000000' }} />
+        <span style={{ ...MONO, fontSize: 11, letterSpacing: '0.08em', color: '#757575', fontWeight: 600 }}>SMART DCA ALLOCATOR · {acct.label.toUpperCase()}</span>
       </div>
-      <p style={{ ...SANS, color: 'rgba(226,221,213,0.52)' }} className="text-[13px] leading-relaxed mt-1">Instead of spreading your DCA evenly, the allocator finds the 1–2 holdings that are the best "buy the dip" right now — most oversold but still in a weekly uptrend — and concentrates the dollars there. It skips anything tripping the sell protocol.</p>
+      <p style={{ fontSize: 13, color: '#757575', lineHeight: 1.5, marginTop: 4, marginBottom: 16 }}>
+        Instead of spreading your DCA evenly, the allocator finds the 1–2 holdings that are the best “buy the dip” right now and concentrates the dollars there.
+      </p>
 
-      <div className="mt-4 flex gap-2 flex-wrap sm:flex-nowrap items-center">
-        <div className="relative flex-1 min-w-[160px]">
-          <Coins size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(226,221,213,0.28)' }} />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
+          <Coins size={13} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#AAAAAA' }} />
           <input value={dcaAmount} onChange={e => setDcaAmount(e.target.value.replace(/[^0-9.]/g, ''))}
             inputMode="decimal" placeholder={`amount this round (default $${acct.dca || '—'})`}
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-            className="w-full border rounded-lg pl-9 pr-3 py-3 text-sm outline-none transition-colors"
-            onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+            style={{ width: '100%', background: '#FFFFFF', border: '1px solid #EEEEEE', borderRadius: 8, padding: '11px 12px 11px 34px', fontSize: 14, color: '#000000', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+            onFocus={e => (e.target.style.borderColor = '#000000')}
+            onBlur={e => (e.target.style.borderColor = '#EEEEEE')} />
         </div>
         <button onClick={allocateDCA} disabled={dca.status === 'running'}
-          style={{ ...MONO, letterSpacing: '0.10em', background: dca.status === 'running' ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808', fontWeight: 600 }}
-          className="glow-btn px-5 py-3 rounded-lg flex items-center justify-center gap-2 transition-all hover:brightness-110 whitespace-nowrap disabled:cursor-not-allowed text-[13px]">
-          {dca.status === 'running' ? <><Loader2 size={15} className="animate-spin" /> ALLOCATING…</> : 'ALLOCATE'}
+          style={{ background: dca.status === 'running' ? '#CCCCCC' : '#000000', color: '#FFFFFF', border: 'none', borderRadius: 8, padding: '11px 24px', fontWeight: 600, fontSize: 14, cursor: dca.status === 'running' ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+          {dca.status === 'running' ? <><Loader2 size={15} className="animate-spin" /> Allocating…</> : 'Allocate'}
         </button>
       </div>
 
       {dca.status === 'running' && (
-        <div className="mt-5 border rounded-xl p-6 flex items-center gap-3" style={{ background: '#0e0f18', borderColor: `${CY}22`, ...MONO, color: CY }}>
-          <Loader2 size={17} className="animate-spin" /><span className="text-sm">Scanning {acctHoldings.length} holdings for the best dip…</span>
+        <div style={{ marginTop: 16, background: '#F7F7F7', border: '1px solid #EEEEEE', borderRadius: 12, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Loader2 size={16} className="animate-spin" style={{ color: '#757575' }} />
+          <span style={{ fontSize: 14, color: '#757575' }}>Scanning {acctHoldings.length} holdings for the best dip…</span>
         </div>
       )}
+
       {dca.status === 'done' && dca.result && (
-        <div style={{ animation: 'cardIn .5s ease both' }} className="mt-5">
+        <div className="fade-in" style={{ marginTop: 16 }}>
           {(dca.result.allocations || []).map((al, i) => (
-            <div key={i} className="lift mb-2 border rounded-xl p-4 flex items-center gap-4" style={{ background: '#0e0f18', borderColor: 'rgba(226,221,213,0.07)' }}>
-              <div className="text-center min-w-[64px]">
-                <div style={{ ...MONO, color: CY, fontWeight: 700 }} className="text-2xl">${al.amount}</div>
-                <div style={{ ...MONO, color: 'rgba(226,221,213,0.35)' }} className="text-[9px]">{al.pct}%</div>
+            <div key={i} style={{ background: '#F7F7F7', border: '1px solid #EEEEEE', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
+              <div style={{ textAlign: 'center', minWidth: 64 }}>
+                <div style={{ ...MONO, fontSize: 22, fontWeight: 700, color: '#000000' }}>${al.amount}</div>
+                <div style={{ ...MONO, fontSize: 9, color: '#AAAAAA' }}>{al.pct}%</div>
               </div>
-              <div className="flex-1">
-                <div style={{ ...MONO, fontWeight: 700 }} className="text-[14px]">{al.ticker}</div>
-                <div style={{ ...SANS, color: 'rgba(226,221,213,0.58)' }} className="text-[12px] leading-snug mt-0.5">{al.reason}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{al.ticker}</div>
+                <div style={{ fontSize: 12, color: '#757575', marginTop: 2, lineHeight: 1.4 }}>{al.reason}</div>
               </div>
             </div>
           ))}
           {dca.result.summary && (
-            <p className="mt-3 text-[13px] leading-relaxed pl-3" style={{ ...SANS, color: 'rgba(226,221,213,0.68)', borderLeft: `2px solid ${CY}40` }}>
-              {dca.result.summary}
-            </p>
+            <p style={{ fontSize: 13, color: '#555555', lineHeight: 1.5, marginTop: 10, paddingLeft: 12, borderLeft: '2px solid #EEEEEE' }}>{dca.result.summary}</p>
           )}
-          <p style={{ ...MONO, color: 'rgba(226,221,213,0.25)' }} className="mt-3 text-[10px]">You execute the buys — this is a suggestion, not an order.</p>
+          <p style={{ ...MONO, fontSize: 10, color: '#AAAAAA', marginTop: 10 }}>You execute the buys — this is a suggestion, not an order.</p>
         </div>
       )}
+
+      {dca.status === 'error' && (
+        <div style={{ marginTop: 16, background: '#FFF5F5', border: '1px solid #FFD0CC', borderRadius: 12, padding: '16px', fontSize: 13, color: '#FF3B30' }}>API error — check connection and retry.</div>
+      )}
+
       {dca.status === 'idle' && (
-        <div className="mt-8 text-center py-10 border border-dashed rounded-xl" style={{ borderColor: 'rgba(226,221,213,0.08)' }}>
-          <Coins size={28} className="mx-auto mb-3" style={{ color: CY, opacity: 0.22 }} />
-          <p style={{ ...SANS, color: 'rgba(226,221,213,0.42)' }} className="text-sm">Hit ALLOCATE to route {acct.label}'s DCA into the best dip.</p>
+        <div style={{ marginTop: 32, textAlign: 'center', padding: '32px 20px', background: '#F7F7F7', border: '1px dashed #DDDDDD', borderRadius: 12 }}>
+          <Coins size={26} style={{ color: '#CCCCCC', margin: '0 auto 10px' }} />
+          <p style={{ fontSize: 14, color: '#757575' }}>Hit Allocate to route {acct.label}’s DCA into the best dip.</p>
         </div>
       )}
     </div>

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase.js';
-import { MONO, DISP, CY } from '../constants/styles.js';
-import ArcReactor from './ArcReactor.jsx';
+import { MONO } from '../constants/styles.js';
 
 export default function AuthGate({ children, user }) {
   const [email,    setEmail]    = useState('');
@@ -15,46 +14,39 @@ export default function AuthGate({ children, user }) {
   async function login(e) {
     e.preventDefault();
     setError(''); setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch {
-      setError('Access denied. Check your credentials.');
-    }
+    try { await signInWithEmailAndPassword(auth, email, password); }
+    catch { setError('Access denied. Check your credentials.'); }
     setLoading(false);
   }
 
-  return (
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", background: '#080910', color: '#e2ddd5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -8%, rgba(200,146,42,0.07), transparent 52%)' }} />
+  const inp = { width: '100%', background: '#FFFFFF', border: '1px solid #EEEEEE', borderRadius: 10, padding: '13px 16px', fontSize: 15, color: '#000000', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
 
-      <div className="relative w-full max-w-sm px-5">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-5"><ArcReactor size={52} /></div>
-          <div style={{ ...DISP, color: CY, letterSpacing: '0.24em', fontWeight: 700 }} className="text-xl neon">THE COUNCIL</div>
-          <div style={{ ...MONO, color: 'rgba(226,221,213,0.35)', letterSpacing: '0.18em' }} className="text-[10px] mt-2">AUTHENTICATION REQUIRED</div>
+  return (
+    <div style={{ background: '#FFFFFF', color: '#000000', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" }}>
+      <div style={{ width: '100%', maxWidth: 360, padding: '0 20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ width: 48, height: 48, background: '#000000', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}>
+            <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: 20 }}>C</span>
+          </div>
+          <h1 style={{ fontWeight: 700, fontSize: 24, letterSpacing: '-0.02em', margin: '0 0 6px' }}>The Council</h1>
+          <p style={{ fontSize: 14, color: '#757575', margin: 0 }}>Sign in to access your dashboard</p>
         </div>
-        <form onSubmit={login} className="space-y-3">
+        <form onSubmit={login} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="email" required autoComplete="email"
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-            className="w-full border rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-            onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
+            placeholder="Email" required autoComplete="email" style={inp}
+            onFocus={e => (e.target.style.borderColor = '#000000')}
+            onBlur={e => (e.target.style.borderColor = '#EEEEEE')} />
           <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="password" required autoComplete="current-password"
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-            className="w-full border rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-            onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
-          {error && <p style={{ ...MONO, color: '#e85c5c' }} className="text-[12px]">{error}</p>}
+            placeholder="Password" required autoComplete="current-password" style={inp}
+            onFocus={e => (e.target.style.borderColor = '#000000')}
+            onBlur={e => (e.target.style.borderColor = '#EEEEEE')} />
+          {error && <p style={{ ...MONO, fontSize: 12, color: '#FF3B30', margin: 0 }}>{error}</p>}
           <button type="submit" disabled={loading}
-            style={{ ...MONO, background: loading ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808', letterSpacing: '0.10em', fontWeight: 600 }}
-            className="glow-btn w-full py-3 rounded-xl transition-all disabled:cursor-not-allowed text-[13px]">
-            {loading ? 'AUTHENTICATING…' : 'ACCESS COUNCIL'}
+            style={{ background: loading ? '#CCCCCC' : '#000000', color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '14px', fontWeight: 600, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4 }}>
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
-        <p style={{ ...MONO, color: 'rgba(226,221,213,0.22)' }} className="mt-4 text-[10px] text-center">Add your account in Firebase Console → Authentication → Users</p>
+        <p style={{ ...MONO, fontSize: 11, color: '#CCCCCC', textAlign: 'center', marginTop: 16 }}>Add your account in Firebase Console → Authentication → Users</p>
       </div>
     </div>
   );

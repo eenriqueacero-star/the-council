@@ -1,193 +1,274 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ACCOUNTS } from './constants/agents.js';
-import { MONO, DISP, CY } from './constants/styles.js';
+import { getMarketState, getTimeToNextOpen } from './utils/marketState.js';
 import ArcReactor from './components/ArcReactor.jsx';
-import Header from './components/Header.jsx';
-import AccountSelector from './components/AccountSelector.jsx';
-import TabNav from './components/TabNav.jsx';
+import MarketBanner from './components/MarketBanner.jsx';
+import BottomNav from './components/BottomNav.jsx';
+import PortfolioTab from './components/PortfolioTab.jsx';
 import ChatTab from './components/ChatTab.jsx';
 import CouncilTab from './components/CouncilTab.jsx';
-import PositionsTab from './components/PositionsTab.jsx';
 import DCATab from './components/DCATab.jsx';
 import WatchdogTab from './components/WatchdogTab.jsx';
-import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 import ChangelogTab from './components/ChangelogTab.jsx';
+import { ChevronRight, LogOut } from 'lucide-react';
+
+const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
+const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
+
+const SIDEBAR_TABS = [
+  { id:'portfolio', label:'Portfolio' },
+  { id:'council',   label:'Council'   },
+  { id:'chat',      label:'Chat'      },
+  { id:'watchdog',  label:'Watchdog'  },
+  { id:'dca',       label:'DCA'       },
+  { id:'alpha',     label:'Alpha'     },
+  { id:'roadmap',   label:'Roadmap'   },
+  { id:'changelog', label:'Changelog' },
+];
+
+const MORE_ROWS = [
+  ['dca','DCA Allocator'],['alpha','Alpha Tracker'],
+  ['roadmap','Roadmap'],['changelog','Changelog'],
+];
 
 export default function App() {
-  const [account, setAccount] = useState(() => localStorage.getItem('council_account') || 'edwin');
-  const [tab,     setTab]     = useState('chat');
-  const [apiDown, setApiDown] = useState(false);
+  const [account,  setAccount]  = useState('edwin');
+  const [tab,      setTab]      = useState('portfolio');
+  const [apiDown,  setApiDown]  = useState(false);
+  const [mktState, setMktState] = useState(() => getMarketState(new Date()));
+  const [msToOpen, setMsToOpen] = useState(() => getTimeToNextOpen(new Date()));
+  const [dayChange,setDayChange]= useState(0);
 
-  const [running,   setRunning]   = useState(false);
-  const [wdRunning, setWdRunning] = useState(false);
+  // Council lifted state
+  const [running,    setRunning]    = useState(false);
+  const [wdRunning,  setWdRunning]  = useState(false);
   const [ticker,     setTicker]     = useState('');
   const [capital,    setCapital]    = useState('');
   const [active,     setActive]     = useState(null);
   const [agentState, setAgentState] = useState({});
-  const [synthesis,  setSynthesis]  = useState({ status: 'idle', result: null });
+  const [synthesis,  setSynthesis]  = useState({ status:'idle', result:null });
 
-  const [councilAccounts, setCouncilAccounts] = useState([account]);
-  useEffect(() => { setCouncilAccounts([account]); }, [account]);
-
+  // Positions
   const [positions, setPositions] = useState(() => {
-    const defaults = {};
-    Object.entries(ACCOUNTS).forEach(([k]) => { defaults[k] = {}; });
-    try {
-      const saved = localStorage.getItem('council_positions');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        Object.entries(ACCOUNTS).forEach(([k]) => {
-          if (!parsed[k]) parsed[k] = {};
-        });
-        return parsed;
-      }
-    } catch {}
-    return defaults;
+    const o = {};
+    Object.keys(ACCOUNTS).forEach(k => { o[k] = {}; });
+    return o;
   });
-
-  const posLoadedRef = useRef(false);
-  const saveTimerRef = useRef(null);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, user => {
-      unsub();
-      if (!user) { posLoadedRef.current = true; return; }
-      getDoc(doc(db, 'users', user.uid, 'data', 'positions')).then(snap => {
-        if (snap.exists() && snap.data().positions) {
-          setPositions(prev => {
-            const cloud = snap.data().positions;
-            const merged = { ...prev };
-            Object.entries(cloud).forEach(([k, v]) => { merged[k] = { ...(prev[k] || {}), ...v }; });
-            return merged;
-          });
-        }
-      }).catch(() => {}).finally(() => { posLoadedRef.current = true; });
-    });
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem('council_positions', JSON.stringify(positions)); } catch {}
-    if (!posLoadedRef.current) return;
-    clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
-      setDoc(doc(db, 'users', uid, 'data', 'positions'), { positions, updatedAt: Date.now() }).catch(() => {});
-    }, 1500);
-  }, [positions]);
-
-  useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
-
-  async function savePositions() {
-    try { localStorage.setItem('council_positions', JSON.stringify(positions)); } catch {}
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    await setDoc(doc(db, 'users', uid, 'data', 'positions'), { positions, updatedAt: Date.now() });
-  }
 
   const flagApiDown = () => setApiDown(true);
 
-  function buildCombinedLine(selectedAccounts) {
-    return selectedAccounts.map(k => {
-      const a  = ACCOUNTS[k];
-      const pm = positions[k] || {};
-      const holdings = Object.keys(pm).length ? Object.keys(pm) : a.holdings;
-      const line = holdings.map(t => { const p = pm[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; }).join(', ');
-      return selectedAccounts.length > 1 ? `${a.label}(${line})` : line;
-    }).join(' | ');
-  }
+  // Market state ticker
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = new Date();
+      setMktState(getMarketState(now));
+      setMsToOpen(getTimeToNextOpen(now));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
 
-  const acct        = ACCOUNTS[account];
-  const posMap      = positions[account] || {};
-  const acctHoldings = Object.keys(posMap).length ? Object.keys(posMap) : acct.holdings;
-  const positionsLine = acctHoldings
-    .map(t => { const p = posMap[t] || {}; return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t; })
-    .join(', ');
+  // Firestore real-time sync
+  useEffect(() => {
+    let snapUnsub = () => {};
+    const authUnsub = onAuthStateChanged(auth, user => {
+      snapUnsub();
+      if (!user) return;
+      const ref = doc(db, 'users', user.uid, 'data', 'positions');
+      snapUnsub = onSnapshot(ref, snap => {
+        if (!snap.exists()) return;
+        const data = snap.data().positions || {};
+        setPositions(prev => {
+          const merged = {};
+          Object.keys(ACCOUNTS).forEach(k => { merged[k] = data[k] || prev[k] || {}; });
+          return merged;
+        });
+      });
+    });
+    return () => { authUnsub(); snapUnsub(); };
+  }, []);
 
-  const setPos = (tkr, field, val) =>
-    setPositions(prev => ({ ...prev, [account]: { ...prev[account], [tkr]: { ...(prev[account]?.[tkr] || { shares: '', cost: '' }), [field]: val } } }));
-  const addTicker = t => {
-    if (!t) return;
-    setPositions(prev => ({ ...prev, [account]: { ...prev[account], [t]: prev[account]?.[t] || { shares: '', cost: '' } } }));
-  };
-  const removeTicker = t =>
-    setPositions(prev => { const next = { ...prev[account] }; delete next[t]; return { ...prev, [account]: next }; });
+  const savePositions = useCallback(async pos => {
+    const user = auth.currentUser;
+    if (!user) return;
+    try { await setDoc(doc(db,'users',user.uid,'data','positions'), { positions: pos }, { merge:true }); } catch {}
+  }, []);
+
+  const setPos = (tkr, field, val) => setPositions(prev => {
+    const next = { ...prev, [account]: { ...prev[account], [tkr]: { ...(prev[account]?.[tkr] || {}), [field]: val } } };
+    savePositions(next); return next;
+  });
+  const addTicker = t => { if (!t) return; setPositions(prev => {
+    const next = { ...prev, [account]: { ...prev[account], [t]: prev[account]?.[t] || { shares:'', cost:'' } } };
+    savePositions(next); return next;
+  }); };
+  const removeTicker = t => setPositions(prev => {
+    const acctCopy = { ...prev[account] }; delete acctCopy[t];
+    const next = { ...prev, [account]: acctCopy };
+    savePositions(next); return next;
+  });
+
+  const acct         = ACCOUNTS[account];
+  const posMap       = positions[account] || {};
+  const acctHoldings = Object.keys(posMap).length ? Object.keys(posMap) : (acct?.holdings || []);
+  const positionsLine = acctHoldings.map(t => {
+    const p = posMap[t] || {};
+    return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t;
+  }).join(', ');
 
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown };
 
+  const glowColor = (() => {
+    if (mktState === 'open') {
+      if (dayChange > 0) return 'rgba(0,200,5,0.15)';
+      if (dayChange < 0) return 'rgba(255,59,48,0.15)';
+      return 'transparent';
+    }
+    if (mktState === 'premarket')  return 'rgba(245,158,11,0.12)';
+    if (mktState === 'afterhours') return 'rgba(139,92,246,0.12)';
+    if (mktState === 'evening' || mktState === 'overnight') return 'rgba(109,40,217,0.10)';
+    return 'rgba(107,114,128,0.08)';
+  })();
+
+  const accounts = Object.entries(ACCOUNTS).map(([id, v]) => ({ id, label: v.label }));
+  const padded   = { maxWidth:760, margin:'0 auto', padding:'16px' };
+
   return (
-    <div style={{ fontFamily: "'IBM Plex Sans', sans-serif", background: '#070a0c', color: '#e8eef0', minHeight: '100vh' }} className="relative overflow-hidden">
-      {/* Animated grid */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.4]" style={{ backgroundImage: 'linear-gradient(rgba(56,224,212,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(56,224,212,0.04) 1px, transparent 1px)', backgroundSize: '44px 44px', animation: 'gridmove 8s linear infinite' }} />
-      {/* Radial glow */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -10%, rgba(245,196,81,0.10), transparent 55%)' }} />
-      {/* Floating orbs */}
-      <div className="orb pointer-events-none absolute -top-20 -left-20 w-72 h-72 rounded-full" style={{ background: 'radial-gradient(circle, rgba(56,224,212,0.10), transparent 70%)', filter: 'blur(8px)' }} />
-      <div className="orb pointer-events-none absolute top-1/3 -right-24 w-80 h-80 rounded-full" style={{ background: 'radial-gradient(circle, rgba(176,131,255,0.09), transparent 70%)', filter: 'blur(8px)', animationDelay: '3s' }} />
-      {/* CRT scanline */}
-      <div className="crtline" />
+    <div style={{ ...FONT, background:'#FFFFFF', minHeight:'100vh', color:'#000' }}>
+      {/* Ambient glow */}
+      <div className="ambient-glow" style={{ background: glowColor }} />
 
-      {/* Boot sequence overlay */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: '#070a0c', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', animation: 'bootFade 2s ease forwards', pointerEvents: 'none' }}>
-        <ArcReactor size={96} />
-        <div style={{ ...DISP, color: CY }} className="text-sm tracking-[0.42em] neon">THE COUNCIL</div>
-        <div style={{ ...MONO, animation: 'bootText 1.3s steps(30) forwards' }} className="text-white/45 text-[10px] tracking-[0.22em] overflow-hidden whitespace-nowrap">CALIBRATING 6 AGENTS · LOADING PROTOCOLS · ONLINE</div>
-      </div>
-
-      {/* HUD corner brackets */}
-      <div className="pointer-events-none fixed inset-0 z-20">
-        {[['top-3 left-3', 0], ['top-3 right-3', 1], ['bottom-3 left-3', 2], ['bottom-3 right-3', 3]].map(([pos, i]) => (
-          <div key={i} className={`absolute ${pos} w-6 h-6`} style={{
-            borderTop:    i < 2  ? `1.5px solid ${CY}` : 'none',
-            borderBottom: i >= 2 ? `1.5px solid ${CY}` : 'none',
-            borderLeft:   i % 2 === 0 ? `1.5px solid ${CY}` : 'none',
-            borderRight:  i % 2 === 1 ? `1.5px solid ${CY}` : 'none',
-            opacity: 0.4, filter: `drop-shadow(0 0 4px ${CY})`,
-          }} />
-        ))}
-      </div>
-
-      <div className="relative max-w-5xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
-        <Header onSignOut={() => signOut(auth)} />
-
-        <AccountSelector account={account} setAccount={setAccount} positions={positions} running={running} wdRunning={wdRunning} />
-
-        <TabNav tab={tab} setTab={setTab} />
-
-        <div style={{ display: tab === 'chat' ? undefined : 'none' }}>
-          <ChatTab {...shared} />
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background:'#FFFFFF', borderRight:'1px solid #EEEEEE', zIndex:10, padding:'24px 0' }}>
+        <div style={{ padding:'0 20px 24px', display:'flex', alignItems:'center', gap:10 }}>
+          <ArcReactor size={28} />
+          <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.06em' }}>THE COUNCIL</span>
         </div>
-        {tab === 'council'   && (
-          <CouncilTab {...shared}
-            running={running} setRunning={setRunning}
-            ticker={ticker} setTicker={setTicker}
-            capital={capital} setCapital={setCapital}
-            active={active} setActive={setActive}
-            agentState={agentState} setAgentState={setAgentState}
-            synthesis={synthesis} setSynthesis={setSynthesis}
-            councilAccounts={councilAccounts}
-            setCouncilAccounts={setCouncilAccounts}
-            councilPositionsLine={buildCombinedLine(councilAccounts)}
-          />
-        )}
-        {tab === 'positions' && (
-          <PositionsTab {...shared}
-            setPos={setPos} addTicker={addTicker} removeTicker={removeTicker} onSave={savePositions}
-          />
-        )}
-        {tab === 'dca'       && <DCATab {...shared} />}
-        {tab === 'watchdog'  && <WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} />}
-        {tab === 'alpha'     && <AlphaTrackerTab account={account} />}
-        {tab === 'roadmap'   && <RoadmapTab />}
-        {tab === 'changelog' && <ChangelogTab />}
-
-        <p className="mt-8 text-[10px] text-white/25 text-center leading-relaxed" style={MONO}>THE COUNCIL · LIVE AI AGENTS · NOT FINANCIAL ADVICE — YOU EXECUTE, YOU DECIDE</p>
+        <nav style={{ flex:1, padding:'0 12px', overflowY:'auto' }}>
+          {SIDEBAR_TABS.map(({ id, label }) => (
+            <button key={id} onClick={() => setTab(id)} style={{
+              ...FONT, width:'100%', textAlign:'left', padding:'9px 12px', borderRadius:8,
+              border:'none', cursor:'pointer', fontSize:14, fontWeight: tab===id ? 600 : 400,
+              color: tab===id ? '#000' : '#757575',
+              background: tab===id ? '#F0F0F0' : 'transparent',
+              marginBottom:2, display:'block',
+            }}>{label}</button>
+          ))}
+        </nav>
+        <div style={{ padding:'16px 12px', borderTop:'1px solid #EEEEEE' }}>
+          <div style={{ ...MFONT, fontSize:11, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Account</div>
+          {accounts.map(({ id, label }) => (
+            <button key={id} onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
+              ...FONT, display:'block', width:'100%', textAlign:'left', padding:'7px 10px', borderRadius:6,
+              border:'none', cursor:'pointer', fontSize:13, fontWeight: account===id ? 600 : 400,
+              background: account===id ? '#000' : 'transparent',
+              color:      account===id ? '#fff' : '#757575',
+              marginBottom:2,
+            }}>{label}</button>
+          ))}
+          <button onClick={() => signOut(auth)} style={{ ...FONT, marginTop:8, display:'flex', alignItems:'center', gap:6, color:'#AAAAAA', border:'none', background:'none', cursor:'pointer', fontSize:13, padding:'4px 2px' }}>
+            <LogOut size={14} /> Sign out
+          </button>
+        </div>
       </div>
+
+      {/* Main content */}
+      <div className="lg:ml-[240px]" style={{ position:'relative', zIndex:1 }}>
+        {/* Mobile header */}
+        <div className="lg:hidden" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', borderBottom:'1px solid #EEEEEE', background:'#FFFFFF', position:'sticky', top:0, zIndex:40 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <ArcReactor size={22} />
+            <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.04em' }}>THE COUNCIL</span>
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            {accounts.map(({ id, label }) => (
+              <button key={id} onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
+                ...FONT, fontSize:12, fontWeight: account===id ? 600 : 400,
+                padding:'4px 10px', borderRadius:20,
+                border:`1px solid ${account===id ? '#000' : '#EEEEEE'}`,
+                background: account===id ? '#000' : '#fff',
+                color:      account===id ? '#fff' : '#757575',
+                cursor:'pointer',
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Market banner */}
+        {mktState !== 'open' && (
+          <div style={{ padding:'0 16px', maxWidth:760, margin:'0 auto' }}>
+            <MarketBanner state={mktState} msToOpen={msToOpen} />
+          </div>
+        )}
+
+        {/* API error */}
+        {apiDown && (
+          <div style={{ background:'rgba(255,59,48,0.06)', border:'1px solid rgba(255,59,48,0.2)', borderRadius:8, padding:'10px 16px', margin:'12px 16px 0', fontSize:13, color:'#FF3B30', maxWidth:760, marginLeft:'auto', marginRight:'auto' }}>
+            API connection issue. Council responses may be delayed.
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div style={{ paddingBottom:96 }} className="lg:pb-8">
+          {tab === 'portfolio' && (
+            <PortfolioTab {...shared}
+              positions={positions}
+              setPos={setPos} addTicker={addTicker} removeTicker={removeTicker}
+              marketState={mktState} onDayChange={setDayChange}
+            />
+          )}
+          {tab === 'council' && (
+            <div style={padded}>
+              <CouncilTab {...shared}
+                running={running} setRunning={setRunning}
+                ticker={ticker} setTicker={setTicker}
+                capital={capital} setCapital={setCapital}
+                active={active} setActive={setActive}
+                agentState={agentState} setAgentState={setAgentState}
+                synthesis={synthesis} setSynthesis={setSynthesis}
+              />
+            </div>
+          )}
+          {tab === 'chat' && (
+            <div style={padded}><ChatTab {...shared} /></div>
+          )}
+          {tab === 'watchdog' && (
+            <div style={padded}><WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} /></div>
+          )}
+          {tab === 'dca' && (
+            <div style={padded}><DCATab {...shared} /></div>
+          )}
+          {tab === 'roadmap' && (
+            <div style={padded}><RoadmapTab /></div>
+          )}
+          {tab === 'changelog' && (
+            <div style={padded}><ChangelogTab /></div>
+          )}
+          {tab === 'alpha' && (
+            <div style={{ ...padded, color:'#AAAAAA', textAlign:'center', paddingTop:48 }}>
+              Alpha Tracker — accumulates as you run councils.
+            </div>
+          )}
+          {tab === 'more' && (
+            <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>
+              {MORE_ROWS.map(([t, label]) => (
+                <button key={t} onClick={() => setTab(t)} style={{
+                  ...FONT, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'16px 0', background:'none', border:'none', borderBottom:'1px solid #EEEEEE',
+                  cursor:'pointer', textAlign:'left', fontSize:15, fontWeight:500, color:'#000',
+                }}>
+                  {label} <ChevronRight size={16} style={{ color:'#AAAAAA' }} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <BottomNav tab={tab} setTab={setTab} />
     </div>
   );
 }

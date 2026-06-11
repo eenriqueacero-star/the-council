@@ -1,6 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'llama-3.3-70b-versatile';
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -19,48 +19,38 @@ async function verifyAuth(req) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function callWithRetry(client, body, useSearch, retries = 3) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      if (useSearch) {
-        try {
-          return await client.beta.messages.create({
-            ...body,
-            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-            betas: ['web-search-2025-03-05'],
-          });
-        } catch {
-          return await client.messages.create(body);
-        }
-      }
-      return await client.messages.create(body);
-    } catch (err) {
-      if (err.status === 429 && i < retries - 1) {
-        const wait = (i + 1) * 8000; // 8s, 16s backoff
-        console.log(`Rate limited, retrying in ${wait}ms...`);
-        await sleep(wait);
-      } else {
-        throw err;
-      }
-    }
-  }
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await verifyAuth(req)) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { system, userContent, useSearch } = req.body || {};
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ code: 'ERR-CFG', error: 'GROQ_API_KEY not configured' });
+  }
+
+  const { system, userContent, maxTokens = 512 } = req.body || {};
   if (!system || !userContent) return res.status(400).json({ error: 'Missing system or userContent' });
 
-  try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const body = { model: MODEL, max_tokens: 1000, system, messages: [{ role: 'user', content: userContent }] };
-    const response = await callWithRetry(client, body, useSearch);
-    const text = (response.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    return res.status(200).json({ text });
-  } catch (err) {
-    console.error('runAgent error:', err.status, err.message);
-    return res.status(500).json({ error: err.message });
+  const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+  for (let i = 0; i < 3; i++) {
+    try {
+      const completion = await client.chat.completions.create({
+        model: MODEL,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userContent },
+        ],
+      });
+      const text = completion.choices[0]?.message?.content || '';
+      return res.status(200).json({ text });
+    } catch (err) {
+      if (err.status === 429 && i < 2) {
+        await sleep((i + 1) * 8000);
+      } else {
+        console.error('runAgent error:', err.status, err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    }
   }
 }

@@ -16,19 +16,19 @@ For Vercel serverless functions (`api/*.js`), they run in Node.js on Vercel but 
 
 ## Architecture
 
-**Stack:** React 18 + Vite + Tailwind · Firebase Auth + Firestore · Vercel serverless · Anthropic Claude via `api/run-agent.js` · Finnhub prices via `api/get-quotes.js`
+**Stack:** React 18 + Vite + Tailwind · Firebase Auth + Firestore · Vercel serverless · Groq (`llama-3.3-70b-versatile`) via `api/run-agent.js` · Finnhub prices via `api/get-quotes.js`
 
 ### Request flow
 
 ```
 Browser (React)
   → src/api.js  (attaches Firebase Auth JWT to every request)
-  → api/run-agent.js  (Vercel, 60s max) → Anthropic API
+  → api/run-agent.js  (Vercel, 60s max) → Groq API
   → api/get-quotes.js (Vercel, 30s max) → Finnhub API
   → src/firebase.js → Firestore (direct SDK, user-scoped rules)
 ```
 
-All API keys live **only** in Vercel environment variables (`ANTHROPIC_API_KEY`, `FINNHUB_KEY`). The browser never touches them. Both `/api/*` routes verify the Firebase Auth JWT before forwarding.
+All API keys live **only** in Vercel environment variables (`GROQ_API_KEY`, `FINNHUB_KEY`, `FIREBASE_WEB_API_KEY`). The browser never touches them. Both `/api/*` routes verify the Firebase Auth JWT before forwarding.
 
 ### State management
 
@@ -82,12 +82,9 @@ Only files listed under `functions` can have custom timeouts — adding a functi
 
 Vercel deploys automatically from **`main` branch only**. Feature branches are never deployed. Always push production-ready changes to `main`.
 
-### UI conventions — "The Brief Room"
+### JARVIS UI conventions
 
-- Background: `#080910`, amber accent `CY = #c8922a` (human/interactive), steel blue `ICE = #7db8e8` (AI/machine outputs)
-- Green: `#2fcb8a`, Red: `#e85c5c`
-- `MONO` / `DISP` / `SANS` / `CY` / `ICE` style constants in `src/constants/styles.js`
-- Typography: JetBrains Mono for all UI labels/code; Inter (SANS) for prose/body copy
-- Neon glow via `.neon` CSS class in `index.css`; `dealIn` card entrance animation
+- Background: `#070a0c`, accent cyan: `#38e0d4`, gold: `#f5c451`, purple: `#b083ff`
+- `MONO` / `DISP` / `CY` style constants in `src/constants/styles.js`
+- Neon glow via `.neon` CSS class in `index.css`; CRT scanline via `.crtline`
 - Tab layout uses `flex overflow-x-auto no-scrollbar` (7 tabs don't fit in a grid)
-- No ambient animations, no CRT scanlines, no orbs

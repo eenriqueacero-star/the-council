@@ -73,6 +73,26 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .star-shimmer      { animation: starShimmer     2s ease-in-out infinite; }
 .market-open-flash { animation: marketOpenFlash 1.5s ease; }
 
+/* ── Market overlay effects ── */
+@keyframes twinkle     { 0%,100%{ opacity:.05; transform:scale(1);   } 50%{ opacity:.9; transform:scale(1.45); } }
+@keyframes shootStar   { 0%{ transform:translate(0,0)   scaleX(0.2); opacity:0;   }
+                         8%{ opacity:1; transform:translate(0,0)   scaleX(1);   }
+                        100%{ transform:translate(320px,90px) scaleX(0.3); opacity:0; } }
+@keyframes scanMove    { 0%{ transform:translateX(-200px); } 100%{ transform:translateX(calc(100vw + 200px)); } }
+@keyframes scanSlow    { 0%{ transform:translateX(-120px); } 100%{ transform:translateX(calc(100vw + 120px)); } }
+@keyframes dawnPulse   { 0%,100%{ opacity:.75; } 50%{ opacity:1; } }
+@keyframes auroraShift { 0%,100%{ opacity:.8; transform:scaleX(1)   translateY(0);  }
+                          50%{    opacity:1;   transform:scaleX(1.06) translateY(-8px); } }
+@keyframes auroraSlow  { 0%,100%{ opacity:.6; transform:scaleX(1);   } 50%{ opacity:1; transform:scaleX(1.1); } }
+
+.twinkle-star   { animation: twinkle     var(--dur,3s) var(--delay,0s) ease-in-out infinite; }
+.shooting-star  { animation: shootStar   12s 2s ease-out infinite; }
+.scan-bar       { animation: scanMove    5s  linear infinite; }
+.scan-bar-slow  { animation: scanSlow    9s  2.5s linear infinite; }
+.dawn-pulse     { animation: dawnPulse   4s  ease-in-out infinite; }
+.aurora         { animation: auroraShift 9s  ease-in-out infinite; }
+.aurora-slow    { animation: auroraSlow  13s 3s ease-in-out infinite; }
+
 /* ── Boot fade (safety net) ── */
 @keyframes bootFade { 0%,72%{ opacity:1; } 100%{ opacity:0; visibility:hidden; } }
 @keyframes bootText { from{ clip-path: inset(0 100% 0 0); } to{ clip-path: inset(0 0 0 0); } }
@@ -120,6 +140,7 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
   .spin-slow,.spin-rev,.core-pulse,.card-in,.fade-up,.fade-in,
   .blink,.draw-in,.chart-wipe,.star-shimmer,.market-open-flash,
   .skeleton,.scanline,.price-up,.price-down,.slide-up,.slide-right,
-  .slide-left,.tab-pop,.live-dot { animation: none !important; }
+  .slide-left,.tab-pop,.live-dot,.twinkle-star,.shooting-star,
+  .scan-bar,.scan-bar-slow,.dawn-pulse,.aurora,.aurora-slow { animation: none !important; }
   .ambient-glow { opacity: 0.1; }
 }

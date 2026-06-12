@@ -16,6 +16,7 @@ import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 import ChangelogTab from './components/ChangelogTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
+import MarketOverlay from './components/MarketOverlay.jsx';
 import { ChevronRight, LogOut } from 'lucide-react';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
@@ -126,27 +127,43 @@ export default function App() {
 
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark };
 
+  const isNight = mktState === 'overnight' || mktState === 'evening';
+
   const glowColor = (() => {
     if (mktState === 'open') {
-      if (dayChange > 0) return 'rgba(0,200,5,0.15)';
-      if (dayChange < 0) return 'rgba(255,59,48,0.15)';
+      if (dayChange > 0) return 'rgba(0,200,5,0.18)';
+      if (dayChange < 0) return 'rgba(255,59,48,0.18)';
       return 'transparent';
     }
-    if (mktState === 'premarket')  return 'rgba(245,158,11,0.12)';
-    if (mktState === 'afterhours') return 'rgba(139,92,246,0.12)';
-    if (mktState === 'evening' || mktState === 'overnight') return 'rgba(109,40,217,0.10)';
+    if (mktState === 'premarket')  return 'rgba(245,158,11,0.22)';
+    if (mktState === 'afterhours') return 'rgba(124,58,237,0.20)';
+    if (isNight)                   return 'rgba(88,28,135,0.28)';
     return 'rgba(107,114,128,0.08)';
   })();
+
+  // Background shifts slightly for overnight in dark mode
+  const rootBg = dark
+    ? (isNight ? '#0d0b14' : '#111111')
+    : '#FFFFFF';
 
   const accounts = Object.entries(ACCOUNTS).map(([id, v]) => ({ id, label: v.label }));
   const padded   = { maxWidth:760, margin:'0 auto', padding:'16px' };
 
   return (
-    <div style={{ ...FONT, background: dark ? '#111111' : '#FFFFFF', minHeight:'100vh', color: dark ? '#F2F2F7' : '#000' }}>
-      <div className="ambient-glow" style={{ background: glowColor }} />
+    <div style={{ ...FONT, background: rootBg, minHeight:'100vh', color: dark ? '#F2F2F7' : '#000', transition:'background 3s ease' }}>
+      <div className="ambient-glow" style={{
+        background: glowColor,
+        // Larger, lower-positioned glow for pre-market (horizon feel)
+        ...(mktState === 'premarket'  && { top:'auto', bottom:'-150px', width:500, height:500 }),
+        // Overnight glow sits higher and wider — like a nebula crown
+        ...(isNight                   && { width:700, height:600, top:'-260px' }),
+        // After-hours glow centered and tall
+        ...(mktState === 'afterhours' && { width:500, height:550, top:'-220px' }),
+      }} />
+      <MarketOverlay state={mktState} dark={dark} />
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background: dark ? '#1C1C1E' : '#FFFFFF', borderRight: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`, zIndex:10, padding:'24px 0' }}>
+      <div className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background: dark ? (isNight ? '#12101c' : '#1C1C1E') : '#FFFFFF', borderRight: `1px solid ${dark ? (isNight ? '#2a2040' : '#2C2C2E') : '#EEEEEE'}`, zIndex:10, padding:'24px 0', transition:'background 3s ease, border-color 3s ease' }}>
         <div style={{ padding:'0 20px 24px', display:'flex', alignItems:'center', gap:10 }}>
           <ArcReactor size={28} />
           <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.06em' }}>THE COUNCIL</span>

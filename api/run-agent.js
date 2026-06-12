@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk';
 
-const MODEL = 'llama-3.3-70b-versatile';
+const MODEL_BASE   = 'llama-3.3-70b-versatile';
+const MODEL_SEARCH = 'compound-beta';         // Groq compound model with live web search
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -19,6 +20,18 @@ async function verifyAuth(req) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+async function callGroq(client, model, system, userContent, maxTokens) {
+  const completion = await client.chat.completions.create({
+    model,
+    max_tokens: maxTokens,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user',   content: userContent },
+    ],
+  });
+  return completion.choices[0]?.message?.content || '';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await verifyAuth(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -27,30 +40,32 @@ export default async function handler(req, res) {
     return res.status(500).json({ code: 'ERR-CFG', error: 'GROQ_API_KEY not configured' });
   }
 
-  const { system, userContent, maxTokens = 512 } = req.body || {};
+  const { system, userContent, useSearch = false, maxTokens = 700 } = req.body || {};
   if (!system || !userContent) return res.status(400).json({ error: 'Missing system or userContent' });
 
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const model  = useSearch ? MODEL_SEARCH : MODEL_BASE;
 
   for (let i = 0; i < 3; i++) {
     try {
-      const completion = await client.chat.completions.create({
-        model: MODEL,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: userContent },
-        ],
-      });
-      const text = completion.choices[0]?.message?.content || '';
+      const text = await callGroq(client, model, system, userContent, maxTokens);
       return res.status(200).json({ text });
     } catch (err) {
+      // compound-beta unavailable — fall back to base model
+      if (useSearch && (err.status === 404 || err.status === 400) && i === 0) {
+        try {
+          const text = await callGroq(client, MODEL_BASE, system, userContent, maxTokens);
+          return res.status(200).json({ text });
+        } catch (fe) {
+          return res.status(500).json({ error: fe.message });
+        }
+      }
       if (err.status === 429 && i < 2) {
         await sleep((i + 1) * 8000);
-      } else {
-        console.error('runAgent error:', err.status, err.message);
-        return res.status(500).json({ error: err.message });
+        continue;
       }
+      console.error('runAgent error:', err.status, err.message);
+      return res.status(500).json({ error: err.message });
     }
   }
 }

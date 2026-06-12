@@ -37,9 +37,10 @@ function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
 
 export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark }) {
   const T = theme(dark);
-  const [quotes,     setQuotes]     = useState({});
-  const [candles,    setCandles]    = useState([]);
-  const [range,      setRange]      = useState('1D');
+  const [quotes,      setQuotes]      = useState({});
+  const [candles,     setCandles]     = useState([]);
+  const [candlesLoaded, setCandlesLoaded] = useState(false);
+  const [range,       setRange]       = useState('1D');
   const [expanded,   setExpanded]   = useState(null);
   const [chartKey,   setChartKey]   = useState(0);
   const [scrubIdx,   setScrubIdx]   = useState(null);
@@ -67,12 +68,13 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   }, [fetchQuotes]);
 
   const fetchCandles = useCallback(async () => {
-    if (!withShares.length) return;
+    if (!withShares.length) { setCandlesLoaded(true); return; }
+    setCandlesLoaded(false);
     try {
       const data = await getCandles(withShares, range);
       const primary = withShares[0];
       const base = data[primary];
-      if (!base?.length) return;
+      if (!base?.length) { setCandles([]); setCandlesLoaded(true); return; }
       const minLen = Math.min(...withShares.map(t => data[t]?.length || 0).filter(l => l > 0));
       const curve = base.slice(0, minLen).map((pt, idx) => {
         let val = 0;
@@ -83,7 +85,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       });
       setCandles(curve);
       setChartKey(k => k + 1);
-    } catch {}
+    } catch { setCandles([]); } finally { setCandlesLoaded(true); }
   }, [withShares.join(','), range]);
 
   useEffect(() => { fetchCandles(); }, [fetchCandles]);
@@ -114,13 +116,24 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         <span style={{ ...MFONT, fontSize:11, color:'#CCCCCC' }}>Add positions with share counts to see your equity curve</span>
       </div>;
     }
-    if (!chartPoints.length) {
+    if (!chartPoints.length && !candlesLoaded) {
       return <div className="skeleton" style={{ height: 60, borderRadius: 8, margin: '16px 0' }} />;
     }
-    const min = Math.min(...chartPoints), max = Math.max(...chartPoints);
+    // No candle data returned (pre-market 1D, holiday, API limit, etc.)
+    // Synthesize a 2-point line: prevClose → current so the chart is never blank
+    const effectivePoints = chartPoints.length ? chartPoints
+      : (prevValue > 0 ? [prevValue, totalValue || prevValue] : []);
+    if (!effectivePoints.length) {
+      return <div style={{ height: 60, margin: '16px 0', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <span style={{ ...MFONT, fontSize:11, color: T.text3 }}>No chart data available</span>
+      </div>;
+    }
+
+    const isSynthetic = !chartPoints.length;
+    const min = Math.min(...effectivePoints), max = Math.max(...effectivePoints);
     const rng = max - min || 1;
-    const xs  = chartPoints.map((_, i) => (i / (chartPoints.length - 1)) * W);
-    const ys  = chartPoints.map(p => H - ((p - min) / rng) * (H - 20) - 10);
+    const xs  = effectivePoints.map((_, i) => (i / Math.max(effectivePoints.length - 1, 1)) * W);
+    const ys  = effectivePoints.map(p => H - ((p - min) / rng) * (H - 20) - 10);
     const linePath = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
     const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
     const gradId   = `cg${chartKey}`;
@@ -130,8 +143,8 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     const handleMove = e => {
       const rect = e.currentTarget.getBoundingClientRect();
       const cx = e.touches ? e.touches[0].clientX : e.clientX;
-      const idx = Math.round(((cx - rect.left) / rect.width) * (chartPoints.length - 1));
-      setScrubIdx(Math.max(0, Math.min(chartPoints.length - 1, idx)));
+      const idx = Math.round(((cx - rect.left) / rect.width) * (effectivePoints.length - 1));
+      setScrubIdx(Math.max(0, Math.min(effectivePoints.length - 1, idx)));
     };
 
     return (
@@ -154,6 +167,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
             </>
           )}
         </svg>
+        {isSynthetic && (
+          <div style={{ position:'absolute', bottom:4, right:8, ...MFONT, fontSize:9, color: T.text3, letterSpacing:'0.06em' }}>
+            PREV CLOSE REF
+          </div>
+        )}
       </div>
     );
   };

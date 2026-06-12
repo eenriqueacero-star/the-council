@@ -5,7 +5,7 @@
 * { -webkit-tap-highlight-color: transparent; }
 input, textarea, select { font-size: max(16px, 1em) !important; }
 
-/* ── ArcReactor animations ── */
+/* ── ArcReactor ── */
 @keyframes spin    { to { transform: rotate(360deg); } }
 @keyframes spinRev { to { transform: rotate(-360deg); } }
 @keyframes corePulse { 0%,100%{ opacity:.65; transform:scale(1);} 50%{ opacity:1; transform:scale(1.14);} }
@@ -13,15 +13,33 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .spin-rev   { animation: spinRev  10s linear infinite; transform-box: fill-box; transform-origin: center; }
 .core-pulse { animation: corePulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 
-/* ── Agent / chat ── */
-@keyframes cardIn { from { opacity:0; transform: translateY(12px) scale(.98); } to { opacity:1; transform: none; } }
-@keyframes fadeUp { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
-@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-@keyframes blink  { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
+/* ── Card / general entrance ── */
+@keyframes cardIn  { from { opacity:0; transform: translateY(12px) scale(.98); } to { opacity:1; transform: none; } }
+@keyframes fadeUp  { from { opacity:0; transform: translateY(8px);  } to { opacity:1; transform: none; } }
+@keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
+@keyframes blink   { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
 .card-in { animation: cardIn .4s cubic-bezier(.2,.7,.2,1) both; }
-.fade-up { animation: fadeUp .3s ease both; }
-.fade-in { animation: fadeIn .3s ease both; }
-.blink   { animation: blink  1.4s ease-in-out infinite; }
+.fade-up  { animation: fadeUp .3s ease both; }
+.fade-in  { animation: fadeIn .3s ease both; }
+.blink    { animation: blink  1.4s ease-in-out infinite; }
+
+/* ── Tab content slide-up on switch ── */
+@keyframes slideUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: none; } }
+.slide-up { animation: slideUp .32s cubic-bezier(.2,.7,.2,1) both; }
+
+/* ── Chat message slide-in ── */
+@keyframes slideInRight { from { opacity:0; transform: translateX(10px); } to { opacity:1; transform: none; } }
+@keyframes slideInLeft  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
+.slide-right { animation: slideInRight .22s ease both; }
+.slide-left  { animation: slideInLeft  .22s ease both; }
+
+/* ── Bottom-nav icon spring pop ── */
+@keyframes tabPop { 0%{ transform:scale(.72); } 58%{ transform:scale(1.18); } 100%{ transform:scale(1); } }
+.tab-pop { animation: tabPop .28s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* ── Live market dot pulse ── */
+@keyframes liveDot { 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(2); opacity:.3; } }
+.live-dot { animation: liveDot 2.2s ease-in-out infinite; }
 
 /* ── Skeleton shimmer ── */
 @keyframes shimmer {
@@ -41,7 +59,7 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .price-up   { animation: priceGreenFlash .5s ease; }
 .price-down { animation: priceRedFlash   .5s ease; }
 
-/* ── Chart ── */
+/* ── Chart draw-in ── */
 @keyframes chartWipe {
   from { clip-path: inset(0 100% 0 0); }
   to   { clip-path: inset(0 0%   0 0); }
@@ -55,7 +73,7 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .star-shimmer      { animation: starShimmer     2s ease-in-out infinite; }
 .market-open-flash { animation: marketOpenFlash 1.5s ease; }
 
-/* ── Boot fade (safety net for old overlay) ── */
+/* ── Boot fade (safety net) ── */
 @keyframes bootFade { 0%,72%{ opacity:1; } 100%{ opacity:0; visibility:hidden; } }
 @keyframes bootText { from{ clip-path: inset(0 100% 0 0); } to{ clip-path: inset(0 0 0 0); } }
 
@@ -79,12 +97,17 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 }
 @media (min-width: 1024px) { .ambient-glow { width: 600px; } }
 
-/* ── Position rows ── */
+/* ── Position / holding rows ── */
 @media (hover:hover) {
   .holding-row:hover {
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     transform: translateY(-1px);
     transition: box-shadow .15s ease, transform .15s ease;
+  }
+  .mover-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+    transition: box-shadow .18s ease, transform .18s ease;
   }
 }
 
@@ -96,6 +119,7 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 @media (prefers-reduced-motion: reduce) {
   .spin-slow,.spin-rev,.core-pulse,.card-in,.fade-up,.fade-in,
   .blink,.draw-in,.chart-wipe,.star-shimmer,.market-open-flash,
-  .skeleton,.scanline,.price-up,.price-down { animation: none !important; }
+  .skeleton,.scanline,.price-up,.price-down,.slide-up,.slide-right,
+  .slide-left,.tab-pop,.live-dot { animation: none !important; }
   .ambient-glow { opacity: 0.1; }
 }

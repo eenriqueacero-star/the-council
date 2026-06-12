@@ -42,7 +42,10 @@ export default function BottomNav({ tab, setTab }) {
             padding: '0 4px',
             color: active ? '#000000' : '#AAAAAA',
           }}>
-            <Icon size={24} strokeWidth={active ? 2.2 : 1.8} />
+            {/* key change triggers remount → spring pop animation */}
+            <span key={active ? 'on' : 'off'} className={active ? 'tab-pop' : ''} style={{ display:'flex' }}>
+              <Icon size={24} strokeWidth={active ? 2.2 : 1.8} />
+            </span>
             <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>{label}</span>
           </button>
         );

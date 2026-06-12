@@ -44,7 +44,6 @@ export default function App() {
   const [msToOpen, setMsToOpen] = useState(() => getTimeToNextOpen(new Date()));
   const [dayChange,setDayChange]= useState(0);
 
-  // Council lifted state
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
   const [ticker,     setTicker]     = useState('');
@@ -53,7 +52,6 @@ export default function App() {
   const [agentState, setAgentState] = useState({});
   const [synthesis,  setSynthesis]  = useState({ status:'idle', result:null });
 
-  // Positions
   const [positions, setPositions] = useState(() => {
     const o = {};
     Object.keys(ACCOUNTS).forEach(k => { o[k] = {}; });
@@ -62,7 +60,6 @@ export default function App() {
 
   const flagApiDown = () => setApiDown(true);
 
-  // Market state ticker
   useEffect(() => {
     const id = setInterval(() => {
       const now = new Date();
@@ -72,7 +69,6 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  // Firestore real-time sync
   useEffect(() => {
     let snapUnsub = () => {};
     const authUnsub = onAuthStateChanged(auth, user => {
@@ -155,6 +151,7 @@ export default function App() {
               color: tab===id ? '#000' : '#757575',
               background: tab===id ? '#F0F0F0' : 'transparent',
               marginBottom:2, display:'block',
+              transition: 'background .15s ease, color .15s ease',
             }}>{label}</button>
           ))}
         </nav>
@@ -166,7 +163,7 @@ export default function App() {
               border:'none', cursor:'pointer', fontSize:13, fontWeight: account===id ? 600 : 400,
               background: account===id ? '#000' : 'transparent',
               color:      account===id ? '#fff' : '#757575',
-              marginBottom:2,
+              marginBottom:2, transition: 'background .15s ease, color .15s ease',
             }}>{label}</button>
           ))}
           <button onClick={() => signOut(auth)} style={{ ...FONT, marginTop:8, display:'flex', alignItems:'center', gap:6, color:'#AAAAAA', border:'none', background:'none', cursor:'pointer', fontSize:13, padding:'4px 2px' }}>
@@ -191,7 +188,7 @@ export default function App() {
                 border:`1px solid ${account===id ? '#000' : '#EEEEEE'}`,
                 background: account===id ? '#000' : '#fff',
                 color:      account===id ? '#fff' : '#757575',
-                cursor:'pointer',
+                cursor:'pointer', transition: 'all .15s ease',
               }}>{label}</button>
             ))}
           </div>
@@ -209,7 +206,8 @@ export default function App() {
           </div>
         )}
 
-        <div style={{ paddingBottom:96 }} className="lg:pb-8">
+        {/* Tab content — key forces remount + slide-up on every tab switch */}
+        <div key={tab} className="slide-up lg:pb-8" style={{ paddingBottom:96 }}>
           {tab === 'portfolio' && (
             <PortfolioTab {...shared}
               positions={positions}

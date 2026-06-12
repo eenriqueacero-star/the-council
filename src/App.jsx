@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
@@ -97,10 +97,27 @@ export default function App() {
     return () => { authUnsub(); snapUnsub(); };
   }, []);
 
-  const savePositions = useCallback(async pos => {
-    const user = auth.currentUser;
-    if (!user) return;
-    try { await setDoc(doc(db,'users',user.uid,'data','positions'), { positions: pos }, { merge:true }); } catch {}
+  const saveTimer   = useRef(null);
+  const pendingPos  = useRef(null);
+
+  const savePositions = useCallback(pos => {
+    pendingPos.current = pos;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        // Auth not ready yet — retry once after a short delay
+        saveTimer.current = setTimeout(async () => {
+          const u2 = auth.currentUser;
+          if (!u2) return;
+          try { await setDoc(doc(db,'users',u2.uid,'data','positions'), { positions: pendingPos.current }, { merge:true }); }
+          catch (e) { console.error('savePositions retry failed:', e); }
+        }, 2000);
+        return;
+      }
+      try { await setDoc(doc(db,'users',user.uid,'data','positions'), { positions: pendingPos.current }, { merge:true }); }
+      catch (e) { console.error('savePositions failed:', e); }
+    }, 600);
   }, []);
 
   const setPos = (tkr, field, val) => setPositions(prev => {

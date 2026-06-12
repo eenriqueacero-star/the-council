@@ -1,9 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
-import { AGENTS, PROTOCOLS, STANCE_STYLE } from '../constants/agents.js';
+import { AGENTS, PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
-import { callAgent } from '../api.js';
+import { callAgent, getQuotes } from '../api.js';
+import { auth, db } from '../firebase.js';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { loadTickerHistory } from '../utils/rulingContext.js';
+import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
 import { useVoice } from '../hooks/useVoice.js';
 import ArcReactor from './ArcReactor.jsx';
 
@@ -57,11 +61,27 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
       setChat(p => [...p, { role:'pm', text:intro }]); speak(intro);
       const runId = Date.now();
       setChat(p => [...p, { role:'council', runId, ticker:tkr, agents:{} }]);
-      const userContent = `Ticker: ${tkr}. The investor is considering BUYING it. ${acctLine} Today is ${new Date().toDateString()}. Return ONLY the JSON.`;
+
+      // Intelligence layer: live price + ticker history + agent context
+      let livePrice = null, rawQuote = null;
+      try {
+        const q = await getQuotes([tkr]);
+        rawQuote  = q[tkr] || null;
+        livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
+      } catch {}
+
+      const uid     = auth.currentUser?.uid;
+      const history = uid ? await loadTickerHistory(uid, tkr, livePrice) : '';
+      const ctx     = await loadAgentContext(tkr, rawQuote);
+
+      const priceNote   = livePrice ? ` Current price: $${livePrice.toFixed(2)}.` : '';
+      const baseContent = `Ticker: ${tkr}. The investor is considering BUYING it.${priceNote} ${acctLine} Today is ${new Date().toDateString()}.${history} Return ONLY the JSON.`;
+
       const results = {};
       await Promise.all(AGENTS.map(async ag => {
+        const extra = buildAgentContext(ag.id, ctx);
         try {
-          const txt = await callAgent(ag.system, userContent, ag.search);
+          const txt = await callAgent(ag.system, baseContent + extra, ag.search);
           const pr  = extractJSON(txt);
           results[ag.id] = pr || { stance:'CAUTION' };
         } catch {
@@ -72,16 +92,38 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-3 sentence reply>","c
       }));
 
       const council  = AGENTS.map(ag => `${ag.name}: ${JSON.stringify(results[ag.id])}`).join('\n');
-      const synthSys = `You are the PM concluding the council on ${tkr} for ${acct.label}. ${PROTOCOLS}
-Speak the ruling to the investor conversationally (JARVIS tone, 2-4 sentences): the verdict, conviction out of 10, the single most important factor, and sizing if buying. Reference that the agents reported in.
-Respond ONLY with JSON in a \`\`\`json block: {"speak":"<the spoken ruling>","verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>}`;
+      const synthSys = `You are the PM concluding the council on ${tkr} for ${acct.label}. ${PROTOCOLS}\nSpeak the ruling to the investor conversationally (British butler tone, 2-4 sentences): the verdict, conviction out of 10, the single most important factor, and sizing if buying.\nRespond ONLY with JSON in a \`\`\`json block: {"speak":"<the spoken ruling>","verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<numeric stop price>","takeProfit":"<numeric target price>"}`;
       let synth;
       try {
-        const txt = await callAgent(synthSys, `Council reports on ${tkr}:\n${council}\n\nDeliver the ruling. Return ONLY the JSON.`, false);
+        const txt = await callAgent(synthSys, `Council reports on ${tkr}:\n${council}\n${livePrice ? `Current price: $${livePrice.toFixed(2)}.` : ''}\n\nDeliver the ruling. Return ONLY the JSON.`, false);
         synth = extractJSON(txt) || { speak:'The council is split, sir — I\'d hold off for now.', verdict:'WATCH', conviction:5 };
       } catch {
         synth = { speak:'I couldn\'t finalize the ruling, sir.', verdict:'WATCH', conviction:5 };
       }
+
+      // Save ruling to Firestore
+      if (uid && synth.verdict) {
+        try {
+          await addDoc(collection(db, 'users', uid, 'rulings'), {
+            ticker: tkr,
+            account,
+            date: new Date().toISOString().slice(0, 10),
+            ts: serverTimestamp(),
+            priceAtCall: livePrice,
+            agentStances: Object.fromEntries(AGENTS.map(ag => [ag.id, { stance: results[ag.id]?.stance ?? null, score: results[ag.id]?.score ?? null, headline: results[ag.id]?.headline ?? null }])),
+            verdict: synth.verdict,
+            conviction: synth.conviction ?? null,
+            entry: null,
+            stopLoss: synth.stopLoss || null,
+            takeProfit: synth.takeProfit || null,
+            summary: synth.speak || '',
+            outcomeCheckedAt: null,
+            priceAt30d: null,
+            outcome: null,
+          });
+        } catch {}
+      }
+
       setChat(p => [...p, { role:'pm', text:synth.speak, verdict:synth.verdict, conviction:synth.conviction, ticker:tkr }]);
       speak(synth.speak);
     } else {
@@ -93,7 +135,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<the spoken ruling>","ve
 
   return (
     <div>
-      {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <MessageSquare size={16} style={{ color:'#000' }} />
@@ -106,7 +147,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<the spoken ruling>","ve
         </button>
       </div>
 
-      {/* Chat window */}
       <div style={{ background:'#FFFFFF', border:'1px solid #EEEEEE', borderRadius:12, overflow:'hidden', display:'flex', flexDirection:'column', height:'min(60vh, 560px)' }}>
         <div className="flex-1 overflow-y-auto no-scrollbar" style={{ padding:16, display:'flex', flexDirection:'column', gap:10 }}>
           {chat.map((m, i) => {
@@ -175,7 +215,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<the spoken ruling>","ve
           <div ref={chatEndRef} />
         </div>
 
-        {/* Input bar */}
         <div style={{ borderTop:'1px solid #EEEEEE', padding:10, display:'flex', alignItems:'center', gap:8 }}>
           <button onClick={() => toggleListen(t => sendChat(t))} disabled={!srSupported || chatBusy}
             title={srSupported ? 'Tap to speak' : 'Voice input needs Chrome'}
@@ -194,7 +233,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<the spoken ruling>","ve
         </div>
       </div>
 
-      {/* Quick suggestions */}
       <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:6 }}>
         {['How does CRDO look?','Should I buy OKLO?',"What's the macro risk today?"].map(q => (
           <button key={q} onClick={() => sendChat(q)} disabled={chatBusy} style={MONO}
@@ -202,7 +240,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<the spoken ruling>","ve
         ))}
       </div>
       <p style={{ ...MONO, marginTop:8, fontSize:10, color:'#AAAAAA' }}>
-        {srSupported ? 'Tap the mic to talk, or type. ' : 'Type to chat (voice input needs Chrome). '}
+        {srSupported ? 'Tap the mic to talk, or type. ' : 'Voice input needs Chrome. '}
         PM replies aloud when voice is on.
       </p>
     </div>

@@ -1,13 +1,16 @@
 import React, { useRef } from 'react';
-import { Search, ChevronRight, Loader2, AlertTriangle, Crown, TrendingUp, Wallet, Play } from 'lucide-react';
+import { Search, ChevronRight, Loader2, AlertTriangle, Crown, TrendingUp, Wallet } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
-import { AGENTS, STANCE_STYLE, DEMO_TICKER, DEMO_RESULTS, DEMO_SYNTH } from '../constants/agents.js';
+import { AGENTS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
-import { callAgent } from '../api.js';
+import { callAgent, getQuotes } from '../api.js';
+import { auth, db } from '../firebase.js';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { loadTickerHistory } from '../utils/rulingContext.js';
+import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
 
 const FONT = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 
-// Public.com stance palette (overrides STANCE_STYLE for visuals)
 const PS = {
   PASS:       { bg:'rgba(0,200,5,0.1)',    fg:'#00C805', label:'PASS'    },
   FAIL:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'FAIL'    },
@@ -31,13 +34,29 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     if (!t || running) return;
     setActive(t); setRunning(true); setSynthesis({ status:'idle', result:null });
     const init = {}; AGENTS.forEach(a => (init[a.id] = { status:'running', result:null })); setAgentState(init);
-    const acctLine   = `Account under review: ${acct.label}'s (${acct.sub}). This account currently holds: ${positionsLine}. DCA: ${acct.dcaNote}. Judge concentration and sizing against THIS account.`;
-    const capLine    = capital.trim() ? `Available capital to deploy: $${capital.trim()}.` : 'Available capital not specified.';
-    const userContent= `Ticker under consideration: ${t}. The investor is thinking about BUYING it. ${acctLine} ${capLine} Today is ${new Date().toDateString()}. Return ONLY the JSON.`;
+
+    // Live price + ticker history
+    let livePrice = null, rawQuote = null;
+    try {
+      const q = await getQuotes([t]);
+      rawQuote  = q[t] || null;
+      livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
+    } catch {}
+
+    const uid     = auth.currentUser?.uid;
+    const history = uid ? await loadTickerHistory(uid, t, livePrice) : '';
+    const ctx     = await loadAgentContext(t, rawQuote);
+
+    const priceNote   = livePrice ? ` Current price: $${livePrice.toFixed(2)}.` : '';
+    const acctLine    = `Account under review: ${acct.label}'s (${acct.sub}). This account currently holds: ${positionsLine}. DCA: ${acct.dcaNote}. Judge concentration and sizing against THIS account.`;
+    const capLine     = capital.trim() ? `Available capital to deploy: $${capital.trim()}.` : 'Available capital not specified.';
+    const baseContent = `Ticker under consideration: ${t}. The investor is thinking about BUYING it.${priceNote} ${acctLine} ${capLine} Today is ${new Date().toDateString()}.${history} Return ONLY the JSON.`;
+
     const results = {};
     await Promise.all(AGENTS.map(async a => {
+      const agentExtra = buildAgentContext(a.id, ctx);
       try {
-        const txt = await callAgent(a.system, userContent, a.search);
+        const txt = await callAgent(a.system, baseContent + agentExtra, a.search);
         const p   = extractJSON(txt);
         results[a.id] = p || { stance:'CAUTION', headline:'Could not parse output', points:['Agent returned unstructured data.'], score:5 };
         setAgentState(prev => ({ ...prev, [a.id]:{ status:'done', result:results[a.id] } }));
@@ -47,14 +66,38 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         setAgentState(prev => ({ ...prev, [a.id]:{ status:'error', result:null } }));
       }
     }));
+
     setSynthesis({ status:'running', result:null });
     setTimeout(() => synthRef.current?.scrollIntoView({ behavior:'smooth', block:'center' }), 200);
     const council     = AGENTS.map(a => `${a.name} (${a.role}): ${JSON.stringify(results[a.id])}`).join('\n');
-    const synthSystem = `You are the PORTFOLIO MANAGER and final decision-maker. ${acct.label}'s account.\nFive specialists weighed in. Weigh against the 4-Gate Rule. BUY requires gates broadly satisfied AND conviction >= 7. If macro is a headwind day, downgrade to WATCH. Respect a strong unrebutted bear case.\nRespond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"sizing":"<one line>","summary":"<2-3 sentences, plain, direct>","bull":["<for>","<for>"],"risks":["<risk>","<risk>"]}`;
+    const synthSystem = `You are the PORTFOLIO MANAGER and final decision-maker. ${acct.label}'s account.\nFive specialists weighed in. Weigh against the 4-Gate Rule. BUY requires gates broadly satisfied AND conviction >= 7. If macro is a headwind day, downgrade to WATCH. Respect a strong unrebutted bear case.\nRespond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"entry":"<entry price or range>","stopLoss":"<numeric stop price>","takeProfit":"<numeric target price>","sizing":"<one line>","summary":"<2-3 sentences, plain, direct>","bull":["<for>","<for>"],"risks":["<risk>","<risk>"]}`;
     try {
-      const txt = await callAgent(synthSystem, `Council inputs for ${t}:\n${council}\n\n${acctLine}\n${capLine}\n\nFinal ruling. Return ONLY the JSON.`, false);
+      const txt = await callAgent(synthSystem, `Council inputs for ${t}:\n${council}\n\n${acctLine}\n${capLine}\n${livePrice ? `Current price: $${livePrice.toFixed(2)}.` : ''}\n\nFinal ruling. Return ONLY the JSON.`, false);
       const p   = extractJSON(txt);
-      setSynthesis({ status:'done', result: p || { verdict:'WATCH', conviction:5, sizing:'n/a', summary:'Could not parse synthesis.', bull:[], risks:[] } });
+      const res = p || { verdict:'WATCH', conviction:5, sizing:'n/a', summary:'Could not parse synthesis.', bull:[], risks:[] };
+      setSynthesis({ status:'done', result: res });
+
+      if (uid && res.verdict) {
+        try {
+          await addDoc(collection(db, 'users', uid, 'rulings'), {
+            ticker: t,
+            account,
+            date: new Date().toISOString().slice(0, 10),
+            ts: serverTimestamp(),
+            priceAtCall: livePrice,
+            agentStances: Object.fromEntries(AGENTS.map(a => [a.id, { stance: results[a.id]?.stance ?? null, score: results[a.id]?.score ?? null, headline: results[a.id]?.headline ?? null }])),
+            verdict: res.verdict,
+            conviction: res.conviction ?? null,
+            entry: res.entry || null,
+            stopLoss: res.stopLoss || null,
+            takeProfit: res.takeProfit || null,
+            summary: res.summary || '',
+            outcomeCheckedAt: null,
+            priceAt30d: null,
+            outcome: null,
+          });
+        } catch {}
+      }
     } catch {
       flagApiDown();
       setSynthesis({ status:'error', result:null });
@@ -62,20 +105,8 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     setRunning(false);
   }
 
-  function runDemo() {
-    if (running) return;
-    setTicker(DEMO_TICKER); setCapital('2000'); setActive(DEMO_TICKER); setRunning(true); setSynthesis({ status:'idle', result:null });
-    const init = {}; AGENTS.forEach(a => (init[a.id] = { status:'running', result:null })); setAgentState(init);
-    const order = ['risk','catalyst','technical','macro','bear','sizer'];
-    order.forEach((id, i) => setTimeout(() => setAgentState(prev => ({ ...prev, [id]:{ status:'done', result:DEMO_RESULTS[id] } })), 700 + i * 600));
-    const total = 700 + order.length * 600;
-    setTimeout(() => { setSynthesis({ status:'running', result:null }); synthRef.current?.scrollIntoView({ behavior:'smooth', block:'center' }); }, total + 200);
-    setTimeout(() => { setSynthesis({ status:'done', result:DEMO_SYNTH }); setRunning(false); }, total + 1500);
-  }
-
   return (
     <div className="mt-2">
-      {/* Ticker input */}
       <label style={{ ...MONO, display:'block', fontSize:11, color:'#AAAAAA', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:8 }}>Enter Ticker to Convene the Council</label>
       <div className="flex gap-2 flex-wrap sm:flex-nowrap">
         <div className="relative flex-1 min-w-[180px]">
@@ -91,7 +122,6 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         </button>
       </div>
 
-      {/* Capital */}
       <div className="mt-2 flex gap-2 items-center">
         <div className="relative flex-1">
           <Wallet size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'#AAAAAA' }} />
@@ -102,20 +132,14 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         </div>
       </div>
 
-      {/* Quick picks */}
       <div className="mt-3 flex items-center gap-2 flex-wrap">
         <span style={MONO} className="text-[10px] text-[#AAAAAA]">QUICK:</span>
         {quickPicks.map(q => (
           <button key={q} onClick={() => setTicker(q)} disabled={running} style={MONO}
             className="text-[11px] px-2.5 py-1 rounded border border-[#EEEEEE] text-[#757575] hover:border-black hover:text-black transition-colors disabled:opacity-40">{q}</button>
         ))}
-        <button onClick={runDemo} disabled={running} style={MONO}
-          className="ml-auto text-[11px] px-3 py-1 rounded border border-[#EEEEEE] text-[#757575] hover:border-black hover:text-black transition-colors disabled:opacity-40 flex items-center gap-1.5">
-          <Play size={11} /> DEMO
-        </button>
       </div>
 
-      {/* Agent grid */}
       {active && (
         <div className="mt-8">
           <div className="flex items-center gap-2 mb-4">
@@ -131,8 +155,8 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
               const ss   = r && (PS[r.stance] || PS.CAUTION);
               return (
                 <div key={a.id}
-                  style={{ animation: st.status==='done' ? 'cardIn .5s cubic-bezier(.2,.7,.2,1) both' : undefined, background:'#FFFFFF', border:`1px solid ${st.status==='done' ? '#EEEEEE' : '#EEEEEE'}`, borderRadius:12, padding:16, overflow:'hidden', position:'relative', boxShadow:'0 2px 12px rgba(0,0,0,0.05)' }}>
-                  {st.status==='running' && <div className="absolute left-0 right-0 h-12 scanline" style={{ background:`linear-gradient(${a.accent}18, transparent)`, top:0 }} />}
+                  style={{ animation: st.status==='done' ? 'cardIn .5s cubic-bezier(.2,.7,.2,1) both' : undefined, background:'#FFFFFF', border:'1px solid #EEEEEE', borderRadius:12, padding:16, overflow:'hidden', position:'relative', boxShadow:'0 2px 12px rgba(0,0,0,0.05)' }}>
+                  {st.status==='running' && <div className="absolute left-0 right-0 h-12" style={{ background:`linear-gradient(${a.accent}18, transparent)`, top:0 }} />}
                   <div className="flex items-start justify-between gap-2 relative">
                     <div className="flex items-center gap-2.5">
                       <div style={{ background:`${a.accent}12`, border:`1px solid ${a.accent}28`, borderRadius:8, padding:7 }}><Icon size={16} style={{ color:a.accent }} /></div>
@@ -169,7 +193,6 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         </div>
       )}
 
-      {/* Synthesis */}
       {active && (
         <div ref={synthRef} className="mt-5">
           {synthesis.status==='running' && (
@@ -184,20 +207,27 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
                 <span style={{ ...DISP, fontSize:14, fontWeight:600, letterSpacing:'0.06em', color:'#fff' }}>PORTFOLIO MANAGER · FINAL RULING</span>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:20, flexWrap:'wrap' }}>
-                <div style={{ background:vStyle.bg === '#000000' ? 'rgba(255,255,255,0.12)' : vStyle.bg, border:`1px solid rgba(255,255,255,0.2)`, borderRadius:10, padding:'12px 24px', textAlign:'center' }}>
+                <div style={{ background: vStyle.bg === '#000000' ? 'rgba(255,255,255,0.12)' : vStyle.bg, border:'1px solid rgba(255,255,255,0.2)', borderRadius:10, padding:'12px 24px', textAlign:'center' }}>
                   <div style={{ ...DISP, color: vStyle.fg === '#FFFFFF' ? '#FFFFFF' : vStyle.fg, fontSize:32, fontWeight:700, letterSpacing:'0.04em' }}>{vStyle.label}</div>
                   <div style={{ ...MONO, color:'rgba(255,255,255,0.45)', fontSize:10, marginTop:2 }}>{active} · {acct.label}</div>
                 </div>
                 <div style={{ flex:1, minWidth:160 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', ...MONO, fontSize:11, color:'rgba(255,255,255,0.45)', marginBottom:6 }}><span>CONVICTION</span><span>{synthesis.result.conviction}/10</span></div>
                   <div style={{ height:8, borderRadius:4, background:'rgba(255,255,255,0.15)', overflow:'hidden' }}>
-                    <div style={{ width:`${(synthesis.result.conviction/10)*100}%`, background:vStyle.fg === '#000000' ? '#FFFFFF' : vStyle.fg, height:'100%', borderRadius:4, transition:'width .8s ease' }} />
+                    <div style={{ width:`${(synthesis.result.conviction/10)*100}%`, background: vStyle.fg === '#000000' ? '#FFFFFF' : vStyle.fg, height:'100%', borderRadius:4, transition:'width .8s ease' }} />
                   </div>
                   <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginTop:12, ...MONO, fontSize:12, color:'rgba(255,255,255,0.55)' }}>
                     <TrendingUp size={13} style={{ marginTop:1, color:'rgba(255,255,255,0.35)' }} /><span>{synthesis.result.sizing}</span>
                   </div>
                 </div>
               </div>
+              {(synthesis.result.entry || synthesis.result.stopLoss || synthesis.result.takeProfit) && (
+                <div style={{ marginTop:12, display:'flex', gap:16, flexWrap:'wrap' }}>
+                  {synthesis.result.entry     && <div style={{ ...MONO, fontSize:11, color:'rgba(255,255,255,0.55)' }}>ENTRY: <span style={{ color:'#fff' }}>{synthesis.result.entry}</span></div>}
+                  {synthesis.result.stopLoss  && <div style={{ ...MONO, fontSize:11, color:'rgba(255,255,255,0.55)' }}>STOP: <span style={{ color:'#FF3B30' }}>{synthesis.result.stopLoss}</span></div>}
+                  {synthesis.result.takeProfit && <div style={{ ...MONO, fontSize:11, color:'rgba(255,255,255,0.55)' }}>TARGET: <span style={{ color:'#00C805' }}>{synthesis.result.takeProfit}</span></div>}
+                </div>
+              )}
               <p style={{ marginTop:16, fontSize:14, color:'rgba(255,255,255,0.85)', lineHeight:1.6 }}>{synthesis.result.summary}</p>
               <div style={{ marginTop:16, display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <div style={{ background:'rgba(0,200,5,0.1)', border:'1px solid rgba(0,200,5,0.25)', borderRadius:8, padding:12 }}>
@@ -214,7 +244,6 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         </div>
       )}
 
-      {/* Empty state */}
       {!active && (
         <div style={{ marginTop:48, textAlign:'center', padding:'40px 20px', border:'1px dashed #EEEEEE', borderRadius:12 }}>
           <Crown size={32} style={{ margin:'0 auto 12px', opacity:0.25, color:'#F59E0B' }} />

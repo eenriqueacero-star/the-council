@@ -12,6 +12,7 @@ import ChatTab from './components/ChatTab.jsx';
 import CouncilTab from './components/CouncilTab.jsx';
 import DCATab from './components/DCATab.jsx';
 import WatchdogTab from './components/WatchdogTab.jsx';
+import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 import ChangelogTab from './components/ChangelogTab.jsx';
 import { ChevronRight, LogOut } from 'lucide-react';
@@ -20,14 +21,14 @@ const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display'
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const SIDEBAR_TABS = [
-  { id:'portfolio', label:'Portfolio' },
-  { id:'council',   label:'Council'   },
-  { id:'chat',      label:'Chat'      },
-  { id:'watchdog',  label:'Watchdog'  },
-  { id:'dca',       label:'DCA'       },
-  { id:'alpha',     label:'Alpha'     },
-  { id:'roadmap',   label:'Roadmap'   },
-  { id:'changelog', label:'Changelog' },
+  { id:'portfolio', label:'Portfolio'  },
+  { id:'council',   label:'Council'    },
+  { id:'chat',      label:'Chat'       },
+  { id:'watchdog',  label:'Watchdog'   },
+  { id:'dca',       label:'DCA'        },
+  { id:'alpha',     label:'Alpha'      },
+  { id:'roadmap',   label:'Roadmap'    },
+  { id:'changelog', label:'Changelog'  },
 ];
 
 const MORE_ROWS = [
@@ -138,7 +139,6 @@ export default function App() {
 
   return (
     <div style={{ ...FONT, background:'#FFFFFF', minHeight:'100vh', color:'#000' }}>
-      {/* Ambient glow */}
       <div className="ambient-glow" style={{ background: glowColor }} />
 
       {/* Desktop sidebar */}
@@ -197,21 +197,18 @@ export default function App() {
           </div>
         </div>
 
-        {/* Market banner */}
         {mktState !== 'open' && (
           <div style={{ padding:'0 16px', maxWidth:760, margin:'0 auto' }}>
             <MarketBanner state={mktState} msToOpen={msToOpen} />
           </div>
         )}
 
-        {/* API error */}
         {apiDown && (
           <div style={{ background:'rgba(255,59,48,0.06)', border:'1px solid rgba(255,59,48,0.2)', borderRadius:8, padding:'10px 16px', margin:'12px 16px 0', fontSize:13, color:'#FF3B30', maxWidth:760, marginLeft:'auto', marginRight:'auto' }}>
             API connection issue. Council responses may be delayed.
           </div>
         )}
 
-        {/* Tabs */}
         <div style={{ paddingBottom:96 }} className="lg:pb-8">
           {tab === 'portfolio' && (
             <PortfolioTab {...shared}
@@ -241,16 +238,14 @@ export default function App() {
           {tab === 'dca' && (
             <div style={padded}><DCATab {...shared} /></div>
           )}
+          {tab === 'alpha' && (
+            <div style={padded}><AlphaTrackerTab account={account} /></div>
+          )}
           {tab === 'roadmap' && (
             <div style={padded}><RoadmapTab /></div>
           )}
           {tab === 'changelog' && (
             <div style={padded}><ChangelogTab /></div>
-          )}
-          {tab === 'alpha' && (
-            <div style={{ ...padded, color:'#AAAAAA', textAlign:'center', paddingTop:48 }}>
-              Alpha Tracker — accumulates as you run councils.
-            </div>
           )}
           {tab === 'more' && (
             <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>

@@ -15,6 +15,7 @@ import WatchdogTab from './components/WatchdogTab.jsx';
 import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 import ChangelogTab from './components/ChangelogTab.jsx';
+import SettingsTab from './components/SettingsTab.jsx';
 import { ChevronRight, LogOut } from 'lucide-react';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
@@ -29,11 +30,13 @@ const SIDEBAR_TABS = [
   { id:'alpha',     label:'Alpha'      },
   { id:'roadmap',   label:'Roadmap'    },
   { id:'changelog', label:'Changelog'  },
+  { id:'settings',  label:'Settings'   },
 ];
 
 const MORE_ROWS = [
   ['dca','DCA Allocator'],['alpha','Alpha Tracker'],
   ['roadmap','Roadmap'],['changelog','Changelog'],
+  ['settings','Settings'],
 ];
 
 export default function App() {
@@ -43,6 +46,8 @@ export default function App() {
   const [mktState, setMktState] = useState(() => getMarketState(new Date()));
   const [msToOpen, setMsToOpen] = useState(() => getTimeToNextOpen(new Date()));
   const [dayChange,setDayChange]= useState(0);
+  const [dark, setDark] = useState(() => localStorage.getItem('council_dark') === 'true');
+  useEffect(() => { localStorage.setItem('council_dark', String(dark)); }, [dark]);
 
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
@@ -119,7 +124,7 @@ export default function App() {
     return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t;
   }).join(', ');
 
-  const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown };
+  const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark };
 
   const glowColor = (() => {
     if (mktState === 'open') {
@@ -137,11 +142,11 @@ export default function App() {
   const padded   = { maxWidth:760, margin:'0 auto', padding:'16px' };
 
   return (
-    <div style={{ ...FONT, background:'#FFFFFF', minHeight:'100vh', color:'#000' }}>
+    <div style={{ ...FONT, background: dark ? '#111111' : '#FFFFFF', minHeight:'100vh', color: dark ? '#F2F2F7' : '#000' }}>
       <div className="ambient-glow" style={{ background: glowColor }} />
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background:'#FFFFFF', borderRight:'1px solid #EEEEEE', zIndex:10, padding:'24px 0' }}>
+      <div className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background: dark ? '#1C1C1E' : '#FFFFFF', borderRight: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`, zIndex:10, padding:'24px 0' }}>
         <div style={{ padding:'0 20px 24px', display:'flex', alignItems:'center', gap:10 }}>
           <ArcReactor size={28} />
           <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.06em' }}>THE COUNCIL</span>
@@ -151,21 +156,21 @@ export default function App() {
             <button key={id} onClick={() => setTab(id)} style={{
               ...FONT, width:'100%', textAlign:'left', padding:'9px 12px', borderRadius:8,
               border:'none', cursor:'pointer', fontSize:14, fontWeight: tab===id ? 600 : 400,
-              color: tab===id ? '#000' : '#757575',
-              background: tab===id ? '#F0F0F0' : 'transparent',
+              color: tab===id ? (dark ? '#F2F2F7' : '#000') : '#757575',
+              background: tab===id ? (dark ? '#2C2C2E' : '#F0F0F0') : 'transparent',
               marginBottom:2, display:'block',
               transition: 'background .15s ease, color .15s ease',
             }}>{label}</button>
           ))}
         </nav>
-        <div style={{ padding:'16px 12px', borderTop:'1px solid #EEEEEE' }}>
+        <div style={{ padding:'16px 12px', borderTop: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}` }}>
           <div style={{ ...MFONT, fontSize:11, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Account</div>
           {accounts.map(({ id, label }) => (
             <button key={id} onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
               ...FONT, display:'block', width:'100%', textAlign:'left', padding:'7px 10px', borderRadius:6,
               border:'none', cursor:'pointer', fontSize:13, fontWeight: account===id ? 600 : 400,
-              background: account===id ? '#000' : 'transparent',
-              color:      account===id ? '#fff' : '#757575',
+              background: account===id ? (dark ? '#F2F2F7' : '#000') : 'transparent',
+              color:      account===id ? (dark ? '#000' : '#fff') : '#757575',
               marginBottom:2, transition: 'background .15s ease, color .15s ease',
             }}>{label}</button>
           ))}
@@ -178,7 +183,7 @@ export default function App() {
       {/* Main content */}
       <div className="lg:ml-[240px]" style={{ position:'relative', zIndex:1 }}>
         {/* Mobile header */}
-        <div className="lg:hidden" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', borderBottom:'1px solid #EEEEEE', background:'#FFFFFF', position:'sticky', top:0, zIndex:40 }}>
+        <div className="lg:hidden" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', borderBottom: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`, background: dark ? '#1C1C1E' : '#FFFFFF', position:'sticky', top:0, zIndex:40 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <ArcReactor size={22} />
             <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.04em' }}>THE COUNCIL</span>
@@ -188,9 +193,9 @@ export default function App() {
               <button key={id} onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
                 ...FONT, fontSize:12, fontWeight: account===id ? 600 : 400,
                 padding:'4px 10px', borderRadius:20,
-                border:`1px solid ${account===id ? '#000' : '#EEEEEE'}`,
-                background: account===id ? '#000' : '#fff',
-                color:      account===id ? '#fff' : '#757575',
+                border:`1px solid ${account===id ? (dark ? '#F2F2F7' : '#000') : (dark ? '#2C2C2E' : '#EEEEEE')}`,
+                background: account===id ? (dark ? '#F2F2F7' : '#000') : (dark ? '#1C1C1E' : '#fff'),
+                color:      account===id ? (dark ? '#000' : '#fff') : '#757575',
                 cursor:'pointer', transition: 'all .15s ease',
               }}>{label}</button>
             ))}
@@ -240,21 +245,24 @@ export default function App() {
             <div style={padded}><DCATab {...shared} /></div>
           )}
           {tab === 'alpha' && (
-            <div style={padded}><AlphaTrackerTab account={account} /></div>
+            <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>
           )}
           {tab === 'roadmap' && (
-            <div style={padded}><RoadmapTab /></div>
+            <div style={padded}><RoadmapTab dark={dark} /></div>
           )}
           {tab === 'changelog' && (
-            <div style={padded}><ChangelogTab /></div>
+            <div style={padded}><ChangelogTab dark={dark} /></div>
+          )}
+          {tab === 'settings' && (
+            <div style={padded}><SettingsTab dark={dark} setDark={setDark} /></div>
           )}
           {tab === 'more' && (
             <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>
               {MORE_ROWS.map(([t, label]) => (
                 <button key={t} onClick={() => setTab(t)} style={{
                   ...FONT, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'16px 0', background:'none', border:'none', borderBottom:'1px solid #EEEEEE',
-                  cursor:'pointer', textAlign:'left', fontSize:15, fontWeight:500, color:'#000',
+                  padding:'16px 0', background:'none', border:'none', borderBottom:`1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`,
+                  cursor:'pointer', textAlign:'left', fontSize:15, fontWeight:500, color: dark ? '#F2F2F7' : '#000',
                 }}>
                   {label} <ChevronRight size={16} style={{ color:'#AAAAAA' }} />
                 </button>
@@ -264,7 +272,7 @@ export default function App() {
         </div>
       </div>
 
-      <BottomNav tab={tab} setTab={setTab} />
+      <BottomNav tab={tab} setTab={setTab} dark={dark} />
     </div>
   );
 }

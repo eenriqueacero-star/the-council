@@ -13,15 +13,14 @@ const TABS = [
 
 const MORE_IDS = new Set(['dca','alpha','roadmap','changelog']);
 
-export default function BottomNav({ tab, setTab }) {
+export default function BottomNav({ tab, setTab, dark }) {
   return (
-    <div className="lg:hidden" style={{
+    <div className="flex lg:hidden" style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-      background: '#FFFFFF',
-      borderTop: '1px solid #EEEEEE',
+      background: dark ? '#1C1C1E' : '#FFFFFF',
+      borderTop: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`,
       boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
       height: 83,
-      display: 'flex',
       alignItems: 'flex-start',
       paddingTop: 10,
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -40,7 +39,7 @@ export default function BottomNav({ tab, setTab }) {
             background: 'none',
             cursor: 'pointer',
             padding: '0 4px',
-            color: active ? '#000000' : '#AAAAAA',
+            color: active ? (dark ? '#F2F2F7' : '#000000') : '#AAAAAA',
           }}>
             {/* key change triggers remount → spring pop animation */}
             <span key={active ? 'on' : 'off'} className={active ? 'tab-pop' : ''} style={{ display:'flex' }}>

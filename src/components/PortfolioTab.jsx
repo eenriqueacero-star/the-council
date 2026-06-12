@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuotes, getCandles } from '../api.js';
+import { theme } from '../utils/theme.js';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', 'Fira Code', monospace" };
@@ -18,8 +19,9 @@ const LOGO_DOMAINS = {
 
 const RANGES = ['1D','1W','1M','3M','1Y','ALL'];
 
-function TickerLogo({ ticker }) {
+function TickerLogo({ ticker, dark }) {
   const [err, setErr] = useState(false);
+  const T = theme(dark);
   const domain = LOGO_DOMAINS[ticker];
   if (!domain || err) {
     return (
@@ -28,12 +30,13 @@ function TickerLogo({ ticker }) {
       </div>
     );
   }
-  return <img src={`https://logo.clearbit.com/${domain}`} onError={() => setErr(true)} style={{ width:36, height:36, borderRadius:'50%', objectFit:'contain', flexShrink:0, background:'#F7F7F7' }} alt={ticker} />;
+  return <img src={`https://logo.clearbit.com/${domain}`} onError={() => setErr(true)} style={{ width:36, height:36, borderRadius:'50%', objectFit:'contain', flexShrink:0, background: T.bgCard }} alt={ticker} />;
 }
 
 function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
 
-export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange }) {
+export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark }) {
+  const T = theme(dark);
   const [quotes,     setQuotes]     = useState({});
   const [candles,    setCandles]    = useState([]);
   const [range,      setRange]      = useState('1D');
@@ -163,29 +166,29 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   }).filter(m => Math.abs(m.pct) > 0.01).sort((a,b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 4);
 
   return (
-    <div style={{ ...FONT, background:'#FFFFFF', minHeight:'100vh' }}>
+    <div style={{ ...FONT, background: T.bg, minHeight:'100vh' }}>
       {/* Hero */}
       <div style={{ padding:'20px 16px 0', maxWidth:760, margin:'0 auto' }}>
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
           <div>
-            <div style={{ fontSize:36, fontWeight:700, color:'#000', lineHeight:1.1, letterSpacing:'-0.02em' }}>
+            <div style={{ fontSize:36, fontWeight:700, color: T.text, lineHeight:1.1, letterSpacing:'-0.02em' }}>
               ${displayValue.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
             </div>
             <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:8 }}>
               <span style={{ fontSize:15, fontWeight:500, color: dayChange >= 0 ? GRN : RED }}>
                 {dayChange >= 0 ? '+' : ''}{dayChange.toFixed(2)} ({fmtPct(dayChangePct)})
               </span>
-              <span style={{ fontSize:13, color:'#AAAAAA' }}>Today</span>
+              <span style={{ fontSize:13, color: T.text3 }}>Today</span>
             </div>
             {buyingPower > 0 && (
-              <div style={{ fontSize:13, color:'#757575', marginTop:4 }}>
+              <div style={{ fontSize:13, color: T.text2, marginTop:4 }}>
                 ${buyingPower.toLocaleString()} buying power
               </div>
             )}
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:6, paddingTop:4 }}>
             <div style={{ width:8, height:8, borderRadius:'50%', background: marketState==='open' ? GRN : '#CCCCCC', boxShadow: marketState==='open' ? `0 0 6px ${GRN}` : 'none' }} />
-            <span style={{ ...MFONT, fontSize:11, color:'#AAAAAA' }}>
+            <span style={{ ...MFONT, fontSize:11, color: T.text3 }}>
               {marketState === 'open' ? 'LIVE' : marketState === 'premarket' ? 'PRE-MARKET' : marketState === 'afterhours' ? 'AFTER HOURS' : 'MARKET CLOSED'}
             </span>
           </div>
@@ -199,26 +202,26 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
           {RANGES.map(r => (
             <button key={r} onClick={() => setRange(r)} style={{
               ...FONT, fontSize:13, fontWeight:500, padding:'6px 10px',
-              border:'none', borderBottom: range===r ? '2px solid #000' : '2px solid transparent',
-              background:'none', cursor:'pointer', color: range===r ? '#000' : '#AAAAAA',
+              border:'none', borderBottom: range===r ? `2px solid ${T.text}` : '2px solid transparent',
+              background:'none', cursor:'pointer', color: range===r ? T.text : T.text3,
             }}>{r}</button>
           ))}
           <button onClick={() => { fetchQuotes(); fetchCandles(); }}
-            style={{ marginLeft:'auto', border:'none', background:'none', cursor:'pointer', color:'#AAAAAA', padding:6 }}>
+            style={{ marginLeft:'auto', border:'none', background:'none', cursor:'pointer', color: T.text3, padding:6 }}>
             <RefreshCw size={14} />
           </button>
         </div>
 
         {/* Breakdown */}
-        <div style={{ border:'1px solid #EEEEEE', borderRadius:12, padding:'0 16px', marginBottom:16 }}>
+        <div style={{ border: `1px solid ${T.border}`, borderRadius:12, padding:'0 16px', marginBottom:16 }}>
           {[
             ['Equity',       `$${totalValue.toFixed(2)}`],
             ['Cash',         `$${buyingPower.toLocaleString()}`],
             ['Total',        `$${(totalValue+buyingPower).toFixed(2)}`],
           ].map(([label, val], i, arr) => (
-            <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 0', borderBottom: i<arr.length-1 ? '1px solid #EEEEEE' : 'none' }}>
-              <span style={{ fontSize:14, color:'#757575' }}>{label}</span>
-              <span style={{ fontSize:16, fontWeight:500, color:'#000' }}>{val}</span>
+            <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 0', borderBottom: i<arr.length-1 ? `1px solid ${T.border}` : 'none' }}>
+              <span style={{ fontSize:14, color: T.text2 }}>{label}</span>
+              <span style={{ fontSize:16, fontWeight:500, color: T.text }}>{val}</span>
             </div>
           ))}
         </div>
@@ -227,13 +230,13 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       {/* Movers */}
       {movers.length > 0 && (
         <div style={{ padding:'0 16px 16px', maxWidth:760, margin:'0 auto' }}>
-          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>TODAY’S MOVERS</div>
+          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:’uppercase’, letterSpacing:’0.08em’, marginBottom:8 }}>TODAY’S MOVERS</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
             {movers.map(({ t, pct, price }) => (
-              <div key={t} style={{ border:'1px solid #EEEEEE', borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
-                <TickerLogo ticker={t} />
+              <div key={t} style={{ border: `1px solid ${T.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
+                <TickerLogo ticker={t} dark={dark} />
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14, fontWeight:600, color:'#000' }}>{t}</div>
+                  <div style={{ fontSize:14, fontWeight:600, color: T.text }}>{t}</div>
                   <div style={{ fontSize:12, color: pct>=0 ? GRN : RED, display:'flex', alignItems:'center', gap:3 }}>
                     {pct>=0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                     {fmtPct(pct)}
@@ -249,31 +252,31 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       {/* Positions */}
       <div style={{ maxWidth:760, margin:'0 auto', paddingBottom:24 }}>
         <div style={{ padding:'0 16px 8px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.08em' }}>POSITIONS</div>
+          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:'uppercase', letterSpacing:'0.08em' }}>POSITIONS</div>
           <button onClick={() => setAddMode(!addMode)}
-            style={{ ...FONT, fontSize:13, fontWeight:500, color:'#000', border:'1px solid #EEEEEE', borderRadius:8, padding:'5px 10px', background:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+            style={{ ...FONT, fontSize:13, fontWeight:500, color: T.text, border: `1px solid ${T.border}`, borderRadius:8, padding:'5px 10px', background: T.bg, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
             <Plus size={14} /> Add
           </button>
         </div>
 
         {addMode && (
-          <div style={{ padding:'12px 16px', borderBottom:'1px solid #EEEEEE', display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', background:'#F7F7F7', marginBottom:0 }}>
+          <div style={{ padding:'12px 16px', borderBottom: `1px solid ${T.border}`, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', background: T.bgCard, marginBottom:0 }}>
             <input value={newTicker} onChange={e => setNewTicker(e.target.value.toUpperCase())} placeholder="TICKER"
-              style={{ width:80, padding:'8px 10px', border:'1px solid #EEEEEE', borderRadius:8, fontSize:13, textTransform:'uppercase', background:'#fff', outline:'none', ...MFONT }} />
+              style={{ width:80, padding:'8px 10px', border: `1px solid ${T.border}`, borderRadius:8, fontSize:13, textTransform:'uppercase', background: T.input, color: T.text, outline:'none', ...MFONT }} />
             <input value={newShares} onChange={e => setNewShares(e.target.value)} placeholder="Shares"
-              style={{ width:90, padding:'8px 10px', border:'1px solid #EEEEEE', borderRadius:8, fontSize:13, background:'#fff', outline:'none' }} />
+              style={{ width:90, padding:'8px 10px', border: `1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
             <input value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="Avg cost"
-              style={{ width:100, padding:'8px 10px', border:'1px solid #EEEEEE', borderRadius:8, fontSize:13, background:'#fff', outline:'none' }} />
+              style={{ width:100, padding:'8px 10px', border: `1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
             <button onClick={() => { if (!newTicker) return; addTicker(newTicker); if (newShares) setPos(newTicker,'shares',newShares); if (newCost) setPos(newTicker,'cost',newCost); setNewTicker(''); setNewShares(''); setNewCost(''); setAddMode(false); }}
-              style={{ padding:'8px 14px', background:'#000', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:13 }}>Add</button>
+              style={{ padding:'8px 14px', background: T.text, color: T.bg, border:'none', borderRadius:8, cursor:'pointer', fontSize:13 }}>Add</button>
             <button onClick={() => setAddMode(false)}
-              style={{ padding:'8px 12px', border:'1px solid #EEEEEE', background:'#fff', borderRadius:8, cursor:'pointer', fontSize:13 }}>Cancel</button>
+              style={{ padding:'8px 12px', border: `1px solid ${T.border}`, background: T.input, color: T.text, borderRadius:8, cursor:'pointer', fontSize:13 }}>Cancel</button>
           </div>
         )}
 
-        <div style={{ border:'1px solid #EEEEEE', borderRadius:12, overflow:'hidden', margin:'0 16px' }}>
+        <div style={{ border: `1px solid ${T.border}`, borderRadius:12, overflow:'hidden', margin:'0 16px' }}>
           {tickers.length === 0 ? (
-            <div style={{ padding:32, textAlign:'center', color:'#AAAAAA', fontSize:14 }}>No positions yet. Add a ticker above.</div>
+            <div style={{ padding:32, textAlign:'center', color: T.text3, fontSize:14 }}>No positions yet. Add a ticker above.</div>
           ) : tickers.map((t, idx) => {
             const q       = quotes[t] || {};
             const pos     = posMap[t]  || {};
@@ -292,16 +295,16 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               <div key={t} style={{ animation:`cardIn 0.4s ease both`, animationDelay:`${idx*40}ms` }}>
                 {/* Row */}
                 <div className="holding-row" onClick={() => setExpanded(isExp ? null : t)}
-                  style={{ display:'flex', alignItems:'center', gap:12, minHeight:64, padding:'0 16px', borderBottom:'1px solid #EEEEEE', cursor:'pointer', background:'#FFFFFF' }}>
-                  <TickerLogo ticker={t} />
+                  style={{ display:'flex', alignItems:'center', gap:12, minHeight:64, padding:'0 16px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', background: T.bg }}>
+                  <TickerLogo ticker={t} dark={dark} />
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:15, fontWeight:600, color:'#000' }}>{t}</div>
-                    {shares > 0 && <div style={{ ...MFONT, fontSize:12, color:'#757575' }}>{shares} sh</div>}
+                    <div style={{ fontSize:15, fontWeight:600, color: T.text }}>{t}</div>
+                    {shares > 0 && <div style={{ ...MFONT, fontSize:12, color: T.text2 }}>{shares} sh</div>}
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0 }}>
                     {price > 0 ? (
                       <>
-                        <div style={{ fontSize:15, fontWeight:500, color:'#000' }}>${price.toFixed(2)}</div>
+                        <div style={{ fontSize:15, fontWeight:500, color: T.text }}>${price.toFixed(2)}</div>
                         <div style={{ ...MFONT, fontSize:12, color: dayPct>=0 ? GRN : RED }}>{fmtPct(dayPct)}</div>
                       </>
                     ) : <div className="skeleton" style={{ width:60, height:32, borderRadius:6 }} />}
@@ -311,19 +314,19 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
                 {/* Expanded */}
                 {isExp && (
-                  <div className="card-in" style={{ background:'#F7F7F7', borderBottom:'1px solid #EEEEEE', padding:'12px 16px 16px' }}>
+                  <div className="card-in" style={{ background: T.bgCard, borderBottom:`1px solid ${T.border}`, padding:'12px 16px 16px' }}>
                     {isEdit ? (
                       <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
                         <input value={editShares} onChange={e => setEditShares(e.target.value)} placeholder="Shares"
-                          style={{ width:100, padding:'8px 10px', border:'1px solid #EEEEEE', borderRadius:8, fontSize:13, background:'#fff', outline:'none' }} />
+                          style={{ width:100, padding:'8px 10px', border:`1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
                         <input value={editCost} onChange={e => setEditCost(e.target.value)} placeholder="Avg cost"
-                          style={{ width:100, padding:'8px 10px', border:'1px solid #EEEEEE', borderRadius:8, fontSize:13, background:'#fff', outline:'none' }} />
+                          style={{ width:100, padding:'8px 10px', border:`1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
                         <button onClick={() => { setPos(t,'shares',editShares); setPos(t,'cost',editCost); setEditTicker(null); }}
-                          style={{ padding:'8px 12px', background:'#000', color:'#fff', border:'none', borderRadius:8, cursor:'pointer' }}><Check size={14}/></button>
+                          style={{ padding:'8px 12px', background: T.text, color: T.bg, border:'none', borderRadius:8, cursor:'pointer' }}><Check size={14}/></button>
                         <button onClick={() => setEditTicker(null)}
-                          style={{ padding:'8px 12px', border:'1px solid #EEEEEE', background:'#fff', borderRadius:8, cursor:'pointer' }}><X size={14}/></button>
+                          style={{ padding:'8px 12px', border:`1px solid ${T.border}`, background: T.input, color: T.text, borderRadius:8, cursor:'pointer' }}><X size={14}/></button>
                         <button onClick={() => { removeTicker(t); setExpanded(null); setEditTicker(null); }}
-                          style={{ padding:'8px 12px', border:'1px solid #EEEEEE', background:'#fff', borderRadius:8, cursor:'pointer', color:RED }}><Trash2 size={14}/></button>
+                          style={{ padding:'8px 12px', border:`1px solid ${T.border}`, background: T.input, borderRadius:8, cursor:'pointer', color:RED }}><Trash2 size={14}/></button>
                       </div>
                     ) : (
                       <>
@@ -337,13 +340,13 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
                             ['Break-even',   cost > 0 ? `$${cost.toFixed(2)}` : '—'],
                           ].map(([label, v]) => (
                             <div key={label}>
-                              <div style={{ ...MFONT, fontSize:11, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:2 }}>{label}</div>
-                              <div style={{ fontSize:14, fontWeight:500, color: label==='Total Return' && totRet!==null ? (totRet>=0?GRN:RED) : '#000' }}>{v}</div>
+                              <div style={{ ...MFONT, fontSize:11, color: T.text3, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:2 }}>{label}</div>
+                              <div style={{ fontSize:14, fontWeight:500, color: label==='Total Return' && totRet!==null ? (totRet>=0?GRN:RED) : T.text }}>{v}</div>
                             </div>
                           ))}
                         </div>
                         <button onClick={e => { e.stopPropagation(); setEditTicker(t); setEditShares(pos.shares||''); setEditCost(pos.cost||''); }}
-                          style={{ ...FONT, fontSize:12, color:'#757575', display:'flex', alignItems:'center', gap:4, background:'none', border:'1px solid #EEEEEE', borderRadius:8, padding:'6px 10px', cursor:'pointer' }}>
+                          style={{ ...FONT, fontSize:12, color: T.text2, display:'flex', alignItems:'center', gap:4, background:'none', border:`1px solid ${T.border}`, borderRadius:8, padding:'6px 10px', cursor:'pointer' }}>
                           <Edit2 size={12}/> Edit position
                         </button>
                       </>

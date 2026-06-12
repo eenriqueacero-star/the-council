@@ -3,8 +3,11 @@ import { collection, query, orderBy, getDocs, doc, updateDoc } from 'firebase/fi
 import { db, auth } from '../firebase.js';
 import { getQuotes } from '../api.js';
 import { AGENTS, STANCE_STYLE } from '../constants/agents.js';
-import { MONO, DISP, FONT, ICE } from '../constants/styles.js';
+import { theme } from '../utils/theme.js';
 import { Loader2, BarChart2 } from 'lucide-react';
+
+const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
+const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 
 function fmt(ts) {
   if (!ts) return '—';
@@ -24,25 +27,26 @@ function parsePrice(v) {
   return parseFloat(String(v).replace(/[^0-9.]/g, ''));
 }
 
-function OutcomeBadge({ outcome }) {
+function OutcomeBadge({ outcome, T }) {
   if (!outcome) return (
-    <span style={{ ...MONO, fontSize: 9, color: ICE, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: ICE, animation: 'pulse 2s cubic-bezier(.4,0,.6,1) infinite' }} />
+    <span style={{ ...MFONT, fontSize: 9, color: T.text3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: T.text3, animation: 'pulse 2s cubic-bezier(.4,0,.6,1) infinite' }} />
       OPEN
     </span>
   );
   if (outcome === 'target') return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(0,200,5,0.12)', color: '#00C805', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(0,200,5,0.12)', color: '#00C805', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
   );
   if (outcome === 'stop') return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: 'rgba(255,59,48,0.12)', color: '#FF3B30', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(255,59,48,0.12)', color: '#FF3B30', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
   );
   return (
-    <span style={{ ...MONO, fontSize: 9, fontWeight: 700, background: '#F0F0F0', color: '#AAAAAA', padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: T.bgHover, color: T.text2, padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
   );
 }
 
-export default function AlphaTrackerTab({ account }) {
+export default function AlphaTrackerTab({ account, dark }) {
+  const T = theme(dark);
   const [rulings,    setRulings]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [grading,    setGrading]    = useState(false);
@@ -153,92 +157,92 @@ export default function AlphaTrackerTab({ account }) {
   }, [rulings]);
 
   if (loading) return (
-    <div className="mt-6 flex items-center gap-2" style={{ ...MONO, color: '#AAAAAA' }}>
+    <div style={{ ...MFONT, color: T.text2, display: 'flex', alignItems: 'center', gap: 8, marginTop: 24 }}>
       <Loader2 size={14} className="animate-spin" />
-      <span className="text-[12px]">Loading alpha tracker…</span>
+      <span style={{ fontSize: 12 }}>Loading alpha tracker…</span>
     </div>
   );
 
   return (
-    <div className="mt-2 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <BarChart2 size={14} style={{ color: '#000000' }} />
-          <span style={{ ...MONO, letterSpacing: '0.10em', color: '#333333', fontWeight: 600 }} className="text-[11px]">ALPHA TRACKER · ALL-TIME</span>
+    <div style={{ ...FONT, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BarChart2 size={14} style={{ color: T.text }} />
+          <span style={{ ...MFONT, fontSize: 11, letterSpacing: '0.10em', color: T.text, fontWeight: 600 }}>ALPHA TRACKER · ALL-TIME</span>
         </div>
         {grading && (
-          <div className="flex items-center gap-1.5" style={{ ...MONO, color: '#AAAAAA' }}>
+          <div style={{ ...MFONT, color: T.text2, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Loader2 size={11} className="animate-spin" />
-            <span className="text-[10px]">GRADING OLD CALLS…</span>
+            <span style={{ fontSize: 10 }}>GRADING OLD CALLS…</span>
           </div>
         )}
       </div>
 
       {rulings.length === 0 ? (
-        <div className="mt-8 text-center py-12 border border-dashed rounded-xl" style={{ borderColor: '#EEEEEE' }}>
-          <BarChart2 size={28} className="mx-auto mb-3" style={{ color: '#000000', opacity: 0.12 }} />
-          <p style={{ ...FONT, color: '#888888' }} className="text-sm">No rulings yet.</p>
-          <p style={{ ...MONO, color: '#AAAAAA' }} className="text-[11px] mt-1">Run a council on any ticker to start building your track record.</p>
+        <div style={{ marginTop: 32, textAlign: 'center', padding: '48px 16px', border: `1px dashed ${T.border}`, borderRadius: 12 }}>
+          <BarChart2 size={28} style={{ color: T.text3, margin: '0 auto 12px' }} />
+          <p style={{ ...FONT, color: T.text2, fontSize: 14 }}>No rulings yet.</p>
+          <p style={{ ...MFONT, color: T.text3, fontSize: 11, marginTop: 4 }}>Run a council on any ticker to start building your track record.</p>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
             {[
               { label: 'TOTAL CALLS',    value: String(stats.total), sub: `${stats.buyCalls} BUY · ${stats.total - stats.buyCalls} WATCH/PASS` },
               { label: 'TARGET HIT',     value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} graded`, color: '#00C805' },
-              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped    / stats.graded * 100)}%` : '—', sub: `${stats.stopped} losses`,                        color: '#FF3B30' },
-              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded call${stats.graded !== 1 ? 's' : ''}`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#00C805' : '#FF3B30') : undefined },
+              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped    / stats.graded * 100)}%` : '—', sub: `${stats.stopped} losses`, color: '#FF3B30' },
+              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#00C805' : '#FF3B30') : undefined },
             ].map((c, i) => (
-              <div key={i} className="rounded-xl p-4" style={{ background: '#F7F7F7', border: '1px solid #EEEEEE' }}>
-                <div style={{ ...MONO, letterSpacing: '0.10em', color: '#757575' }} className="text-[9px] tracking-widest mb-1.5">{c.label}</div>
-                <div style={{ ...MONO, color: c.color || '#000000', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{c.value}</div>
-                <div style={{ ...MONO, color: '#AAAAAA' }} className="text-[10px] mt-1.5">{c.sub}</div>
+              <div key={i} style={{ borderRadius: 12, padding: 16, background: T.bgCard, border: `1px solid ${T.border}` }}>
+                <div style={{ ...MFONT, fontSize: 9, letterSpacing: '0.10em', color: T.text2, marginBottom: 6 }}>{c.label}</div>
+                <div style={{ ...MFONT, color: c.color || T.text, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{c.value}</div>
+                <div style={{ ...MFONT, color: T.text3, fontSize: 10, marginTop: 6 }}>{c.sub}</div>
               </div>
             ))}
           </div>
 
           {stats.graded >= 5 && (
-            <div className="rounded-xl p-4" style={{ background: '#F7F7F7', border: '1px solid #EEEEEE' }}>
-              <div style={{ ...MONO, letterSpacing: '0.10em', color: '#757575' }} className="text-[10px] tracking-widest mb-3">AGENT ACCURACY · ALL-TIME</div>
-              <div className="grid sm:grid-cols-3 gap-3">
+            <div style={{ borderRadius: 12, padding: 16, background: T.bgCard, border: `1px solid ${T.border}` }}>
+              <div style={{ ...MFONT, fontSize: 10, letterSpacing: '0.10em', color: T.text2, marginBottom: 12 }}>AGENT ACCURACY · ALL-TIME</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
                 {AGENTS.map(a => {
                   const s        = stats.agentAcc[a.id];
-                  const barColor = s.pct == null ? '#EEEEEE'
+                  const barColor = s.pct == null ? T.border
                     : s.pct >= 65 ? '#00C805'
-                    : s.pct >= 45 ? '#000000'
+                    : s.pct >= 45 ? T.text
                     : '#FF3B30';
                   return (
-                    <div key={a.id} className="flex items-center gap-2.5">
-                      <div className="rounded-md p-1.5 shrink-0" style={{ background: `${a.accent}1a`, border: `1px solid ${a.accent}22` }}>
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ borderRadius: 6, padding: 6, flexShrink: 0, background: `${a.accent}1a`, border: `1px solid ${a.accent}22` }}>
                         <a.icon size={11} style={{ color: a.accent }} />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <span style={{ ...MONO, color: '#555555' }} className="text-[10px] truncate">{a.name.split(' ')[0]}</span>
-                          <span style={{ ...MONO, color: barColor, fontSize: 10, fontWeight: 700 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginBottom: 4 }}>
+                          <span style={{ ...MFONT, color: T.text2, fontSize: 10 }}>{a.name.split(' ')[0]}</span>
+                          <span style={{ ...MFONT, color: barColor, fontSize: 10, fontWeight: 700 }}>
                             {s.pct != null ? `${s.pct}%` : '—'}
                           </span>
                         </div>
-                        <div className="h-1 rounded-full overflow-hidden" style={{ background: '#EEEEEE' }}>
-                          <div style={{ width: `${s.pct || 0}%`, background: barColor, transition: 'width .6s ease' }} className="h-full rounded-full" />
+                        <div style={{ height: 4, borderRadius: 2, overflow: 'hidden', background: T.border }}>
+                          <div style={{ width: `${s.pct || 0}%`, background: barColor, height: '100%', borderRadius: 2, transition: 'width .6s ease' }} />
                         </div>
-                        <div style={{ ...MONO, color: '#BBBBBB' }} className="text-[9px] mt-0.5">{s.total} call{s.total !== 1 ? 's' : ''}</div>
+                        <div style={{ ...MFONT, color: T.text3, fontSize: 9, marginTop: 2 }}>{s.total} call{s.total !== 1 ? 's' : ''}</div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <p style={{ ...MONO, color: '#CCCCCC' }} className="text-[9px] mt-3">Bull calls (PASS/BUY) scored on target · Bear calls (FAIL/BEARISH) scored on stop or expired.</p>
+              <p style={{ ...MFONT, color: T.text3, fontSize: 9, marginTop: 12 }}>Bull calls (PASS/BUY) scored on target · Bear calls (FAIL/BEARISH) scored on stop or expired.</p>
             </div>
           )}
 
-          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #EEEEEE' }}>
-            <div className="overflow-x-auto">
-              <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 560 }}>
+          <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
                 <thead>
-                  <tr style={{ background: '#FAFAFA', borderBottom: '1px solid #EEEEEE' }}>
+                  <tr style={{ background: T.bgCard, borderBottom: `1px solid ${T.border}` }}>
                     {['DATE', 'TICKER', 'VERDICT', 'CONV', 'PRICE@CALL', '30D / NOW', 'MOVE', 'OUTCOME'].map(h => (
-                      <th key={h} style={{ ...MONO, letterSpacing: '0.08em', color: '#888888' }} className="px-3 py-2.5 text-left text-[9px] tracking-widest font-normal whitespace-nowrap">{h}</th>
+                      <th key={h} style={{ ...MFONT, fontSize: 9, letterSpacing: '0.08em', color: T.text2, padding: '10px 12px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -251,23 +255,23 @@ export default function AlphaTrackerTab({ account }) {
                     const move       = moveStr(r.priceAtCall, displayPrice);
                     return (
                       <tr key={r.id} style={{
-                        borderBottom: i < rulings.length - 1 ? '1px solid #EEEEEE' : undefined,
-                        background: i % 2 === 0 ? '#FAFAFA' : '#FFFFFF',
+                        borderBottom: i < rulings.length - 1 ? `1px solid ${T.border}` : undefined,
+                        background: i % 2 === 0 ? T.bgCard : T.bg,
                       }}>
-                        <td style={{ ...MONO, color: '#757575' }} className="px-3 py-2.5 text-[11px] whitespace-nowrap">{fmt(r.ts)}</td>
-                        <td style={{ ...MONO, letterSpacing: '0.1em', color: '#1A1A1A', fontWeight: 600 }} className="px-3 py-2.5 text-[12px]">{r.ticker}</td>
-                        <td className="px-3 py-2.5">
-                          {vs && <span style={{ ...MONO, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>{vs.label}</span>}
+                        <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.ts)}</td>
+                        <td style={{ ...MFONT, letterSpacing: '0.1em', color: T.text, fontSize: 12, fontWeight: 600, padding: '10px 12px' }}>{r.ticker}</td>
+                        <td style={{ padding: '10px 12px' }}>
+                          {vs && <span style={{ ...MFONT, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>{vs.label}</span>}
                         </td>
-                        <td style={{ ...MONO, color: '#666666' }} className="px-3 py-2.5 text-[11px]">{r.conviction ?? '—'}/10</td>
-                        <td style={{ ...MONO, color: '#666666' }} className="px-3 py-2.5 text-[11px]">{r.priceAtCall ? `$${r.priceAtCall.toFixed(2)}` : '—'}</td>
-                        <td style={{ ...MONO, color: '#666666' }} className="px-3 py-2.5 text-[11px]">{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
-                        <td className="px-3 py-2.5">
+                        <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px' }}>{r.conviction ?? '—'}/10</td>
+                        <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px' }}>{r.priceAtCall ? `$${r.priceAtCall.toFixed(2)}` : '—'}</td>
+                        <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px' }}>{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
+                        <td style={{ padding: '10px 12px' }}>
                           {move != null
-                            ? <span style={{ ...MONO, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#00C805' : '#FF3B30' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
-                            : <span style={{ ...MONO, color: '#CCCCCC' }} className="text-[11px]">—</span>}
+                            ? <span style={{ ...MFONT, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#00C805' : '#FF3B30' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
+                            : <span style={{ ...MFONT, color: T.text3, fontSize: 11 }}>—</span>}
                         </td>
-                        <td className="px-3 py-2.5"><OutcomeBadge outcome={r.outcome} /></td>
+                        <td style={{ padding: '10px 12px' }}><OutcomeBadge outcome={r.outcome} T={T} /></td>
                       </tr>
                     );
                   })}

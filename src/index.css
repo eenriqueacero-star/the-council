@@ -5,23 +5,23 @@
 * { -webkit-tap-highlight-color: transparent; }
 input, textarea, select { font-size: max(16px, 1em) !important; }
 
-/* ── ArcReactor animations (preserved) ── */
+/* ── ArcReactor animations ── */
 @keyframes spin    { to { transform: rotate(360deg); } }
 @keyframes spinRev { to { transform: rotate(-360deg); } }
 @keyframes corePulse { 0%,100%{ opacity:.65; transform:scale(1);} 50%{ opacity:1; transform:scale(1.14);} }
-.spin-slow  { animation: spin    16s linear infinite; transform-box: fill-box; transform-origin: center; }
-.spin-rev   { animation: spinRev 10s linear infinite; transform-box: fill-box; transform-origin: center; }
+.spin-slow  { animation: spin     16s linear infinite; transform-box: fill-box; transform-origin: center; }
+.spin-rev   { animation: spinRev  10s linear infinite; transform-box: fill-box; transform-origin: center; }
 .core-pulse { animation: corePulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 
-/* ── Agent / chat animations ── */
-@keyframes cardIn  { from { opacity:0; transform: translateY(12px) scale(.98); } to { opacity:1; transform: none; } }
-@keyframes fadeUp  { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
-@keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
-@keyframes blink   { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
-.card-in  { animation: cardIn  .4s cubic-bezier(.2,.7,.2,1) both; }
-.fade-up  { animation: fadeUp  .3s ease both; }
-.fade-in  { animation: fadeIn  .3s ease both; }
-.blink    { animation: blink   1.4s ease-in-out infinite; }
+/* ── Agent / chat ── */
+@keyframes cardIn { from { opacity:0; transform: translateY(12px) scale(.98); } to { opacity:1; transform: none; } }
+@keyframes fadeUp { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes blink  { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
+.card-in { animation: cardIn .4s cubic-bezier(.2,.7,.2,1) both; }
+.fade-up { animation: fadeUp .3s ease both; }
+.fade-in { animation: fadeIn .3s ease both; }
+.blink   { animation: blink  1.4s ease-in-out infinite; }
 
 /* ── Skeleton shimmer ── */
 @keyframes shimmer {
@@ -41,21 +41,25 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .price-up   { animation: priceGreenFlash .5s ease; }
 .price-down { animation: priceRedFlash   .5s ease; }
 
-/* ── Equity chart draw-in / wipe ── */
+/* ── Chart ── */
 @keyframes chartWipe {
   from { clip-path: inset(0 100% 0 0); }
   to   { clip-path: inset(0 0%   0 0); }
 }
-.draw-in    { animation: chartWipe 1s    ease forwards; }
-.chart-wipe { animation: chartWipe 0.4s  ease forwards; }
+.draw-in    { animation: chartWipe 1s   ease forwards; }
+.chart-wipe { animation: chartWipe 0.4s ease forwards; }
 
-/* ── Market state animations ── */
+/* ── Market state ── */
 @keyframes starShimmer     { 0%,100%{ opacity:.2; } 50%{ opacity:1; } }
 @keyframes marketOpenFlash { 0%{ background:rgba(0,200,5,0); } 40%{ background:rgba(0,200,5,0.12); } 100%{ background:rgba(0,200,5,0); } }
 .star-shimmer      { animation: starShimmer     2s ease-in-out infinite; }
 .market-open-flash { animation: marketOpenFlash 1.5s ease; }
 
-/* ── Agent running scan ── */
+/* ── Boot fade (safety net for old overlay) ── */
+@keyframes bootFade { 0%,72%{ opacity:1; } 100%{ opacity:0; visibility:hidden; } }
+@keyframes bootText { from{ clip-path: inset(0 100% 0 0); } to{ clip-path: inset(0 0 0 0); } }
+
+/* ── Agent scan line ── */
 @keyframes scan { 0%{ transform: translateY(-100%); } 100%{ transform: translateY(400%); } }
 .scanline { animation: scan 1.6s linear infinite; }
 
@@ -90,8 +94,8 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  .spin-slow, .spin-rev, .core-pulse, .card-in, .fade-up, .fade-in,
-  .blink, .draw-in, .chart-wipe, .star-shimmer, .market-open-flash,
-  .skeleton, .scanline, .price-up, .price-down { animation: none !important; }
+  .spin-slow,.spin-rev,.core-pulse,.card-in,.fade-up,.fade-in,
+  .blink,.draw-in,.chart-wipe,.star-shimmer,.market-open-flash,
+  .skeleton,.scanline,.price-up,.price-down { animation: none !important; }
   .ambient-glow { opacity: 0.1; }
 }

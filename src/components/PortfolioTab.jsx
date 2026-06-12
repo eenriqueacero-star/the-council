@@ -230,7 +230,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       {/* Movers */}
       {movers.length > 0 && (
         <div style={{ padding:'0 16px 16px', maxWidth:760, margin:'0 auto' }}>
-          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:’uppercase’, letterSpacing:’0.08em’, marginBottom:8 }}>TODAY’S MOVERS</div>
+          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>{"TODAY'S MOVERS"}</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
             {movers.map(({ t, pct, price }) => (
               <div key={t} style={{ border: `1px solid ${T.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>

@@ -106,6 +106,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   // SVG chart
   const W = 400, H = 180;
   const renderChart = () => {
+    if (!withShares.length) {
+      return <div style={{ height: 60, margin: '16px 0', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <span style={{ ...MFONT, fontSize:11, color:'#CCCCCC' }}>Add positions with share counts to see your equity curve</span>
+      </div>;
+    }
     if (!chartPoints.length) {
       return <div className="skeleton" style={{ height: 60, borderRadius: 8, margin: '16px 0' }} />;
     }
@@ -180,7 +185,9 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:6, paddingTop:4 }}>
             <div style={{ width:8, height:8, borderRadius:'50%', background: marketState==='open' ? GRN : '#CCCCCC', boxShadow: marketState==='open' ? `0 0 6px ${GRN}` : 'none' }} />
-            <span style={{ ...MFONT, fontSize:11, color:'#AAAAAA' }}>{marketState==='open' ? 'LIVE' : 'DELAYED'}</span>
+            <span style={{ ...MFONT, fontSize:11, color:'#AAAAAA' }}>
+              {marketState === 'open' ? 'LIVE' : marketState === 'premarket' ? 'PRE-MARKET' : marketState === 'afterhours' ? 'AFTER HOURS' : 'MARKET CLOSED'}
+            </span>
           </div>
         </div>
 

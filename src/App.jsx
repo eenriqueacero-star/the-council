@@ -80,7 +80,10 @@ export default function App() {
         const data = snap.data().positions || {};
         setPositions(prev => {
           const merged = {};
-          Object.keys(ACCOUNTS).forEach(k => { merged[k] = data[k] || prev[k] || {}; });
+          Object.keys(ACCOUNTS).forEach(k => {
+            const cloud = data[k];
+            merged[k] = (cloud && Object.keys(cloud).length > 0) ? cloud : (prev[k] || {});
+          });
           return merged;
         });
       });

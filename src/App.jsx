@@ -173,37 +173,41 @@ export default function App() {
     prevMktRef.current = mktState;
   }, [mktState]);
 
-  // 9-step boot GSAP timeline
+  // 9-step boot GSAP timeline — uses gsap.from() so elements start visible and
+  // GSAP only adds the starting offset; content is always readable if JS stalls.
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-    // 1. ambient canvas is already painting
-    // 2. sidebar container
-    if (sidebarRef.current) {
-      tl.fromTo(sidebarRef.current, { x: -30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6 }, 0.05);
-      // 3. brand wordmark inside sidebar
-      const brand = sidebarRef.current.querySelector('.sidebar-brand');
-      if (brand) tl.fromTo(brand, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.4 }, 0.22);
-      // 4. nav buttons stagger
-      const navBtns = sidebarRef.current.querySelectorAll('nav button');
-      if (navBtns.length) tl.fromTo(navBtns, { x: -10, opacity: 0 }, { x: 0, opacity: 1, duration: 0.35, stagger: 0.028 }, 0.3);
-      // 5. account switcher area
-      const acctArea = sidebarRef.current.querySelector('.sidebar-accounts');
-      if (acctArea) tl.fromTo(acctArea, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4 }, 0.55);
-    }
-    // 6. main content area
-    if (mainRef.current) {
-      tl.fromTo(mainRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7 }, 0.3);
-      // 7. portfolio hero (first child of main)
-      const hero = mainRef.current.querySelector('.portfolio-hero');
-      if (hero) tl.fromTo(hero, { scale: 0.97, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5 }, 0.48);
-    }
-    // 8. ambient glow
-    const glow = document.querySelector('.ambient-glow');
-    if (glow) tl.fromTo(glow, { opacity: 0 }, { opacity: 1, duration: 1.8 }, 0.05);
-    // 9. bottom nav
-    const bnav = document.querySelector('.bottom-nav');
-    if (bnav) tl.fromTo(bnav, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55 }, 0.45);
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      // 1. ambient canvas already painting
+      // 2. sidebar slide in from left
+      if (sidebarRef.current) {
+        tl.from(sidebarRef.current, { x: -28, duration: 0.55 }, 0.05);
+        // 3. brand wordmark
+        const brand = sidebarRef.current.querySelector('.sidebar-brand');
+        if (brand) tl.from(brand, { y: -8, opacity: 0, duration: 0.38 }, 0.18);
+        // 4. nav buttons stagger
+        const navBtns = sidebarRef.current.querySelectorAll('nav button');
+        if (navBtns.length) tl.from(navBtns, { x: -8, opacity: 0, duration: 0.3, stagger: 0.025 }, 0.26);
+        // 5. account area
+        const acctArea = sidebarRef.current.querySelector('.sidebar-accounts');
+        if (acctArea) tl.from(acctArea, { y: 6, opacity: 0, duration: 0.35 }, 0.48);
+      }
+      // 6. main content
+      if (mainRef.current) {
+        tl.from(mainRef.current, { y: 16, duration: 0.6 }, 0.22);
+      }
+      // 7. ambient glow fade in
+      const glow = document.querySelector('.ambient-glow');
+      if (glow) tl.from(glow, { opacity: 0, duration: 1.6 }, 0.05);
+      // 8. bottom nav slide up
+      const bnav = document.querySelector('.bottom-nav');
+      if (bnav) tl.from(bnav, { y: 36, opacity: 0, duration: 0.5 }, 0.38);
+      // 9. ArcReactor
+      const arc = document.querySelector('.sidebar-brand svg');
+      if (arc) tl.from(arc, { scale: 0, opacity: 0, duration: 0.4, ease: 'back.out(1.7)' }, 0.08);
+    });
+    return () => ctx.revert();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const acct         = ACCOUNTS[account];

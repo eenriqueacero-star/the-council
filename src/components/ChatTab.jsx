@@ -280,82 +280,71 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         if (raw) liveContext += `\n\nLIVE MARKET CONTEXT:\n${raw}`;
       } catch {}
 
-      // Natural complement pairs — if an agent doesn't invite anyone, their complement auto-joins
       const COMPLEMENTS = {
-        technical: 'catalyst',  // REX → NOVA (chart needs catalyst context)
-        catalyst:  'bear',      // NOVA → VEGA (catalyst needs stress test)
-        macro:     'technical', // ATLAS → REX (macro needs chart confirmation)
-        risk:      'bear',      // SAGE → VEGA (risk needs worst-case view)
-        bear:      'catalyst',  // VEGA → NOVA (bear case needs bull counter)
-        sizer:     'risk',      // ZEN → SAGE (sizing needs risk check)
+        technical: 'catalyst', catalyst: 'bear', macro: 'technical',
+        risk: 'bear', bear: 'catalyst', sizer: 'risk',
       };
 
       const spokenThisTurn = [];
-      const spokenIds = new Set(); // track who has spoken to avoid duplicate auto-complements
-      const MAX_WAVES = 4;
+      const inQueue = new Set(routeIds); // track what's already queued to avoid duplicates
+      const queue = [...routeIds];       // flat ordered queue — append to end as agents invite each other
+      const MIN_EXCHANGES = 3;
       const MAX_CALLS = 10;
-      const MIN_EXCHANGES = 3; // minimum agents before AXIOM can close
       let totalCalls = 0;
-      let pendingIds = [...routeIds];
-      let naturalEnd = false;
 
-      for (let wave = 0; wave < MAX_WAVES && pendingIds.length > 0 && totalCalls < MAX_CALLS; wave++) {
-        const nextWaveIds = new Set();
+      for (let i = 0; i < queue.length && totalCalls < MAX_CALLS; i++) {
+        const agId = queue[i];
+        const ag = AGENTS.find(a => a.id === agId);
+        if (!ag) continue;
+        if (totalCalls > 0) await sleep(3000);
 
-        for (const agId of pendingIds) {
-          if (totalCalls >= MAX_CALLS) break;
-          const ag = AGENTS.find(a => a.id === agId);
-          if (!ag) continue;
-          if (totalCalls > 0) await sleep(3000);
+        const isFirst = spokenThisTurn.length === 0;
+        const knowledgeBase = isFirst
+          ? `${liveContext}\n\nYou are opening the discussion. Be specific — tickers, prices, dates. End by inviting the most relevant colleague by name to add their perspective.`
+          : `${liveContext}\n\nSHARED COUNCIL KNOWLEDGE:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nAdd what's genuinely missing. Respond directly to anything aimed at you. Invite another colleague by name if their domain is still needed.`;
 
-          const knowledgeBase = spokenThisTurn.length > 0
-            ? `${liveContext}\n\nSHARED COUNCIL KNOWLEDGE:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nAdd what's genuinely missing. Respond directly to any question aimed at you. Reference specific points your colleagues made by name.`
-            : `${liveContext}\n\nOpen the discussion. Be specific — tickers, prices, dates. End by inviting the most relevant colleague to add their perspective.`;
+        const userMsg = isFirst
+          ? text
+          : `Council discussion on: "${text}". See shared knowledge above. Add your angle.`;
 
-          const userMsg = wave === 0
-            ? text
-            : `Council discussion on: "${text}". See shared knowledge above. Add your angle — what's still missing or worth challenging?`;
+        let response;
+        try {
+          const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). First person only. 3-4 sentences max. Reference your colleagues by name when responding to their points.\n\n`;
+          const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
+          response = await callAgent(sys, userMsg, false, 280);
+        } catch {
+          flagApiDown();
+          response = 'Having trouble connecting right now.';
+        }
 
-          let response;
-          try {
-            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). First person only. 3-4 sentences max — tight and direct. Reference specific things your colleagues said. Address them by name when responding to their points.\n\n`;
-            const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
-            response = await callAgent(sys, userMsg, false, 280);
-          } catch {
-            flagApiDown();
-            response = 'Having trouble connecting right now.';
-          }
+        spokenThisTurn.push({ agentId: agId, name: ag.name, response });
+        totalCalls++;
 
-          spokenThisTurn.push({ agentId: agId, name: ag.name, response });
-          spokenIds.add(agId);
-          totalCalls++;
+        setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
+        setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
 
-          setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
-          setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
-
-          // Queue any colleague mentioned by name
-          const lower = response.toLowerCase();
-          for (const candidate of AGENTS) {
-            if (candidate.id !== agId && lower.includes(candidate.name.toLowerCase())) {
-              nextWaveIds.add(candidate.id);
-            }
-          }
-
-          // If no one was invited and we haven't hit minimum exchanges, auto-add complement
-          if (nextWaveIds.size === 0 && spokenThisTurn.length < MIN_EXCHANGES) {
-            const complementId = COMPLEMENTS[agId];
-            if (complementId && !spokenIds.has(complementId)) {
-              nextWaveIds.add(complementId);
-            }
+        // Any agent mentioned by name gets appended to the queue (once only)
+        const lower = response.toLowerCase();
+        for (const candidate of AGENTS) {
+          if (candidate.id !== agId && !inQueue.has(candidate.id) && lower.includes(candidate.name.toLowerCase())) {
+            queue.push(candidate.id);
+            inQueue.add(candidate.id);
           }
         }
 
-        pendingIds = Array.from(nextWaveIds);
-        if (pendingIds.length === 0) naturalEnd = true;
+        // If this is the last item in the queue and we haven't hit MIN_EXCHANGES, auto-add complement
+        const isLast = i === queue.length - 1;
+        if (isLast && spokenThisTurn.length < MIN_EXCHANGES) {
+          const complementId = COMPLEMENTS[agId];
+          if (complementId && !inQueue.has(complementId)) {
+            queue.push(complementId);
+            inQueue.add(complementId);
+          }
+        }
       }
 
-      // AXIOM closes when discussion reached natural end or call cap
-      if (spokenThisTurn.length > 0 && (naturalEnd || totalCalls >= MAX_CALLS)) {
+      // AXIOM closes when discussion is done
+      if (spokenThisTurn.length > 0) {
         try {
           const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated and reached a conclusion. Deliver a single crisp summary (2-3 sentences) that directly answers the investor's original question based on everything the team established. Be specific — include tickers, dates, or numbers if they came up. No fluff.`;
           const closingCtx = `Investor asked: "${text}"\n\nFull council discussion:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nDeliver the consensus answer.`;

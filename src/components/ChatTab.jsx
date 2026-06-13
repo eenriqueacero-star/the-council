@@ -254,8 +254,8 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
       const spokenThisTurn = []; // { agentId, name, response } — ordered, agents can appear multiple times
-      const MAX_WAVES = 4;   // max deliberation rounds
-      const MAX_CALLS = 14;  // hard safety cap
+      const MAX_WAVES = 3;  // max deliberation rounds
+      const MAX_CALLS = 8;  // hard safety cap — keeps rate limits manageable
       let totalCalls = 0;
       let pendingIds = [...routeIds];
 
@@ -266,17 +266,22 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           if (totalCalls >= MAX_CALLS) break;
           const ag = AGENTS.find(a => a.id === agId);
           if (!ag) continue;
-          if (totalCalls > 0) await sleep(1500);
+          if (totalCalls > 0) await sleep(3000); // 3s stagger to stay within rate limits
 
           const discussionSoFar = spokenThisTurn.length > 0
-            ? `\n\nCOUNCIL DISCUSSION SO FAR:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nRespond to what's been said. Build on it, challenge it, or add what's missing. If you want a specific colleague to weigh in, call them by their real name from the roster.`
-            : `\n\nYou are opening the discussion. Be direct. If another specialist's input would help reach a complete answer, invite them by their real name from the roster.`;
+            ? `\n\nCOUNCIL DISCUSSION SO FAR:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYou are joining this ongoing discussion. Do NOT re-ask or rephrase the original question. Respond directly to what your colleagues said above. Add your perspective, challenge a point, or build on it. If you want another colleague to weigh in, address them by name.`
+            : `\n\nYou are opening this discussion. Answer directly. If another specialist's input would strengthen the answer, invite them by name at the end.`;
+
+          // For wave > 0, make the user content clearly about joining the discussion — not a fresh question
+          const userMsg = wave === 0
+            ? text
+            : `Continue the council discussion about: "${text}". Respond to your colleagues above.`;
 
           let response;
           try {
-            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. You CAN and SHOULD address colleagues directly by name (e.g. "REX, what does the chart say?" or "VEGA, push back on this") — just never say "I'll bring in ${ag.name}" or act as if you are not ${ag.name}.\n\n`;
+            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. You CAN and SHOULD address colleagues directly by name — just never say "I'll bring in ${ag.name}" or act as if you are not ${ag.name}.\n\n`;
             const sys = identityAnchor + ag.conversationalPrompt + ROSTER + discussionSoFar + historyBlock;
-            response = await callAgent(sys, text, false, 500);
+            response = await callAgent(sys, userMsg, false, 450);
           } catch {
             flagApiDown();
             response = 'Having trouble connecting right now.';

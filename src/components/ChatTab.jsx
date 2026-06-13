@@ -255,7 +255,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
       const spokenThisTurn = []; // { agentId, name, response } — ordered, agents can appear multiple times
-      const hasSearched = new Set(); // each agent searches once per turn on their first appearance
       const MAX_WAVES = 4;
       const MAX_CALLS = 10;
       let totalCalls = 0;
@@ -284,9 +283,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           try {
             const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. Address colleagues directly by name when needed — but never re-ask a question that's already been answered in the shared knowledge above. Keep your response to 3-4 sentences MAX — tight, direct, no padding.\n\n`;
             const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
-            const shouldSearch = ag.search && !hasSearched.has(ag.id);
-            if (shouldSearch) hasSearched.add(ag.id);
-            response = await callAgent(sys, userMsg, shouldSearch, 280);
+            response = await callAgent(sys, userMsg, false, 280);
           } catch {
             flagApiDown();
             response = 'Having trouble connecting right now.';

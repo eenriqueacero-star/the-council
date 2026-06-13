@@ -280,12 +280,24 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         if (raw) liveContext += `\n\nLIVE MARKET CONTEXT:\n${raw}`;
       } catch {}
 
-      const spokenThisTurn = []; // { agentId, name, response } — ordered, agents can appear multiple times
+      // Natural complement pairs — if an agent doesn't invite anyone, their complement auto-joins
+      const COMPLEMENTS = {
+        technical: 'catalyst',  // REX → NOVA (chart needs catalyst context)
+        catalyst:  'bear',      // NOVA → VEGA (catalyst needs stress test)
+        macro:     'technical', // ATLAS → REX (macro needs chart confirmation)
+        risk:      'bear',      // SAGE → VEGA (risk needs worst-case view)
+        bear:      'catalyst',  // VEGA → NOVA (bear case needs bull counter)
+        sizer:     'risk',      // ZEN → SAGE (sizing needs risk check)
+      };
+
+      const spokenThisTurn = [];
+      const spokenIds = new Set(); // track who has spoken to avoid duplicate auto-complements
       const MAX_WAVES = 4;
       const MAX_CALLS = 10;
+      const MIN_EXCHANGES = 3; // minimum agents before AXIOM can close
       let totalCalls = 0;
       let pendingIds = [...routeIds];
-      let naturalEnd = false; // agents stopped calling each other on their own
+      let naturalEnd = false;
 
       for (let wave = 0; wave < MAX_WAVES && pendingIds.length > 0 && totalCalls < MAX_CALLS; wave++) {
         const nextWaveIds = new Set();
@@ -296,18 +308,17 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           if (!ag) continue;
           if (totalCalls > 0) await sleep(3000);
 
-          // Build a clear shared knowledge base so agents don't re-ask answered questions
           const knowledgeBase = spokenThisTurn.length > 0
-            ? `${liveContext}\n\nSHARED COUNCIL KNOWLEDGE (already established — do NOT re-ask these, do NOT repeat them, BUILD on them):\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYour job NOW: add what is genuinely missing from the above. If a specific question was just directed at you by a colleague, answer it directly. If you're making a concrete recommendation (specific ticker, action, or dollar amount), invite at least one colleague to validate or push back before you finish.`
-            : `${liveContext}\n\nYou are opening the discussion. Use the live context above. Be specific — name tickers, dates, prices. If you're making a concrete recommendation, invite a colleague to validate or challenge it at the end.`;
+            ? `${liveContext}\n\nSHARED COUNCIL KNOWLEDGE:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nAdd what's genuinely missing. Respond directly to any question aimed at you. Reference specific points your colleagues made by name.`
+            : `${liveContext}\n\nOpen the discussion. Be specific — tickers, prices, dates. End by inviting the most relevant colleague to add their perspective.`;
 
           const userMsg = wave === 0
             ? text
-            : `The council is building an answer to: "${text}". The shared knowledge is in your system context above. Add your part — what's still missing.`;
+            : `Council discussion on: "${text}". See shared knowledge above. Add your angle — what's still missing or worth challenging?`;
 
           let response;
           try {
-            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. Address colleagues directly by name when needed — but never re-ask a question that's already been answered in the shared knowledge above. Keep your response to 3-4 sentences MAX — tight, direct, no padding.\n\n`;
+            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). First person only. 3-4 sentences max — tight and direct. Reference specific things your colleagues said. Address them by name when responding to their points.\n\n`;
             const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
             response = await callAgent(sys, userMsg, false, 280);
           } catch {
@@ -316,17 +327,25 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           }
 
           spokenThisTurn.push({ agentId: agId, name: ag.name, response });
+          spokenIds.add(agId);
           totalCalls++;
 
           setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
           setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
 
-          // Detect which other agents were addressed — they join the next wave
-          // Exclude the current speaker to prevent self-re-queuing
+          // Queue any colleague mentioned by name
           const lower = response.toLowerCase();
           for (const candidate of AGENTS) {
             if (candidate.id !== agId && lower.includes(candidate.name.toLowerCase())) {
               nextWaveIds.add(candidate.id);
+            }
+          }
+
+          // If no one was invited and we haven't hit minimum exchanges, auto-add complement
+          if (nextWaveIds.size === 0 && spokenThisTurn.length < MIN_EXCHANGES) {
+            const complementId = COMPLEMENTS[agId];
+            if (complementId && !spokenIds.has(complementId)) {
+              nextWaveIds.add(complementId);
             }
           }
         }
@@ -335,7 +354,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         if (pendingIds.length === 0) naturalEnd = true;
       }
 
-      // AXIOM closes when the discussion reached a natural end or hit the call cap
+      // AXIOM closes when discussion reached natural end or call cap
       if (spokenThisTurn.length > 0 && (naturalEnd || totalCalls >= MAX_CALLS)) {
         try {
           const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated and reached a conclusion. Deliver a single crisp summary (2-3 sentences) that directly answers the investor's original question based on everything the team established. Be specific — include tickers, dates, or numbers if they came up. No fluff.`;

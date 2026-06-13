@@ -96,11 +96,19 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     // 3. Multi-round council: 3 rounds, sequential with 1.5s stagger
     const allRounds = []; // allRounds[roundIndex][agentId] = result
 
+    // Compact summary of a round's results to keep prompts under 20k limit
+    const summariseRound = (r, idx) => {
+      const summary = AGENTS.map(ag => {
+        const res = r[ag.id] || {};
+        return `${ag.name}: ${res.stance || '?'} (${res.score ?? '?'}/10) — ${res.headline || ''}`;
+      }).join('\n');
+      return `=== ROUND ${idx + 1} ===\n${summary}`;
+    };
+
     for (let round = 0; round < 3; round++) {
       const roundResults = {};
-      const priorRoundsContext = allRounds.map((r, i) =>
-        `=== ROUND ${i + 1} RESULTS ===\n` + AGENTS.map(ag => `${ag.name} (${ag.role}): ${JSON.stringify(r[ag.id])}`).join('\n')
-      ).join('\n\n');
+      // Use compact summaries for prior rounds to stay within the 20k prompt limit
+      const priorRoundsContext = allRounds.map((r, i) => summariseRound(r, i)).join('\n\n');
 
       for (let i = 0; i < AGENTS.length; i++) {
         const ag = AGENTS[i];
@@ -110,9 +118,9 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
           [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'running' } },
         }));
 
-        // What agents earlier in this round said
+        // What agents earlier in this round said (compact)
         const currentRoundSoFar = Object.entries(roundResults)
-          .map(([id, r]) => { const a = AGENTS.find(x => x.id === id); return `${a.name}: ${JSON.stringify(r)}`; })
+          .map(([id, r]) => { const a = AGENTS.find(x => x.id === id); return `${a.name}: ${r.stance || '?'} — ${r.headline || ''}`; })
           .join('\n');
 
         const profile = profiles[ag.id] || null;
@@ -122,12 +130,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         let roundPromptSuffix = '';
         if (round === 0) {
           roundPromptSuffix = currentRoundSoFar
-            ? `\n\nEARLIER IN THIS ROUND:\n${currentRoundSoFar}\n\nYou may acknowledge these views but deliver your independent analysis.`
+            ? `\n\nEARLIER IN THIS ROUND:\n${currentRoundSoFar}\n\nDeliver your independent analysis.`
             : '';
         } else if (round === 1) {
-          roundPromptSuffix = `\n\n${priorRoundsContext}\n\nEARLIER IN ROUND 2:\n${currentRoundSoFar || 'None yet.'}\n\nYou have heard the council. You may REVISE your stance. Add a "rebuttal" field (1-2 sentences responding to the strongest opposing view). Return updated JSON with rebuttal field added.`;
+          roundPromptSuffix = `\n\nCOUNCIL ROUND 1 SUMMARY:\n${priorRoundsContext}\n\nEARLIER IN ROUND 2:\n${currentRoundSoFar || 'None yet.'}\n\nRevise if needed. Add a "rebuttal" field (1-2 sentences). Return updated JSON.`;
         } else {
-          roundPromptSuffix = `\n\n${priorRoundsContext}\n\nEARLIER IN ROUND 3:\n${currentRoundSoFar || 'None yet.'}\n\nDeliver your FINAL position. If changing stance, explain briefly in a "finalNote" field. Be honest — not all agents need to agree, but justify any dissent. Return JSON with finalNote field.`;
+          roundPromptSuffix = `\n\nCOUNCIL ROUNDS 1-2 SUMMARY:\n${priorRoundsContext}\n\nEARLIER IN ROUND 3:\n${currentRoundSoFar || 'None yet.'}\n\nFinal position. Add "finalNote" if changing stance. Return JSON.`;
         }
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';

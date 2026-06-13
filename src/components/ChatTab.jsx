@@ -89,11 +89,14 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
     // 3-round council (compact for chat — show only final stances)
     const allRounds = [];
 
+    const summariseRound = (r, idx) => {
+      const s = AGENTS.map(ag => { const res = r[ag.id] || {}; return `${ag.name}: ${res.stance || '?'} — ${res.headline || ''}`; }).join('\n');
+      return `=== ROUND ${idx + 1} ===\n${s}`;
+    };
+
     for (let round = 0; round < 3; round++) {
       const roundResults = {};
-      const priorRoundsContext = allRounds.map((r, i) =>
-        `=== ROUND ${i + 1} ===\n` + AGENTS.map(ag => `${ag.name}: ${JSON.stringify(r[ag.id])}`).join('\n')
-      ).join('\n\n');
+      const priorRoundsContext = allRounds.map((r, i) => summariseRound(r, i)).join('\n\n');
 
       for (let i = 0; i < AGENTS.length; i++) {
         const ag = AGENTS[i];
@@ -101,16 +104,16 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
         const extra = buildAgentContext(ag.id, ctx, profile);
         const profileCtx = buildProfileContext(profile);
         const currentRoundSoFar = Object.entries(roundResults)
-          .map(([id, r]) => { const a = AGENTS.find(x => x.id === id); return `${a.name}: ${JSON.stringify(r)}`; })
+          .map(([id, r]) => { const a = AGENTS.find(x => x.id === id); return `${a.name}: ${r.stance || '?'} — ${r.headline || ''}`; })
           .join('\n');
 
         let roundPromptSuffix = '';
         if (round === 0) {
           roundPromptSuffix = currentRoundSoFar ? `\n\nEARLIER IN THIS ROUND:\n${currentRoundSoFar}\n\nDeliver your independent analysis.` : '';
         } else if (round === 1) {
-          roundPromptSuffix = `\n\n${priorRoundsContext}\n\nEARLIER IN ROUND 2:\n${currentRoundSoFar || 'None yet.'}\n\nRevise if needed. Add "rebuttal" field. Return updated JSON.`;
+          roundPromptSuffix = `\n\nCOUNCIL ROUND 1 SUMMARY:\n${priorRoundsContext}\n\nEARLIER IN ROUND 2:\n${currentRoundSoFar || 'None yet.'}\n\nRevise if needed. Add "rebuttal" field. Return updated JSON.`;
         } else {
-          roundPromptSuffix = `\n\n${priorRoundsContext}\n\nEARLIER IN ROUND 3:\n${currentRoundSoFar || 'None yet.'}\n\nFinal position. Add "finalNote" if changing stance. Return JSON.`;
+          roundPromptSuffix = `\n\nCOUNCIL ROUNDS 1-2 SUMMARY:\n${priorRoundsContext}\n\nEARLIER IN ROUND 3:\n${currentRoundSoFar || 'None yet.'}\n\nFinal position. Add "finalNote" if changing stance. Return JSON.`;
         }
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';

@@ -28,15 +28,27 @@ Check ONE holding against the SELL PROTOCOL: a SELL signal requires red candles 
 Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","note":"<one-line weekly read>"}`;
     for (let i = 0; i < acctHoldings.length; i++) {
       const h = acctHoldings[i];
-      try {
-        const txt = await callAgent(sys, `Holding: ${h}. Today is ${new Date().toDateString()}. Check it against the sell protocol. Return ONLY the JSON.`, true);
-        const p = extractJSON(txt);
-        setWd(prev => ({ ...prev, [h]: { status: 'done', result: p || { status: 'WATCH', note: 'Could not parse.' } } }));
-      } catch {
-        flagApiDown();
-        setWd(prev => ({ ...prev, [h]: { status: 'error' } }));
+      let attempts = 0;
+      while (attempts < 2) {
+        try {
+          // useSearch=false: base model is far more reliable on free Groq tier
+          const txt = await callAgent(sys, `Holding: ${h}. Today is ${new Date().toDateString()}. Check it against the sell protocol. Return ONLY the JSON.`, false);
+          const p = extractJSON(txt);
+          setWd(prev => ({ ...prev, [h]: { status: 'done', result: p || { status: 'WATCH', note: 'Could not parse.' } } }));
+          break;
+        } catch (err) {
+          attempts++;
+          const isRateLimit = err?.message?.includes('429') || err?.message?.includes('ERR-429');
+          if (isRateLimit && attempts < 2) {
+            await new Promise(r => setTimeout(r, 35000)); // wait out rate limit
+            continue;
+          }
+          flagApiDown();
+          setWd(prev => ({ ...prev, [h]: { status: 'error' } }));
+          break;
+        }
       }
-      if (i < acctHoldings.length - 1) await new Promise(r => setTimeout(r, 3000));
+      if (i < acctHoldings.length - 1) await new Promise(r => setTimeout(r, 5000));
     }
     setWdRunning(false);
   }

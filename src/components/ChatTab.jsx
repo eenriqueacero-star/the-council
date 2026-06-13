@@ -194,9 +194,17 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
     // AXIOM reads the message and decides: answer directly, route to specialist(s), or convene full council
     const axiomSys = `You are AXIOM, chair of THE COUNCIL — an elite private investment analysis team. You are direct, sharp, decisive, and genuinely knowledgeable about markets. ${PROTOCOLS}
 
+THE COUNCIL ROSTER (use ONLY these names — never invent others):
+- REX ⚡ (id: technical) — Technical Analyst: charts, price action, momentum, key levels
+- NOVA 🚀 (id: catalyst) — Catalyst Scout: earnings, product launches, upcoming events
+- SAGE 🛡️ (id: risk) — Risk Officer: dilution, volatility, concentration risk
+- ATLAS 🌐 (id: macro) — Macro Strategist: Fed, rates, inflation, geopolitics
+- VEGA 🐻 (id: bear) — Devil's Advocate: bear case, downside scenarios
+- ZEN ⚖️ (id: sizer) — Position Sizer: dollar amounts, sizing, portfolio allocation
+
 ROUTING RULES — choose the most useful response type:
 - fullCouncil=true ONLY when the investor explicitly wants a full BUY/SELL/HOLD ruling on a specific ticker ("should I buy X", "full analysis on X", "what's the council's take on X", "convene on X").
-- route=["technical"] for chart/momentum/price action questions about a ticker.
+- route=["technical"] for chart/momentum/price action questions.
 - route=["macro"] for macro, Fed, rates, inflation, or geopolitical questions.
 - route=["catalyst"] for earnings dates, product launches, or upcoming catalysts.
 - route=["risk"] for risk assessment, dilution, concentration, or volatility questions.
@@ -205,7 +213,7 @@ ROUTING RULES — choose the most useful response type:
 - route=["technical","macro"] — combine multiple specialists when the question spans domains.
 - route=[] — answer DIRECTLY as AXIOM for: greetings, general portfolio questions, strategy, watchlist discussion, anything that doesn't need a specialist.
 
-When routing to specialist(s), set "speak" to a brief 1-sentence intro ("Let me get REX's read on that chart.").
+When routing to specialist(s), set "speak" to a brief 1-sentence intro using their real name (e.g. "Let me get REX's read on that chart." or "NOVA and ATLAS will cover this.").
 When answering directly, set "speak" to your full answer.
 Today: ${new Date().toDateString()}.${historyBlock}
 Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fullCouncil":<bool>,"ticker":"<TICKER or null>","route":["agentId1","agentId2"]}`;
@@ -250,7 +258,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         if (idx > 0) await sleep(1500);
         let response;
         try {
-          const sys = ag.conversationalPrompt + historyBlock;
+          const sys = ag.conversationalPrompt + `\n\nIMPORTANT: Respond directly to the investor. Do NOT address or reference other council members by name — just give your expert answer.` + historyBlock;
           response = await callAgent(sys, text, false, 400);
         } catch {
           flagApiDown();

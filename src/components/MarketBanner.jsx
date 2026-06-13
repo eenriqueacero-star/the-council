@@ -1,52 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const FONT = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
-// Airport departure-board digit — flips when value changes
-function FlipDigit({ value }) {
-  const [cur,  setCur]  = useState(value);
-  const [prev, setPrev] = useState(value);
-  const [key,  setKey]  = useState(0);
-
-  useEffect(() => {
-    if (value === cur) return;
-    setPrev(cur);
-    setCur(value);
-    setKey(k => k + 1);
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return (
-    <span style={{ position:'relative', display:'inline-block', minWidth:'0.65em', overflow:'hidden', textAlign:'center' }}>
-      <span key={key} className="flip-digit-new" style={{ display:'block' }}>{cur}</span>
-    </span>
-  );
-}
-
-function FlipCountdown({ ms }) {
-  if (ms <= 0) return <span style={MFONT}>Opening now…</span>;
-  const s   = Math.floor(ms / 1000);
-  const h   = Math.floor(s / 3600);
-  const m   = Math.floor((s % 3600) / 60);
+function fmtCountdown(ms) {
+  if (ms <= 0) return 'Opening now…';
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-
-  if (h > 0) {
-    return (
-      <span style={{ ...MFONT, fontSize:12 }}>
-        Opens in {h}h{' '}
-        <FlipDigit value={String(m).padStart(2,'0')[0]} /><FlipDigit value={String(m).padStart(2,'0')[1]} />m
-      </span>
-    );
-  }
-  const mm = String(m).padStart(2,'0');
-  const ss = String(sec).padStart(2,'0');
-  return (
-    <span style={{ ...MFONT, fontSize:12, display:'inline-flex', alignItems:'center', gap:1, letterSpacing:'0.04em' }}>
-      Opens in{' '}
-      <FlipDigit value={mm[0]} /><FlipDigit value={mm[1]} />m{' '}
-      <FlipDigit value={ss[0]} /><FlipDigit value={ss[1]} />s
-    </span>
-  );
+  if (h > 0) return `Opens in ${h}h ${String(m).padStart(2,'0')}m`;
+  return `Opens in ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
 }
 
 const CONFIGS = {
@@ -101,7 +65,7 @@ export default function MarketBanner({ state, msToOpen }) {
         )}
       </div>
       {cfg.showCount && (
-        <span style={{ opacity: 0.85 }}><FlipCountdown ms={remaining} /></span>
+        <span style={{ ...MFONT, fontSize: 12, opacity: 0.85 }}>{fmtCountdown(remaining)}</span>
       )}
     </div>
   );

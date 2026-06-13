@@ -2,41 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuotes, getCandles } from '../api.js';
 import { theme } from '../utils/theme.js';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-gsap.registerPlugin(ScrollTrigger);
-
-// Scrambles digits for `dur`ms before settling on the real formatted value
-function useScrambleNumber(value, trigger) {
-  const [display, setDisplay] = useState('');
-  const rafRef  = useRef(null);
-
-  useEffect(() => {
-    if (value == null) return;
-    const fmt = v => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const target = '$' + fmt(value);
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setDisplay(target); return; }
-    const DIGITS = '0123456789';
-    const start  = performance.now();
-    const dur    = 680;
-    cancelAnimationFrame(rafRef.current);
-    function tick(now) {
-      const prog    = Math.min((now - start) / dur, 1);
-      const settled = Math.ceil(prog * target.length);
-      const result  = target.split('').map((c, i) => {
-        if (i < settled || '.,$ '.includes(c)) return c;
-        return DIGITS[Math.floor(Math.random() * DIGITS.length)];
-      }).join('');
-      setDisplay(result);
-      if (prog < 1) rafRef.current = requestAnimationFrame(tick);
-    }
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [trigger]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!display) return '$' + (value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return display;
-}
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', 'Fira Code', monospace" };
@@ -54,19 +19,18 @@ const LOGO_DOMAINS = {
 
 const RANGES = ['1D','1W','1M','3M','1Y','ALL'];
 
-function TickerLogo({ ticker, dark, delay = 0 }) {
+function TickerLogo({ ticker, dark }) {
   const [err, setErr] = useState(false);
   const T = theme(dark);
   const domain = LOGO_DOMAINS[ticker];
-  const anim = { animationDelay: `${delay}ms` };
   if (!domain || err) {
     return (
-      <div className="coin-flip" style={{ width:36, height:36, borderRadius:'50%', background:'#1A1A1A', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:600, flexShrink:0, ...MFONT, ...anim }}>
+      <div style={{ width:36, height:36, borderRadius:'50%', background:'#1A1A1A', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:600, flexShrink:0, ...MFONT }}>
         {ticker.slice(0,2)}
       </div>
     );
   }
-  return <img className="coin-flip" src={`https://logo.clearbit.com/${domain}`} onError={() => setErr(true)} style={{ width:36, height:36, borderRadius:'50%', objectFit:'contain', flexShrink:0, background: T.bgCard, ...anim }} alt={ticker} />;
+  return <img src={`https://logo.clearbit.com/${domain}`} onError={() => setErr(true)} style={{ width:36, height:36, borderRadius:'50%', objectFit:'contain', flexShrink:0, background: T.bgCard }} alt={ticker} />;
 }
 
 function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
@@ -87,16 +51,14 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [editTicker, setEditTicker] = useState(null);
   const [editShares, setEditShares] = useState('');
   const [editCost,   setEditCost]   = useState('');
-  const [quoteTick,  setQuoteTick]  = useState(0);
-  const timerRef  = useRef(null);
-  const lineRef   = useRef(null);
+  const timerRef = useRef(null);
 
   const tickers = acctHoldings.filter(t => posMap[t]);
   const withShares = tickers.filter(t => parseFloat(posMap[t]?.shares) > 0);
 
   const fetchQuotes = useCallback(async () => {
     if (!tickers.length) return;
-    try { setQuotes(await getQuotes(tickers)); setQuoteTick(n => n + 1); } catch { flagApiDown?.(); }
+    try { setQuotes(await getQuotes(tickers)); } catch { flagApiDown?.(); }
   }, [tickers.join(',')]);
 
   useEffect(() => {
@@ -128,35 +90,6 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
   useEffect(() => { fetchCandles(); }, [fetchCandles]);
 
-  // Stroke-dashoffset draw-on for chart line path
-  useEffect(() => {
-    const path = lineRef.current;
-    if (!path) return;
-    const len = path.getTotalLength();
-    path.style.transition = 'none';
-    path.style.strokeDasharray = `${len}`;
-    path.style.strokeDashoffset = `${len}`;
-    const raf = requestAnimationFrame(() => {
-      if (!lineRef.current) return;
-      lineRef.current.style.transition = 'stroke-dashoffset 1.15s cubic-bezier(.4,0,.2,1)';
-      lineRef.current.style.strokeDashoffset = '0';
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [chartKey]);
-
-  // ScrollTrigger — position rows fade+slide in as they enter viewport
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const rows = document.querySelectorAll('.holding-row');
-    rows.forEach((row, i) => {
-      gsap.fromTo(row,
-        { opacity: 0, x: -14 },
-        { opacity: 1, x: 0, duration: 0.45, ease: 'power2.out', delay: i * 0.05,
-          scrollTrigger: { trigger: row, start: 'top 92%', once: true } });
-    });
-    return () => ScrollTrigger.getAll().forEach(t => t.kill());
-  }, [tickers.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Portfolio value
   let totalValue = 0, prevValue = 0;
   withShares.forEach(t => {
@@ -172,9 +105,8 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
   useEffect(() => { onDayChange?.(dayChange); }, [dayChange]);
 
-  const chartPoints    = candles.map(c => c.c);
-  const displayValue   = (scrubIdx !== null && chartPoints[scrubIdx]) ? chartPoints[scrubIdx] : totalValue;
-  const scrambledValue = useScrambleNumber(displayValue, quoteTick);
+  const chartPoints  = candles.map(c => c.c);
+  const displayValue = (scrubIdx !== null && chartPoints[scrubIdx]) ? chartPoints[scrubIdx] : totalValue;
 
   // SVG chart
   const W = 400, H = 180;
@@ -227,7 +159,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
             </linearGradient>
           </defs>
           <path className="fade-in" d={areaPath} fill={`url(#${gradId})`} style={{ animationDuration:'1.4s' }} />
-          <path ref={lineRef} d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           {scrubX !== null && (
             <>
               <line x1={scrubX} y1="0" x2={scrubX} y2={H} stroke="#CCCCCC" strokeWidth="1" strokeDasharray="4 3" />
@@ -258,7 +190,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
           <div>
             <div style={{ fontSize:36, fontWeight:700, color: T.text, lineHeight:1.1, letterSpacing:'-0.02em', ...MFONT, fontVariantNumeric:'tabular-nums' }}>
-              {scrambledValue}
+              ${displayValue.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
             </div>
             <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:8 }}>
               <span style={{ fontSize:15, fontWeight:500, color: dayChange >= 0 ? GRN : RED }}>
@@ -328,7 +260,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
             {movers.map(({ t, pct, price }, mi) => (
               <div key={t} style={{ border: `1px solid ${T.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10, background: T.bgCard }}>
-                <TickerLogo ticker={t} dark={dark} delay={mi * 70} />
+                <TickerLogo ticker={t} dark={dark} />
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:14, fontWeight:600, color: T.text }}>{t}</div>
                   <div style={{ fontSize:12, color: pct>=0 ? GRN : RED, display:'flex', alignItems:'center', gap:3 }}>
@@ -390,7 +322,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
                 {/* Row */}
                 <div className="holding-row" onClick={() => setExpanded(isExp ? null : t)}
                   style={{ display:'flex', alignItems:'center', gap:12, minHeight:64, padding:'0 16px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', background: T.bg }}>
-                  <TickerLogo ticker={t} dark={dark} delay={idx * 60} />
+                  <TickerLogo ticker={t} dark={dark} />
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:15, fontWeight:600, color: T.text }}>{t}</div>
                     {shares > 0 && <div style={{ ...MFONT, fontSize:12, color: T.text2 }}>{shares} sh</div>}

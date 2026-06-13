@@ -1,34 +1,5 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef } from 'react';
 import { Search, ChevronRight, Loader2, AlertTriangle, Crown, TrendingUp, Wallet } from 'lucide-react';
-
-// 3D parallax tilt card — mouse-tracking perspective tilt, snaps back on leave
-function TiltCard({ children, style, ...rest }) {
-  const ref = useRef(null);
-  const reduced = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const onMove = useCallback(e => {
-    if (reduced || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    const x = ((e.clientX - r.left)  / r.width  - 0.5) * 10;
-    const y = ((e.clientY - r.top)   / r.height - 0.5) * -10;
-    ref.current.style.transform = `perspective(700px) rotateX(${y}deg) rotateY(${x}deg) translateZ(3px)`;
-    ref.current.style.boxShadow = `${-x * 1.5}px ${y * 1.5}px 24px rgba(0,0,0,0.22)`;
-  }, [reduced]);
-
-  const onLeave = useCallback(() => {
-    if (!ref.current) return;
-    ref.current.style.transform = 'perspective(700px) rotateX(0deg) rotateY(0deg) translateZ(0)';
-    ref.current.style.boxShadow = '';
-  }, []);
-
-  return (
-    <div ref={ref} onMouseMove={onMove} onMouseLeave={onLeave}
-      style={{ ...style, transition: 'transform 0.18s ease, box-shadow 0.18s ease', willChange: 'transform' }}
-      {...rest}>
-      {children}
-    </div>
-  );
-}
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
@@ -183,7 +154,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
               const r    = st.result;
               const ss   = r && (PS[r.stance] || PS.CAUTION);
               return (
-                <TiltCard key={a.id} style={{
+                <div key={a.id} style={{
                   animation: st.status==='done' ? `cardIn .5s cubic-bezier(.2,.7,.2,1) ${idx*55}ms both` : undefined,
                   background: T.bg, border:`1px solid ${st.status==='error' ? 'rgba(255,59,48,0.3)' : T.border}`,
                   borderRadius:12, padding:16, overflow:'hidden', position:'relative',
@@ -231,7 +202,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
                       </ul>
                     </div>
                   )}
-                </TiltCard>
+                </div>
               );
             })}
           </div>

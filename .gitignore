@@ -33,3 +33,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Claude Code worktree metadata
+.claude/

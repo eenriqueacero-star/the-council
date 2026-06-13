@@ -112,7 +112,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<1-2 sentence reply>","c
           entry: null, stopLoss: synth.stopLoss || null, takeProfit: synth.takeProfit || null,
           summary: synth.speak || '',
           outcomeCheckedAt: null, priceAt30d: null, outcome: null,
-        }).catch(() => {});
+        }).catch(e => console.error('Failed to save ruling:', e));
       }
 
       setChat(p => [...p, { role:'pm', text:synth.speak, verdict:synth.verdict, conviction:synth.conviction, ticker:tkr }]);

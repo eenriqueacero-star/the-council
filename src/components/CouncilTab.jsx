@@ -87,7 +87,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
           entry: res.entry || null, stopLoss: res.stopLoss || null, takeProfit: res.takeProfit || null,
           summary: res.summary || '',
           outcomeCheckedAt: null, priceAt30d: null, outcome: null,
-        }).catch(() => {});
+        }).catch(e => console.error('Failed to save ruling:', e));
       }
     } catch {
       flagApiDown();

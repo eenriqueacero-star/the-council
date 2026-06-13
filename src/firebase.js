@@ -1,10 +1,12 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 
-// After creating your web app in Firebase Console:
-// Project Settings → Your apps → Add web app → copy firebaseConfig here
 const firebaseConfig = {
   apiKey:            'AIzaSyB6KEbMzfSlOo6UdXhHjHAnziDfJIU-EmM',
   authDomain:        'the-council-89570.firebaseapp.com',
@@ -16,6 +18,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth      = getAuth(app);
-export const db        = getFirestore(app);
+export const auth = getAuth(app);
+
+// Offline-first: writes go to IndexedDB immediately, sync to server in the
+// background and auto-retry on reconnect. Prevents silent data loss on any
+// brief network interruption.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
+
 export const functions = getFunctions(app);

@@ -61,19 +61,21 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
     const ctx     = await loadAgentContext(tkr, rawQuote);
     const profiles = uid ? await loadAllAgentProfiles(uid, AGENTS.map(a => a.id)) : {};
 
-    // Background research refresh
+    // Refresh the single most-stale agent's research in background (1 call max per run)
     if (uid) {
+      const STALE_MS = 24 * 60 * 60 * 1000;
+      let staleest = null; let staleestAge = 0;
       AGENTS.forEach(ag => {
-        const profile = profiles[ag.id];
-        const stale = !profile?.lastResearch?.searchedAt ||
-          Date.now() - new Date(profile.lastResearch.searchedAt).getTime() > 4 * 60 * 60 * 1000;
-        if (stale) {
-          refreshAgentResearch(uid, ag.id, ag.researchPrompt, callAgent)
-            .then(content => {
-              if (content) profiles[ag.id] = { ...profiles[ag.id], lastResearch: { content, searchedAt: new Date().toISOString() } };
-            });
-        }
+        const searched = profiles[ag.id]?.lastResearch?.searchedAt;
+        const age = searched ? Date.now() - new Date(searched).getTime() : Infinity;
+        if (age > STALE_MS && age > staleestAge) { staleest = ag; staleestAge = age; }
       });
+      if (staleest) {
+        refreshAgentResearch(uid, staleest.id, staleest.researchPrompt, callAgent)
+          .then(content => {
+            if (content) profiles[staleest.id] = { ...profiles[staleest.id], lastResearch: { content, searchedAt: new Date().toISOString() } };
+          });
+      }
     }
 
     const priceNote   = livePrice ? ` Price: $${livePrice.toFixed(2)}.` : '';

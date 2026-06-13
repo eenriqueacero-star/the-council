@@ -66,21 +66,25 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     const rawQuote = quotesRes[upperTicker] || null;
     const livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
 
-    // 2. Check for stale research and refresh in background (don't await)
+    // 2. Refresh research for the single most-stale agent (background, no await).
+    // Limited to 1 compound-beta call per council run to avoid rate limit bursts.
     if (uid) {
+      const STALE_MS = 24 * 60 * 60 * 1000; // 24h threshold
+      let staleest = null;
+      let staleestAge = 0;
       AGENTS.forEach(ag => {
-        const profile = profiles[ag.id];
-        const stale = !profile?.lastResearch?.searchedAt ||
-          Date.now() - new Date(profile.lastResearch.searchedAt).getTime() > 4 * 60 * 60 * 1000;
-        if (stale) {
-          refreshAgentResearch(uid, ag.id, ag.researchPrompt, callAgent)
-            .then(content => {
-              if (content) {
-                profiles[ag.id] = { ...profiles[ag.id], lastResearch: { content, searchedAt: new Date().toISOString() } };
-              }
-            });
-        }
+        const searched = profiles[ag.id]?.lastResearch?.searchedAt;
+        const age = searched ? Date.now() - new Date(searched).getTime() : Infinity;
+        if (age > STALE_MS && age > staleestAge) { staleest = ag; staleestAge = age; }
       });
+      if (staleest) {
+        refreshAgentResearch(uid, staleest.id, staleest.researchPrompt, callAgent)
+          .then(content => {
+            if (content) {
+              profiles[staleest.id] = { ...profiles[staleest.id], lastResearch: { content, searchedAt: new Date().toISOString() } };
+            }
+          });
+      }
     }
 
     const priceNote = livePrice ? ` Price: $${livePrice.toFixed(2)}.` : '';

@@ -274,7 +274,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
 
           let response;
           try {
-            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). You are speaking RIGHT NOW as ${ag.name}. Never refer to yourself in the third person. Never say "I'll bring in ${ag.name}" or "Let me get ${ag.name}" — you ARE ${ag.name}. Speak in first person only.\n\n`;
+            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. You CAN and SHOULD address colleagues directly by name (e.g. "REX, what does the chart say?" or "VEGA, push back on this") — just never say "I'll bring in ${ag.name}" or act as if you are not ${ag.name}.\n\n`;
             const sys = identityAnchor + ag.conversationalPrompt + ROSTER + discussionSoFar + historyBlock;
             response = await callAgent(sys, text, false, 500);
           } catch {

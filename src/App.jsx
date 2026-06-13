@@ -220,6 +220,11 @@ export default function App() {
 
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus };
 
+  // Derived values — must be defined before isNight / glowColor use them
+  const effectiveMkt      = mktOverride || mktState;
+  const effectiveMsToOpen = mktOverride ? 0 : msToOpen;
+  const portfolioDirection = pdOverride || (dayChange > 0.01 ? 'up' : dayChange < -0.01 ? 'down' : 'flat');
+
   const isNight = effectiveMkt === 'overnight' || effectiveMkt === 'evening';
 
   const glowColor = (() => {
@@ -233,10 +238,6 @@ export default function App() {
     if (isNight)                       return 'rgba(88,28,135,0.28)';
     return 'rgba(107,114,128,0.08)';
   })();
-
-  const portfolioDirection = pdOverride  || (dayChange > 0.01 ? 'up' : dayChange < -0.01 ? 'down' : 'flat');
-  const effectiveMkt       = mktOverride || mktState;
-  const effectiveMsToOpen  = mktOverride ? 0 : msToOpen;
 
   // In dark mode the ambient canvas provides the background; keep solid bg only in light mode
   const rootBg = dark ? 'transparent' : '#FFFFFF';

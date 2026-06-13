@@ -41,7 +41,7 @@ const MORE_ROWS = [
 ];
 
 export default function App() {
-  const [account,  setAccount]  = useState('edwin');
+  const [account,  setAccount]  = useState(() => localStorage.getItem('council_account') || 'edwin');
   const [tab,      setTab]      = useState('portfolio');
   const [apiDown,  setApiDown]  = useState(false);
   const [mktState, setMktState] = useState(() => getMarketState(new Date()));
@@ -49,6 +49,7 @@ export default function App() {
   const [dayChange,setDayChange]= useState(0);
   const [dark, setDark] = useState(() => localStorage.getItem('council_dark') === 'true');
   useEffect(() => { localStorage.setItem('council_dark', String(dark)); }, [dark]);
+  useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
 
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
@@ -63,6 +64,7 @@ export default function App() {
     Object.keys(ACCOUNTS).forEach(k => { o[k] = {}; });
     return o;
   });
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
 
   const flagApiDown = () => setApiDown(true);
 
@@ -75,13 +77,19 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
+  const saveTimer     = useRef(null);
+  const positionsRef  = useRef(positions); // always mirrors latest positions state
+  const fsLoaded      = useRef(false);     // true after first snapshot fires
+
   useEffect(() => {
     let snapUnsub = () => {};
     const authUnsub = onAuthStateChanged(auth, user => {
       snapUnsub();
+      fsLoaded.current = false;
       if (!user) return;
       const ref = doc(db, 'users', user.uid, 'data', 'positions');
       snapUnsub = onSnapshot(ref, snap => {
+        fsLoaded.current = true;
         if (!snap.exists()) return;
         const data = snap.data().positions || {};
         setPositions(prev => {
@@ -90,48 +98,62 @@ export default function App() {
             const cloud = data[k];
             merged[k] = (cloud && Object.keys(cloud).length > 0) ? cloud : (prev[k] || {});
           });
+          // Keep positionsRef in sync so pending saves use the latest merged state
+          positionsRef.current = merged;
           return merged;
         });
+      }, err => {
+        console.error('positions snapshot error:', err);
+        fsLoaded.current = true; // unblock saves even on error
       });
     });
     return () => { authUnsub(); snapUnsub(); };
   }, []);
 
-  const saveTimer   = useRef(null);
-  const pendingPos  = useRef(null);
-
-  const savePositions = useCallback(pos => {
-    pendingPos.current = pos;
+  const savePositions = useCallback(() => {
     clearTimeout(saveTimer.current);
+    setSaveStatus('saving');
     saveTimer.current = setTimeout(async () => {
       const user = auth.currentUser;
+      const doSave = async (u) => {
+        await setDoc(
+          doc(db, 'users', u.uid, 'data', 'positions'),
+          { positions: positionsRef.current },
+          { merge: true }
+        );
+      };
       if (!user) {
-        // Auth not ready yet — retry once after a short delay
         saveTimer.current = setTimeout(async () => {
           const u2 = auth.currentUser;
-          if (!u2) return;
-          try { await setDoc(doc(db,'users',u2.uid,'data','positions'), { positions: pendingPos.current }, { merge:true }); }
-          catch (e) { console.error('savePositions retry failed:', e); }
+          if (!u2) { setSaveStatus('error'); return; }
+          try { await doSave(u2); setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); }
+          catch (e) { setSaveStatus('error'); console.error('savePositions retry failed:', e); }
         }, 2000);
         return;
       }
-      try { await setDoc(doc(db,'users',user.uid,'data','positions'), { positions: pendingPos.current }, { merge:true }); }
-      catch (e) { console.error('savePositions failed:', e); }
+      try { await doSave(user); setSaveStatus('saved'); setTimeout(() => setSaveStatus('idle'), 2000); }
+      catch (e) { setSaveStatus('error'); console.error('savePositions failed:', e); }
     }, 600);
   }, []);
 
   const setPos = (tkr, field, val) => setPositions(prev => {
     const next = { ...prev, [account]: { ...prev[account], [tkr]: { ...(prev[account]?.[tkr] || {}), [field]: val } } };
-    savePositions(next); return next;
+    positionsRef.current = next;
+    savePositions();
+    return next;
   });
   const addTicker = t => { if (!t) return; setPositions(prev => {
     const next = { ...prev, [account]: { ...prev[account], [t]: prev[account]?.[t] || { shares:'', cost:'' } } };
-    savePositions(next); return next;
+    positionsRef.current = next;
+    savePositions();
+    return next;
   }); };
   const removeTicker = t => setPositions(prev => {
     const acctCopy = { ...prev[account] }; delete acctCopy[t];
     const next = { ...prev, [account]: acctCopy };
-    savePositions(next); return next;
+    positionsRef.current = next;
+    savePositions();
+    return next;
   });
 
   const acct         = ACCOUNTS[account];
@@ -142,7 +164,7 @@ export default function App() {
     return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t;
   }).join(', ');
 
-  const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark };
+  const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus };
 
   const isNight = mktState === 'overnight' || mktState === 'evening';
 

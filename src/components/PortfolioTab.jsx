@@ -35,7 +35,7 @@ function TickerLogo({ ticker, dark }) {
 
 function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
 
-export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark }) {
+export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus }) {
   const T = theme(dark);
   const [quotes,      setQuotes]      = useState({});
   const [candles,     setCandles]     = useState([]);
@@ -204,11 +204,19 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               </div>
             )}
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:6, paddingTop:4 }}>
-            <div style={{ width:8, height:8, borderRadius:'50%', background: marketState==='open' ? GRN : '#CCCCCC', boxShadow: marketState==='open' ? `0 0 6px ${GRN}` : 'none' }} />
-            <span style={{ ...MFONT, fontSize:11, color: T.text3 }}>
-              {marketState === 'open' ? 'LIVE' : marketState === 'premarket' ? 'PRE-MARKET' : marketState === 'afterhours' ? 'AFTER HOURS' : 'MARKET CLOSED'}
-            </span>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, paddingTop:4 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <div style={{ width:8, height:8, borderRadius:'50%', background: marketState==='open' ? GRN : '#CCCCCC', boxShadow: marketState==='open' ? `0 0 6px ${GRN}` : 'none' }} />
+              <span style={{ ...MFONT, fontSize:11, color: T.text3 }}>
+                {marketState === 'open' ? 'LIVE' : marketState === 'premarket' ? 'PRE-MARKET' : marketState === 'afterhours' ? 'AFTER HOURS' : 'MARKET CLOSED'}
+              </span>
+            </div>
+            {saveStatus !== 'idle' && (
+              <span style={{ ...MFONT, fontSize:10, letterSpacing:'0.06em',
+                color: saveStatus === 'error' ? RED : saveStatus === 'saved' ? GRN : T.text3 }}>
+                {saveStatus === 'saving' ? 'SAVING…' : saveStatus === 'saved' ? 'SAVED ✓' : 'SAVE FAILED ✕'}
+              </span>
+            )}
           </div>
         </div>
 

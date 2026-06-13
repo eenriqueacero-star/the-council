@@ -27,6 +27,10 @@ export default async function handler(req, res) {
     }
   }
 
+  const { withEarnings = false } = req.body;
+  const today = new Date().toISOString().slice(0, 10);
+  const in90d = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
+
   const results = {};
   await Promise.all(tickers.map(async ticker => {
     try {
@@ -35,6 +39,18 @@ export default async function handler(req, res) {
       if (!r.ok) throw new Error(`Finnhub ${r.status}`);
       const data = await r.json();
       results[ticker] = { price: data.c, changePct: data.dp, high: data.h, low: data.l, open: data.o, prevClose: data.pc };
+
+      if (withEarnings) {
+        try {
+          const eUrl = `https://finnhub.io/api/v1/stock/earnings-calendar?from=${today}&to=${in90d}&symbol=${encodeURIComponent(ticker)}&token=${process.env.FINNHUB_KEY}`;
+          const er = await fetch(eUrl);
+          if (er.ok) {
+            const ed = await er.json();
+            const next = ed.earningsCalendar?.[0];
+            if (next?.date) results[ticker].nextEarnings = next.date;
+          }
+        } catch {}
+      }
     } catch (err) {
       results[ticker] = { error: err.message };
     }

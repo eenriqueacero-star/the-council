@@ -47,12 +47,12 @@ export async function callAgent(system, userContent, useSearch, maxTokens = 512,
   }
 }
 
-export async function getQuotes(tickers) {
-  const key = [...tickers].sort().join(',');
+export async function getQuotes(tickers, withEarnings = false) {
+  const key = [...tickers].sort().join(',') + (withEarnings ? '+earnings' : '');
   const cached = quoteCache.get(key);
   if (cached && Date.now() - cached.ts < 45000) return cached.data;
   const headers = await authHeaders();
-  const res = await fetch('/api/get-quotes', { method: 'POST', headers, body: JSON.stringify({ tickers }) });
+  const res = await fetch('/api/get-quotes', { method: 'POST', headers, body: JSON.stringify({ tickers, withEarnings }) });
   if (!res.ok) throw new Error(`api_unreachable_${res.status}`);
   const data = await res.json();
   quoteCache.set(key, { data, ts: Date.now() });

@@ -254,14 +254,18 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       // The roster line injected into every agent call so they never hallucinate fake names
       const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
-      // Fetch live price via Finnhub if AXIOM identified a specific ticker (fast, accurate)
+      // Fetch live price + verified earnings date via Finnhub when a ticker is identified
       let liveContext = '';
       if (router.ticker) {
         try {
-          const q = await getQuotes([router.ticker.toUpperCase()]);
-          const quote = q[router.ticker.toUpperCase()];
+          const tkr = router.ticker.toUpperCase();
+          const q = await getQuotes([tkr], true);
+          const quote = q[tkr];
           if (quote?.price) {
-            liveContext = `\nLIVE PRICE: ${router.ticker.toUpperCase()} = $${quote.price.toFixed(2)} (prev close $${(quote.prevClose || 0).toFixed(2)}, change ${quote.change >= 0 ? '+' : ''}${(quote.change || 0).toFixed(2)}%)`;
+            liveContext = `\nVERIFIED LIVE DATA for ${tkr}: price $${quote.price.toFixed(2)} (prev close $${(quote.prevClose || 0).toFixed(2)}, chg ${(quote.changePct || 0).toFixed(2)}%)`;
+            if (quote.nextEarnings) {
+              liveContext += `, next earnings: ${quote.nextEarnings} (verified from Finnhub — do NOT cite a different date)`;
+            }
           }
         } catch {}
       }

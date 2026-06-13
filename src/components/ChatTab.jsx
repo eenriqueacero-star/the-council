@@ -254,6 +254,14 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       // The roster line injected into every agent call so they never hallucinate fake names
       const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
+      // ONE live search before the loop — all agents share this fresh context
+      let liveContext = '';
+      try {
+        const searchSys = `You are a market research assistant. Search for the most relevant, current information to help answer this question. Return 3-4 bullet points of key recent facts — prices, news, earnings dates, macro data, whatever is most relevant.`;
+        const raw = await callAgent(searchSys, text, true, 300);
+        if (raw) liveContext = `\n\nLIVE MARKET CONTEXT (just searched):\n${raw}`;
+      } catch {}
+
       const spokenThisTurn = []; // { agentId, name, response } — ordered, agents can appear multiple times
       const MAX_WAVES = 4;
       const MAX_CALLS = 10;
@@ -272,8 +280,8 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
 
           // Build a clear shared knowledge base so agents don't re-ask answered questions
           const knowledgeBase = spokenThisTurn.length > 0
-            ? `\n\nSHARED COUNCIL KNOWLEDGE (already established — do NOT re-ask these, do NOT repeat them, BUILD on them):\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYour job NOW: add what is genuinely missing from the above. If a specific question was just directed at you by a colleague, answer it directly using the knowledge above. Only invite another colleague if their domain hasn't been covered yet.`
-            : `\n\nYou are opening the discussion. Be specific — name tickers, dates, prices, and concrete facts. If another specialist's input would complete the picture, invite them by name at the end.`;
+            ? `${liveContext}\n\nSHARED COUNCIL KNOWLEDGE (already established — do NOT re-ask these, do NOT repeat them, BUILD on them):\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYour job NOW: add what is genuinely missing from the above. If a specific question was just directed at you by a colleague, answer it directly. Only invite another colleague if their domain hasn't been covered yet.`
+            : `${liveContext}\n\nYou are opening the discussion. Use the live context above. Be specific — name tickers, dates, prices. If another specialist's input would complete the picture, invite them by name at the end.`;
 
           const userMsg = wave === 0
             ? text

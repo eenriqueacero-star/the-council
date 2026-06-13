@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 
 const MODEL_BASE   = 'llama-3.3-70b-versatile';
-const MODEL_SEARCH = 'compound-beta';
+const MODEL_SEARCH = 'compound-beta'; // Groq compound model with live web search
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;

@@ -274,7 +274,8 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
 
           let response;
           try {
-            const sys = ag.conversationalPrompt + ROSTER + discussionSoFar + historyBlock;
+            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). You are speaking RIGHT NOW as ${ag.name}. Never refer to yourself in the third person. Never say "I'll bring in ${ag.name}" or "Let me get ${ag.name}" — you ARE ${ag.name}. Speak in first person only.\n\n`;
+            const sys = identityAnchor + ag.conversationalPrompt + ROSTER + discussionSoFar + historyBlock;
             response = await callAgent(sys, text, false, 500);
           } catch {
             flagApiDown();

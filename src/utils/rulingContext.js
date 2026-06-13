@@ -46,7 +46,8 @@ export async function loadTickerHistory(uid, ticker, currentPrice) {
       olderLine = `\n${older.length} earlier call${older.length > 1 ? 's' : ''}: ${buys} BUY, ${watches} WATCH.${avg != null ? ` Avg 30d return: ${Number(avg) >= 0 ? '+' : ''}${avg}%.` : ''}`;
     }
 
-    return `\nCOUNCIL HISTORY ON ${ticker} (${docs.length} prior call${docs.length > 1 ? 's' : ''}):\n${lines.join('\n')}${olderLine}\nReference this history to calibrate confidence — do not anchor to prior stance.`;
+    const out = `\nCOUNCIL HISTORY ON ${ticker} (${docs.length} prior call${docs.length > 1 ? 's' : ''}):\n${lines.join('\n')}${olderLine}\nReference this history to calibrate confidence — do not anchor to prior stance.`;
+    return out.length > 6000 ? out.slice(0, 6000) + '\n[history truncated]' : out;
   } catch {
     return '';
   }

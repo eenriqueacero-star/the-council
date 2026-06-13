@@ -35,7 +35,7 @@ function TickerLogo({ ticker, dark }) {
 
 function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
 
-export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus }) {
+export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus, authReady }) {
   const T = theme(dark);
   const [quotes,      setQuotes]      = useState({});
   const [candles,     setCandles]     = useState([]);
@@ -62,10 +62,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   }, [tickers.join(',')]);
 
   useEffect(() => {
+    if (!authReady) return;
     fetchQuotes();
     timerRef.current = setInterval(fetchQuotes, 60000);
     return () => clearInterval(timerRef.current);
-  }, [fetchQuotes]);
+  }, [fetchQuotes, authReady]);
 
   const fetchCandles = useCallback(async () => {
     if (!withShares.length) { setCandlesLoaded(true); return; }

@@ -64,8 +64,14 @@ export default function App() {
     return o;
   });
   const [saveStatus, setSaveStatus] = useState('idle');
+  const [authReady,  setAuthReady]  = useState(false);
 
-  const flagApiDown = () => setApiDown(true);
+  const apiDownTimer = useRef(null);
+  const flagApiDown = () => {
+    setApiDown(true);
+    clearTimeout(apiDownTimer.current);
+    apiDownTimer.current = setTimeout(() => setApiDown(false), 90000);
+  };
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -85,6 +91,7 @@ export default function App() {
     const authUnsub = onAuthStateChanged(auth, user => {
       snapUnsub();
       fsLoaded.current = false;
+      setAuthReady(!!user);
       if (!user) return;
       const ref = doc(db, 'users', user.uid, 'data', 'positions');
       snapUnsub = onSnapshot(ref, snap => {
@@ -158,7 +165,7 @@ export default function App() {
     return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t;
   }).join(', ');
 
-  const shared  = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus };
+  const shared  = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus, authReady };
   const rootBg  = dark ? '#111111' : '#FFFFFF';
   const accounts = Object.entries(ACCOUNTS).map(([id, v]) => ({ id, label: v.label }));
   const padded   = { maxWidth:760, margin:'0 auto', padding:'16px' };

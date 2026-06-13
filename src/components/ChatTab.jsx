@@ -291,7 +291,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           // Detect which real agents were addressed — they join the next wave
           const lower = response.toLowerCase();
           for (const candidate of AGENTS) {
-            if (!spokenIds.has(candidate.id) && lower.includes(candidate.name.toLowerCase())) {
+            if (lower.includes(candidate.name.toLowerCase())) {
               nextWaveIds.add(candidate.id);
             }
           }

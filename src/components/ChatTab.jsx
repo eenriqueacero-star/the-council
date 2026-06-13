@@ -255,10 +255,11 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
       const spokenThisTurn = []; // { agentId, name, response } — ordered, agents can appear multiple times
-      const MAX_WAVES = 3;  // max deliberation rounds
-      const MAX_CALLS = 8;  // hard safety cap — keeps rate limits manageable
+      const MAX_WAVES = 4;
+      const MAX_CALLS = 10;
       let totalCalls = 0;
       let pendingIds = [...routeIds];
+      let naturalEnd = false; // agents stopped calling each other on their own
 
       for (let wave = 0; wave < MAX_WAVES && pendingIds.length > 0 && totalCalls < MAX_CALLS; wave++) {
         const nextWaveIds = new Set();
@@ -267,21 +268,21 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           if (totalCalls >= MAX_CALLS) break;
           const ag = AGENTS.find(a => a.id === agId);
           if (!ag) continue;
-          if (totalCalls > 0) await sleep(3000); // 3s stagger to stay within rate limits
+          if (totalCalls > 0) await sleep(3000);
 
-          const discussionSoFar = spokenThisTurn.length > 0
-            ? `\n\nCOUNCIL DISCUSSION SO FAR:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYou are joining this ongoing discussion. Do NOT re-ask or rephrase the original question. Respond directly to what your colleagues said above. Add your perspective, challenge a point, or build on it. If you want another colleague to weigh in, address them by name.`
-            : `\n\nYou are opening this discussion. Answer directly. If another specialist's input would strengthen the answer, invite them by name at the end.`;
+          // Build a clear shared knowledge base so agents don't re-ask answered questions
+          const knowledgeBase = spokenThisTurn.length > 0
+            ? `\n\nSHARED COUNCIL KNOWLEDGE (already established — do NOT re-ask these, do NOT repeat them, BUILD on them):\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYour job NOW: add what is genuinely missing from the above. If a specific question was just directed at you by a colleague, answer it directly using the knowledge above. Only invite another colleague if their domain hasn't been covered yet.`
+            : `\n\nYou are opening the discussion. Be specific — name tickers, dates, prices, and concrete facts. If another specialist's input would complete the picture, invite them by name at the end.`;
 
-          // For wave > 0, make the user content clearly about joining the discussion — not a fresh question
           const userMsg = wave === 0
             ? text
-            : `Continue the council discussion about: "${text}". Respond to your colleagues above.`;
+            : `The council is building an answer to: "${text}". The shared knowledge is in your system context above. Add your part — what's still missing.`;
 
           let response;
           try {
-            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. You CAN and SHOULD address colleagues directly by name — just never say "I'll bring in ${ag.name}" or act as if you are not ${ag.name}.\n\n`;
-            const sys = identityAnchor + ag.conversationalPrompt + ROSTER + discussionSoFar + historyBlock;
+            const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. Address colleagues directly by name when needed — but never re-ask a question that's already been answered in the shared knowledge above.\n\n`;
+            const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
             response = await callAgent(sys, userMsg, false, 450);
           } catch {
             flagApiDown();
@@ -304,14 +305,16 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         }
 
         pendingIds = Array.from(nextWaveIds);
+        if (pendingIds.length === 0) naturalEnd = true;
       }
 
-      // AXIOM closes with a 1-2 sentence consensus summary
-      if (spokenThisTurn.length > 1) {
+      // AXIOM only closes when agents reached a natural stopping point (stopped calling each other)
+      // or when the call cap was hit — NOT when the last message was an unanswered question
+      if (spokenThisTurn.length > 1 && (naturalEnd || totalCalls >= MAX_CALLS)) {
         try {
-          const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated. Deliver a single crisp consensus summary (2 sentences max) that answers the investor's original question based on what the team concluded. No fluff.`;
-          const closingCtx = `Investor asked: "${text}"\n\nCouncil discussion:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nDeliver the consensus.`;
-          const closing = await callAgent(closingSys, closingCtx, false, 200);
+          const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated and reached a conclusion. Deliver a single crisp summary (2-3 sentences) that directly answers the investor's original question based on everything the team established. Be specific — include tickers, dates, or numbers if they came up. No fluff.`;
+          const closingCtx = `Investor asked: "${text}"\n\nFull council discussion:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nDeliver the consensus answer.`;
+          const closing = await callAgent(closingSys, closingCtx, false, 250);
           setChat(p => [...p, { role:'pm', text:closing }]);
           setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:closing }]);
           speak(closing);

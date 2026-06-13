@@ -23,17 +23,10 @@ const PS = {
   PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'PASS'    },
 };
 
-const AGENT_CHIPS = [
-  { id: 'pm',      label: 'AXIOM', emoji: '🎯', color: '#38e0d4' },
-  ...AGENTS.map(ag => ({ id: ag.id, label: ag.name, emoji: ag.emoji, color: ag.color })),
-  { id: 'council', label: 'COUNCIL', emoji: '🔄', color: '#b083ff' },
-];
-
 export default function ChatTab({ account, acct, positionsLine, flagApiDown, dark }) {
-  const [chat,        setChat]       = useState([{ role:'pm', text:"The council is assembled. Ask me anything — market conditions, portfolio strategy, or name a specific ticker for a full council analysis." }]);
+  const [chat,        setChat]       = useState([{ role:'pm', text:"The council is assembled. Ask me anything — market conditions, macro outlook, portfolio strategy, or name a ticker for a full investment ruling." }]);
   const [chatInput,   setChatInput]  = useState('');
   const [chatBusy,    setChatBusy]   = useState(false);
-  const [activeAgent, setActiveAgent]= useState('pm');
   const [convHistory, setConvHistory]= useState([]);
   const chatEndRef = useRef(null);
   const T = theme(dark);
@@ -196,109 +189,84 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
     const acctLine = `Account: ${acct.label} (${acct.sub}). Holdings: ${positionsLine}. DCA: ${acct.dcaNote}.`;
     const historyBlock = buildHistoryBlock(convHistory);
 
-    // === COUNCIL mode: send to all 6 agents simultaneously ===
-    if (activeAgent === 'council') {
-      setChat(p => [...p, { role: 'roundtable', agents: [] }]);
-      const responses = [];
-
-      const settled = await Promise.allSettled(
-        AGENTS.map(async (ag, idx) => {
-          await sleep(idx * 500); // slight stagger
-          const sys = ag.conversationalPrompt + historyBlock;
-          const txt = await callAgent(sys, text, false, 400);
-          return { ag, txt };
-        })
-      );
-
-      settled.forEach(res => {
-        if (res.status === 'fulfilled') {
-          const { ag, txt } = res.value;
-          responses.push({ agentId: ag.id, name: ag.name, emoji: ag.emoji, color: ag.color, accent: ag.accent, content: txt });
-        }
-      });
-
-      setChat(p => {
-        const updated = [...p];
-        // Replace the roundtable placeholder with real responses
-        for (let i = updated.length - 1; i >= 0; i--) {
-          if (updated[i].role === 'roundtable') {
-            updated[i] = { role: 'roundtable', agents: responses };
-            break;
-          }
-        }
-        return updated;
-      });
-
-      responses.forEach(r => {
-        setConvHistory(prev => [...prev, { role: 'assistant', agentId: r.agentId, content: r.content }]);
-      });
-
-      setChatBusy(false);
-      return;
-    }
-
-    // === DIRECT AGENT mode ===
-    if (activeAgent !== 'pm') {
-      const ag = AGENTS.find(a => a.id === activeAgent);
-      if (ag) {
-        const sys = ag.conversationalPrompt + historyBlock;
-        let response;
-        try {
-          response = await callAgent(sys, text, false, 400);
-        } catch {
-          flagApiDown();
-          response = 'I\'m having trouble connecting right now.';
-        }
-        setChat(p => [...p, { role: 'agent', agentId: ag.id, name: ag.name, emoji: ag.emoji, color: ag.color, accent: ag.accent, text: response }]);
-        setConvHistory(prev => [...prev, { role: 'assistant', agentId: ag.id, content: response }]);
-        setChatBusy(false);
-        return;
-      }
-    }
-
-    // === AXIOM (PM) mode ===
+    // AXIOM reads the message and decides: answer directly, route to specialist(s), or convene full council
     const axiomSys = `You are AXIOM, chair of THE COUNCIL — an elite private investment analysis team. You are direct, sharp, decisive, and genuinely knowledgeable about markets. ${PROTOCOLS}
-CRITICAL: Only convene the full council (convene=true) when the investor specifically asks for a BUY/SELL/HOLD/ANALYSIS decision on a named ticker.
-For ALL other questions — market conditions, portfolio strategy, macro discussion, greetings, or general questions — answer directly and intelligently yourself (convene=false).
-You are NOT a router. You are a seasoned portfolio manager who happens to have a full research team available.
-Today: ${new Date().toDateString()}. ${historyBlock}
-Respond ONLY with JSON in a \`\`\`json block: {"speak":"<your response>","convene":<true|false>,"ticker":"<TICKER or null>"}`;
+
+ROUTING RULES — choose the most useful response type:
+- fullCouncil=true ONLY when the investor explicitly wants a full BUY/SELL/HOLD ruling on a specific ticker ("should I buy X", "full analysis on X", "what's the council's take on X", "convene on X").
+- route=["technical"] for chart/momentum/price action questions about a ticker.
+- route=["macro"] for macro, Fed, rates, inflation, or geopolitical questions.
+- route=["catalyst"] for earnings dates, product launches, or upcoming catalysts.
+- route=["risk"] for risk assessment, dilution, concentration, or volatility questions.
+- route=["bear"] for bear case, downside risk, or "what could go wrong" questions.
+- route=["sizer"] for position sizing, dollar amounts, or how much to buy.
+- route=["technical","macro"] — combine multiple specialists when the question spans domains.
+- route=[] — answer DIRECTLY as AXIOM for: greetings, general portfolio questions, strategy, watchlist discussion, anything that doesn't need a specialist.
+
+When routing to specialist(s), set "speak" to a brief 1-sentence intro ("Let me get REX's read on that chart.").
+When answering directly, set "speak" to your full answer.
+Today: ${new Date().toDateString()}.${historyBlock}
+Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fullCouncil":<bool>,"ticker":"<TICKER or null>","route":["agentId1","agentId2"]}`;
 
     let router;
     try {
       const txt = await callAgent(axiomSys, `Investor: "${text}". ${acctLine} Return ONLY the JSON.`, false);
-      router = extractJSON(txt) || { speak: "I didn't quite catch that.", convene: false, ticker: null };
+      router = extractJSON(txt) || { speak: "I didn't quite catch that.", fullCouncil: false, ticker: null, route: [] };
     } catch {
       flagApiDown();
-      router = { speak: "I can't reach the council right now.", convene: false, ticker: null };
+      router = { speak: "I can't reach the council right now.", fullCouncil: false, ticker: null, route: [] };
     }
 
-    if (router.convene && router.ticker) {
+    // Ensure backwards-compat if model returns old `convene` field
+    if (router.convene && !router.fullCouncil) router.fullCouncil = true;
+
+    // === FULL COUNCIL ===
+    if (router.fullCouncil && router.ticker) {
       const tkr = String(router.ticker).toUpperCase();
       const intro = router.speak || `Convening the full council on ${tkr}.`;
       setChat(p => [...p, { role:'pm', text:intro }]);
       speak(intro);
-      setConvHistory(prev => [...prev, { role: 'assistant', agentId: 'pm', content: intro }]);
+      setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:intro }]);
       await runCouncilInChat(tkr, acctLine, uid, intro);
-    } else {
-      setChat(p => [...p, { role:'pm', text:router.speak }]);
-      speak(router.speak);
-      setConvHistory(prev => [...prev, { role: 'assistant', agentId: 'pm', content: router.speak }]);
+      setChatBusy(false);
+      return;
     }
 
+    // === SPECIALIST ROUTE ===
+    const routeIds = Array.isArray(router.route) ? router.route.filter(id => AGENTS.find(a => a.id === id)) : [];
+    if (routeIds.length > 0) {
+      // Show AXIOM's intro line first
+      if (router.speak) {
+        setChat(p => [...p, { role:'pm', text:router.speak }]);
+        setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:router.speak }]);
+      }
+
+      // Call each routed agent sequentially (staggered for rate limits)
+      for (let idx = 0; idx < routeIds.length; idx++) {
+        const ag = AGENTS.find(a => a.id === routeIds[idx]);
+        if (!ag) continue;
+        if (idx > 0) await sleep(1500);
+        let response;
+        try {
+          const sys = ag.conversationalPrompt + historyBlock;
+          response = await callAgent(sys, text, false, 400);
+        } catch {
+          flagApiDown();
+          response = 'Having trouble connecting right now.';
+        }
+        setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
+        setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
+      }
+      setChatBusy(false);
+      return;
+    }
+
+    // === AXIOM DIRECT ANSWER ===
+    setChat(p => [...p, { role:'pm', text:router.speak }]);
+    speak(router.speak);
+    setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:router.speak }]);
     setChatBusy(false);
   }
-
-  const agentChipStyle = (chip) => ({
-    fontFamily: 'inherit',
-    display: 'flex', alignItems: 'center', gap: 4,
-    padding: '5px 10px', borderRadius: 20,
-    border: `1px solid ${activeAgent === chip.id ? chip.color : T.border}`,
-    background: activeAgent === chip.id ? `${chip.color}18` : 'transparent',
-    color: activeAgent === chip.id ? chip.color : T.text2,
-    cursor: 'pointer', fontSize: 11, fontWeight: activeAgent === chip.id ? 600 : 400,
-    transition: 'all .15s ease', whiteSpace: 'nowrap',
-  });
 
   return (
     <div>
@@ -312,17 +280,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<your response>","conven
           {voiceOn ? <Volume2 size={13} /> : <VolumeX size={13} />}
           <span style={MONO}>{voiceOn ? 'VOICE ON' : 'MUTED'}</span>
         </button>
-      </div>
-
-      {/* Agent selector chips */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10, overflowX:'auto' }}>
-        {AGENT_CHIPS.map(chip => (
-          <button key={chip.id} onClick={() => setActiveAgent(chip.id)} disabled={chatBusy}
-            style={agentChipStyle(chip)}>
-            <span>{chip.emoji}</span>
-            <span style={MONO}>{chip.label}</span>
-          </button>
-        ))}
       </div>
 
       <div style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:12, overflow:'hidden', display:'flex', flexDirection:'column', height:'min(60vh,560px)' }}>
@@ -469,12 +426,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<your response>","conven
             onChange={e => setChatInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendChat()}
             disabled={chatBusy}
-            placeholder={
-              listening ? 'Listening…' :
-              activeAgent === 'pm' ? 'Ask AXIOM anything…' :
-              activeAgent === 'council' ? 'Ask the full roundtable…' :
-              `Ask ${AGENTS.find(a => a.id === activeAgent)?.name || activeAgent}…`
-            }
+            placeholder={listening ? 'Listening…' : 'Ask anything — AXIOM routes to the right specialist automatically…'}
             style={{ ...MONO, flex:1, background:T.input, border:`1px solid ${T.inputBorder}`, borderRadius:12, padding:'12px 16px', fontSize:14, color:T.text, outline:'none' }}
           />
           <button onClick={() => sendChat()} disabled={chatBusy || !chatInput.trim()}
@@ -492,7 +444,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<your response>","conven
       </div>
       <p style={{ ...MONO, marginTop:8, fontSize:10, color:T.text3 }}>
         {srSupported ? 'Tap the mic to talk, or type. ' : 'Voice input needs Chrome. '}
-        Select an agent chip to talk directly — or use COUNCIL for a roundtable.
+        AXIOM reads your message and routes to the right specialist — or convenes the full council for a buy/sell ruling.
       </p>
     </div>
   );

@@ -6,6 +6,17 @@ const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const ENTRIES = [
   {
+    version: '0.1.11', date: '2026-06-13', label: 'GUI',
+    changes: [
+      { type: 'FEAT', text: 'AmbientBackground canvas scene behind all UI: sunrise gradient + crepuscular rays + drifting clouds (premarket), portfolio-direction particles (open), sunset beach + ocean shimmer + birds (afterhours), deep space + twinkling stars + moon + shooting stars (overnight/evening), cool dark (closed/weekend)' },
+      { type: 'FEAT', text: 'GSAP boot sequence: sidebar slides in from left, main content fades up from below on first load' },
+      { type: 'FEAT', text: 'Portfolio value digit-scramble: number cycles through random digits before settling every time quotes refresh' },
+      { type: 'FEAT', text: 'Account switcher shared layout: Framer Motion spring-slides the active highlight between account buttons' },
+      { type: 'FEAT', text: 'Council agent cards 3D tilt: perspective mouse-tracking on each card, springs back on leave' },
+      { type: 'FEAT', text: 'framer-motion + gsap added as dependencies' },
+    ],
+  },
+  {
     version: '0.1.1', date: '2026-06-13', label: 'FIX',
     changes: [
       { type: 'FIX',  text: 'Portfolio positions now persist correctly — Firestore offline persistence enabled; writes queue to IndexedDB and auto-retry on reconnect instead of failing silently on any network hiccup' },
@@ -47,9 +58,10 @@ const ENTRIES = [
 ];
 
 const BADGE = {
-  FEAT: { bg: 'rgba(0,200,5,0.1)',    fg: '#00C805' },
-  FIX:  { bg: 'rgba(245,158,11,0.1)', fg: '#B45309' },
-  SEC:  { bg: 'rgba(255,59,48,0.1)',  fg: '#FF3B30' },
+  FEAT: { bg: 'rgba(0,200,5,0.1)',      fg: '#00C805' },
+  FIX:  { bg: 'rgba(245,158,11,0.1)',   fg: '#B45309' },
+  SEC:  { bg: 'rgba(255,59,48,0.1)',    fg: '#FF3B30' },
+  GUI:  { bg: 'rgba(176,131,255,0.15)', fg: '#b083ff' },
 };
 
 export default function ChangelogTab({ dark }) {

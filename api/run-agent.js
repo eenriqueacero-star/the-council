@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 
 const MODEL_BASE   = 'llama-3.3-70b-versatile';
-const MODEL_SEARCH = 'compound-beta';         // Groq compound model with live web search
+const MODEL_SEARCH = 'compound-beta';
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -20,7 +20,29 @@ async function verifyAuth(req) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function callGroq(client, model, system, userContent, maxTokens) {
+// Collect all API keys defined in env (GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3, ...)
+function getApiKeys() {
+  const keys = [
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5,
+  ].filter(Boolean);
+  return keys;
+}
+
+function shuffled(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+async function callGroq(apiKey, model, system, userContent, maxTokens) {
+  const client = new Groq({ apiKey });
   const completion = await client.chat.completions.create({
     model,
     max_tokens: maxTokens,
@@ -36,8 +58,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await verifyAuth(req)) return res.status(401).json({ error: 'Unauthorized' });
 
-  if (!process.env.GROQ_API_KEY) {
-    return res.status(500).json({ code: 'ERR-CFG', error: 'GROQ_API_KEY not configured' });
+  const keys = getApiKeys();
+  if (keys.length === 0) {
+    return res.status(500).json({ code: 'ERR-CFG', error: 'No GROQ_API_KEY configured' });
   }
 
   const { system, userContent, useSearch = false, maxTokens = 700 } = req.body || {};
@@ -46,29 +69,48 @@ export default async function handler(req, res) {
     return res.status(400).json({ code: 'ERR-SIZE', error: 'Prompt exceeds maximum allowed length' });
   }
 
-  const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  const model  = useSearch ? MODEL_SEARCH : MODEL_BASE;
+  const model = useSearch ? MODEL_SEARCH : MODEL_BASE;
 
-  for (let i = 0; i < 3; i++) {
+  // Shuffle keys so load is distributed randomly across invocations
+  const keyOrder = shuffled(keys);
+  let lastErr;
+
+  for (let k = 0; k < keyOrder.length; k++) {
+    const apiKey = keyOrder[k];
     try {
-      const text = await callGroq(client, model, system, userContent, maxTokens);
+      const text = await callGroq(apiKey, model, system, userContent, maxTokens);
       return res.status(200).json({ text });
     } catch (err) {
-      // compound-beta unavailable — fall back to base model
-      if (useSearch && (err.status === 404 || err.status === 400) && i === 0) {
+      // compound-beta unavailable — fall back to base model on first key tried
+      if (useSearch && (err.status === 404 || err.status === 400) && k === 0) {
         try {
-          const text = await callGroq(client, MODEL_BASE, system, userContent, maxTokens);
+          const text = await callGroq(apiKey, MODEL_BASE, system, userContent, maxTokens);
           return res.status(200).json({ text });
         } catch (fe) {
           return res.status(500).json({ error: fe.message });
         }
       }
-      if (err.status === 429 && i < 2) {
-        await sleep((i + 1) * 8000);
+
+      if (err.status === 429) {
+        lastErr = err;
+        // Still have more keys to try — rotate immediately, no sleep needed
+        if (k < keyOrder.length - 1) continue;
+        // All keys exhausted — wait before giving up
+        await sleep(8000);
         continue;
       }
+
       console.error('runAgent error:', err.status, err.message);
       return res.status(500).json({ error: err.message });
     }
+  }
+
+  // All keys hit 429 — one final retry on a random key after backoff
+  try {
+    const text = await callGroq(keyOrder[0], model, system, userContent, maxTokens);
+    return res.status(200).json({ text });
+  } catch (err) {
+    console.error('runAgent: all keys exhausted', err.status, err.message);
+    return res.status(429).json({ code: 'ERR-429', error: 'Rate limited on all keys' });
   }
 }

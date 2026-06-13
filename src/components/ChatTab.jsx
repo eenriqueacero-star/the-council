@@ -280,11 +280,12 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
         setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
 
-        // Detect if this agent addressed another agent by name — auto-queue them
+        // Detect if this agent addressed another agent by name — auto-queue them (case-insensitive)
         if (extrasAdded < MAX_EXTRAS) {
           const alreadyQueued = new Set(queue);
+          const responseLower = response.toLowerCase();
           for (const candidate of AGENTS) {
-            if (!alreadyQueued.has(candidate.id) && response.includes(candidate.name)) {
+            if (!alreadyQueued.has(candidate.id) && responseLower.includes(candidate.name.toLowerCase())) {
               queue.push(candidate.id);
               extrasAdded++;
               if (extrasAdded >= MAX_EXTRAS) break;

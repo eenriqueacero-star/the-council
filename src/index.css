@@ -135,12 +135,38 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ── Coin-flip logo entrance ── */
+@keyframes coinFlip {
+  from { transform: perspective(400px) rotateY(-90deg) scale(.7); opacity: 0; }
+  to   { transform: perspective(400px) rotateY(0deg)   scale(1);  opacity: 1; }
+}
+.coin-flip { animation: coinFlip 0.42s cubic-bezier(.2,.7,.2,1) both; }
+
+/* ── Flip digit (airport board) ── */
+@keyframes flipSlide {
+  from { transform: translateY(-110%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.flip-digit-new { animation: flipSlide 0.22s cubic-bezier(.4,0,.2,1) both; }
+
+/* ── Market bell ring ── */
+@keyframes bellRing {
+  0%,100%{ transform: rotate(0deg);  }
+  15%    { transform: rotate(18deg); }
+  30%    { transform: rotate(-16deg);}
+  45%    { transform: rotate(12deg); }
+  60%    { transform: rotate(-10deg);}
+  75%    { transform: rotate(6deg);  }
+}
+.bell-ring { animation: bellRing 0.8s ease both; transform-origin: top center; }
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .spin-slow,.spin-rev,.core-pulse,.card-in,.fade-up,.fade-in,
   .blink,.draw-in,.chart-wipe,.star-shimmer,.market-open-flash,
   .skeleton,.scanline,.price-up,.price-down,.slide-up,.slide-right,
   .slide-left,.tab-pop,.live-dot,.twinkle-star,.shooting-star,
-  .scan-bar,.scan-bar-slow,.dawn-pulse,.aurora,.aurora-slow { animation: none !important; }
+  .scan-bar,.scan-bar-slow,.dawn-pulse,.aurora,.aurora-slow,
+  .coin-flip,.flip-digit-new,.bell-ring { animation: none !important; }
   .ambient-glow { opacity: 0.1; }
 }

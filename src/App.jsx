@@ -50,7 +50,9 @@ export default function App() {
   const [mktState, setMktState] = useState(() => getMarketState(new Date()));
   const [msToOpen, setMsToOpen] = useState(() => getTimeToNextOpen(new Date()));
   const [dayChange,setDayChange]= useState(0);
-  const [dark, setDark] = useState(() => localStorage.getItem('council_dark') === 'true');
+  const [dark, setDark]             = useState(() => localStorage.getItem('council_dark') === 'true');
+  const [mktOverride, setMktOverride] = useState(null); // null = live, string = test override
+  const [pdOverride,  setPdOverride]  = useState(null); // null = computed, string = test override
   useEffect(() => { localStorage.setItem('council_dark', String(dark)); }, [dark]);
   useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
 
@@ -160,14 +162,48 @@ export default function App() {
   });
 
   // ── refs for boot animation ──────────────────────────────────────────────
-  const sidebarRef = useRef(null);
-  const mainRef    = useRef(null);
+  const sidebarRef  = useRef(null);
+  const mainRef     = useRef(null);
+  const [bell, setBell] = useState(false);
+  const prevMktRef  = useRef(mktState);
 
+  // Detect market open transition → ring the bell
+  useEffect(() => {
+    if (prevMktRef.current !== 'open' && mktState === 'open') setBell(true);
+    prevMktRef.current = mktState;
+  }, [mktState]);
+
+  // 9-step boot GSAP timeline
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-    if (sidebarRef.current) tl.fromTo(sidebarRef.current, { x: -28, opacity: 0 }, { x: 0, opacity: 1, duration: 0.65 }, 0.08);
-    if (mainRef.current)    tl.fromTo(mainRef.current,    { y: 18, opacity: 0 },  { y: 0, opacity: 1, duration: 0.72 }, 0.22);
+    // 1. ambient canvas is already painting
+    // 2. sidebar container
+    if (sidebarRef.current) {
+      tl.fromTo(sidebarRef.current, { x: -30, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6 }, 0.05);
+      // 3. brand wordmark inside sidebar
+      const brand = sidebarRef.current.querySelector('.sidebar-brand');
+      if (brand) tl.fromTo(brand, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.4 }, 0.22);
+      // 4. nav buttons stagger
+      const navBtns = sidebarRef.current.querySelectorAll('nav button');
+      if (navBtns.length) tl.fromTo(navBtns, { x: -10, opacity: 0 }, { x: 0, opacity: 1, duration: 0.35, stagger: 0.028 }, 0.3);
+      // 5. account switcher area
+      const acctArea = sidebarRef.current.querySelector('.sidebar-accounts');
+      if (acctArea) tl.fromTo(acctArea, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4 }, 0.55);
+    }
+    // 6. main content area
+    if (mainRef.current) {
+      tl.fromTo(mainRef.current, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7 }, 0.3);
+      // 7. portfolio hero (first child of main)
+      const hero = mainRef.current.querySelector('.portfolio-hero');
+      if (hero) tl.fromTo(hero, { scale: 0.97, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5 }, 0.48);
+    }
+    // 8. ambient glow
+    const glow = document.querySelector('.ambient-glow');
+    if (glow) tl.fromTo(glow, { opacity: 0 }, { opacity: 1, duration: 1.8 }, 0.05);
+    // 9. bottom nav
+    const bnav = document.querySelector('.bottom-nav');
+    if (bnav) tl.fromTo(bnav, { y: 40, opacity: 0 }, { y: 0, opacity: 1, duration: 0.55 }, 0.45);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const acct         = ACCOUNTS[account];
@@ -180,21 +216,23 @@ export default function App() {
 
   const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus };
 
-  const isNight = mktState === 'overnight' || mktState === 'evening';
+  const isNight = effectiveMkt === 'overnight' || effectiveMkt === 'evening';
 
   const glowColor = (() => {
-    if (mktState === 'open') {
+    if (effectiveMkt === 'open') {
       if (dayChange > 0) return 'rgba(0,200,5,0.18)';
       if (dayChange < 0) return 'rgba(255,59,48,0.18)';
       return 'transparent';
     }
-    if (mktState === 'premarket')  return 'rgba(245,158,11,0.16)';
-    if (mktState === 'afterhours') return 'rgba(124,58,237,0.20)';
-    if (isNight)                   return 'rgba(88,28,135,0.28)';
+    if (effectiveMkt === 'premarket')  return 'rgba(245,158,11,0.16)';
+    if (effectiveMkt === 'afterhours') return 'rgba(124,58,237,0.20)';
+    if (isNight)                       return 'rgba(88,28,135,0.28)';
     return 'rgba(107,114,128,0.08)';
   })();
 
-  const portfolioDirection = dayChange > 0.01 ? 'up' : dayChange < -0.01 ? 'down' : 'flat';
+  const portfolioDirection = pdOverride  || (dayChange > 0.01 ? 'up' : dayChange < -0.01 ? 'down' : 'flat');
+  const effectiveMkt       = mktOverride || mktState;
+  const effectiveMsToOpen  = mktOverride ? 0 : msToOpen;
 
   // In dark mode the ambient canvas provides the background; keep solid bg only in light mode
   const rootBg = dark ? 'transparent' : '#FFFFFF';
@@ -204,23 +242,21 @@ export default function App() {
 
   return (
     <div style={{ ...FONT, background: rootBg, minHeight:'100vh', color: dark ? '#F2F2F7' : '#000', transition:'background 3s ease' }}>
-      {dark && <AmbientBackground marketState={mktState} portfolioDirection={portfolioDirection} />}
+      {dark && <AmbientBackground marketState={effectiveMkt} portfolioDirection={portfolioDirection} />}
       <div className="ambient-glow" style={{
         background: glowColor,
-        // Larger, lower-positioned glow for pre-market (horizon feel)
-        ...(mktState === 'premarket'  && { top:'auto', bottom:'-150px', width:500, height:500 }),
-        // Overnight glow sits higher and wider — like a nebula crown
-        ...(isNight                   && { width:700, height:600, top:'-260px' }),
-        // After-hours glow centered and tall
-        ...(mktState === 'afterhours' && { width:500, height:550, top:'-220px' }),
+        ...(effectiveMkt === 'premarket'  && { top:'auto', bottom:'-150px', width:500, height:500 }),
+        ...(isNight                       && { width:700, height:600, top:'-260px' }),
+        ...(effectiveMkt === 'afterhours' && { width:500, height:550, top:'-220px' }),
       }} />
-      <MarketOverlay state={mktState} dark={dark} />
+      <MarketOverlay state={effectiveMkt} dark={dark} />
 
       {/* Desktop sidebar */}
       <div ref={sidebarRef} className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background: dark ? (isNight ? '#12101c' : '#1C1C1E') : '#FFFFFF', borderRight: `1px solid ${dark ? (isNight ? '#2a2040' : '#2C2C2E') : '#EEEEEE'}`, zIndex:10, padding:'24px 0', transition:'background 3s ease, border-color 3s ease' }}>
-        <div style={{ padding:'0 20px 24px', display:'flex', alignItems:'center', gap:10 }}>
+        <div className="sidebar-brand" style={{ padding:'0 20px 24px', display:'flex', alignItems:'center', gap:10 }}>
           <ArcReactor size={28} />
           <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.06em' }}>THE COUNCIL</span>
+          {mktOverride && <span style={{ fontSize:9, background:'rgba(255,165,0,0.2)', color:'#f5a623', padding:'1px 5px', borderRadius:4, marginLeft:2, fontFamily:'monospace' }}>TEST</span>}
         </div>
         <nav style={{ flex:1, padding:'0 12px', overflowY:'auto' }}>
           {SIDEBAR_TABS.map(({ id, label }) => (
@@ -235,6 +271,7 @@ export default function App() {
           ))}
         </nav>
         <div style={{ padding:'16px 12px', borderTop: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}` }}>
+          <div className="sidebar-accounts">
           <div style={{ ...MFONT, fontSize:11, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Account</div>
           <LayoutGroup id="sidebar-acct">
             {accounts.map(({ id, label }) => (
@@ -256,6 +293,7 @@ export default function App() {
           <button onClick={() => signOut(auth)} style={{ ...FONT, marginTop:8, display:'flex', alignItems:'center', gap:6, color:'#AAAAAA', border:'none', background:'none', cursor:'pointer', fontSize:13, padding:'4px 2px' }}>
             <LogOut size={14} /> Sign out
           </button>
+          </div>
         </div>
       </div>
 
@@ -281,9 +319,9 @@ export default function App() {
           </div>
         </div>
 
-        {mktState !== 'open' && (
+        {effectiveMkt !== 'open' && (
           <div style={{ padding:'0 16px', maxWidth:760, margin:'0 auto' }}>
-            <MarketBanner state={mktState} msToOpen={msToOpen} />
+            <MarketBanner state={effectiveMkt} msToOpen={effectiveMsToOpen} />
           </div>
         )}
 
@@ -299,7 +337,7 @@ export default function App() {
             <PortfolioTab {...shared}
               positions={positions}
               setPos={setPos} addTicker={addTicker} removeTicker={removeTicker}
-              marketState={mktState} onDayChange={setDayChange}
+              marketState={effectiveMkt} onDayChange={setDayChange}
             />
           )}
           {tab === 'council' && (
@@ -333,7 +371,12 @@ export default function App() {
             <div style={padded}><ChangelogTab dark={dark} /></div>
           )}
           {tab === 'settings' && (
-            <div style={padded}><SettingsTab dark={dark} setDark={setDark} /></div>
+            <div style={padded}><SettingsTab dark={dark} setDark={setDark}
+              mktOverride={mktOverride} setMktOverride={setMktOverride}
+              pdOverride={pdOverride} setPdOverride={setPdOverride}
+              effectiveMkt={effectiveMkt} portfolioDirection={portfolioDirection}
+              onTestBell={() => setBell(true)}
+            /></div>
           )}
           {tab === 'more' && (
             <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>
@@ -352,6 +395,31 @@ export default function App() {
       </div>
 
       <BottomNav tab={tab} setTab={setTab} dark={dark} />
+
+      {/* Market open bell */}
+      {bell && dark && <MarketBell onDone={() => setBell(false)} />}
+    </div>
+  );
+}
+
+function MarketBell({ onDone }) {
+  const overlayRef = useRef(null);
+  const bellRef    = useRef(null);
+  useEffect(() => {
+    if (!overlayRef.current || !bellRef.current) return;
+    const tl = gsap.timeline({ onComplete: onDone });
+    tl.fromTo(overlayRef.current, { opacity: 0 },          { opacity: 1, duration: 0.3 })
+      .fromTo(bellRef.current,    { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.7)' }, 0.1)
+      .to(bellRef.current,        { className: '+=bell-ring', duration: 0.8 }, 0.55)
+      .to(overlayRef.current,     { opacity: 0, duration: 0.6, ease: 'power2.in' }, 2.6);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div ref={overlayRef} style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+      <div ref={bellRef} style={{ textAlign:'center', background:'rgba(5,10,14,0.9)', borderRadius:20, padding:'28px 44px', backdropFilter:'blur(16px)', border:'1px solid rgba(0,200,5,0.35)', boxShadow:'0 0 40px rgba(0,200,5,0.15)' }}>
+        <div style={{ fontSize:56, lineHeight:1 }}>🔔</div>
+        <div style={{ color:'#00C805', fontWeight:700, marginTop:10, letterSpacing:'0.12em', fontSize:13 }}>MARKET OPEN</div>
+        <div style={{ color:'rgba(255,255,255,0.45)', fontSize:11, marginTop:4, ...MFONT }}>9:30 AM ET</div>
+      </div>
     </div>
   );
 }

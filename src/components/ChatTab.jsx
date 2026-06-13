@@ -253,18 +253,17 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       // The roster line injected into every agent call so they never hallucinate fake names
       const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
-      const spokenThisTurn = []; // { agentId, name, response } — ordered
-      const spokenIds = new Set();
-      let pendingIds = [...routeIds]; // agents to call this wave
-      const MAX_WAVES = 3;   // max deliberation rounds
-      const MAX_CALLS = 10;  // hard safety cap
+      const spokenThisTurn = []; // { agentId, name, response } — ordered, agents can appear multiple times
+      const MAX_WAVES = 4;   // max deliberation rounds
+      const MAX_CALLS = 14;  // hard safety cap
       let totalCalls = 0;
+      let pendingIds = [...routeIds];
 
       for (let wave = 0; wave < MAX_WAVES && pendingIds.length > 0 && totalCalls < MAX_CALLS; wave++) {
         const nextWaveIds = new Set();
 
         for (const agId of pendingIds) {
-          if (spokenIds.has(agId) || totalCalls >= MAX_CALLS) continue;
+          if (totalCalls >= MAX_CALLS) break;
           const ag = AGENTS.find(a => a.id === agId);
           if (!ag) continue;
           if (totalCalls > 0) await sleep(1500);
@@ -283,7 +282,6 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           }
 
           spokenThisTurn.push({ agentId: agId, name: ag.name, response });
-          spokenIds.add(agId);
           totalCalls++;
 
           setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);

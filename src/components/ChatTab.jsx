@@ -242,57 +242,77 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       return;
     }
 
-    // === SPECIALIST ROUTE (with cross-talk) ===
+    // === SPECIALIST ROUTE (deliberation loop until consensus) ===
     const routeIds = Array.isArray(router.route) ? router.route.filter(id => AGENTS.find(a => a.id === id)) : [];
     if (routeIds.length > 0) {
-      // Show AXIOM's intro line first
       if (router.speak) {
         setChat(p => [...p, { role:'pm', text:router.speak }]);
         setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:router.speak }]);
       }
 
-      // Queue starts with AXIOM's routed agents; agents can invite others by name (max 2 extras)
-      const queue = [...routeIds];
-      const spoken = []; // { agentId, name, response }
-      const MAX_EXTRAS = 2;
-      let extrasAdded = 0;
+      // The roster line injected into every agent call so they never hallucinate fake names
+      const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
-      for (let idx = 0; idx < queue.length; idx++) {
-        const ag = AGENTS.find(a => a.id === queue[idx]);
-        if (!ag) continue;
-        if (idx > 0) await sleep(1500);
+      const spokenThisTurn = []; // { agentId, name, response } — ordered
+      const spokenIds = new Set();
+      let pendingIds = [...routeIds]; // agents to call this wave
+      const MAX_WAVES = 3;   // max deliberation rounds
+      const MAX_CALLS = 10;  // hard safety cap
+      let totalCalls = 0;
 
-        // Build context of what colleagues already said in this turn
-        const colleagueContext = spoken.length > 0
-          ? `\n\nYOUR COLLEAGUES HAVE ALREADY WEIGHED IN ON THIS:\n${spoken.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYou may agree, challenge, or build on their points — address them by name if relevant. Keep it conversational and direct.`
-          : `\n\nYou are the first to respond. Speak directly and concisely. If another council member's expertise is relevant, you may invite them by name (e.g. "ATLAS, what's the macro picture here?").`;
+      for (let wave = 0; wave < MAX_WAVES && pendingIds.length > 0 && totalCalls < MAX_CALLS; wave++) {
+        const nextWaveIds = new Set();
 
-        let response;
-        try {
-          const sys = ag.conversationalPrompt + colleagueContext + historyBlock;
-          response = await callAgent(sys, text, false, 450);
-        } catch {
-          flagApiDown();
-          response = 'Having trouble connecting right now.';
-        }
+        for (const agId of pendingIds) {
+          if (spokenIds.has(agId) || totalCalls >= MAX_CALLS) continue;
+          const ag = AGENTS.find(a => a.id === agId);
+          if (!ag) continue;
+          if (totalCalls > 0) await sleep(1500);
 
-        spoken.push({ agentId: ag.id, name: ag.name, response });
-        setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
-        setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
+          const discussionSoFar = spokenThisTurn.length > 0
+            ? `\n\nCOUNCIL DISCUSSION SO FAR:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nRespond to what's been said. Build on it, challenge it, or add what's missing. If you want a specific colleague to weigh in, call them by their real name from the roster.`
+            : `\n\nYou are opening the discussion. Be direct. If another specialist's input would help reach a complete answer, invite them by their real name from the roster.`;
 
-        // Detect if this agent addressed another agent by name — auto-queue them (case-insensitive)
-        if (extrasAdded < MAX_EXTRAS) {
-          const alreadyQueued = new Set(queue);
-          const responseLower = response.toLowerCase();
+          let response;
+          try {
+            const sys = ag.conversationalPrompt + ROSTER + discussionSoFar + historyBlock;
+            response = await callAgent(sys, text, false, 500);
+          } catch {
+            flagApiDown();
+            response = 'Having trouble connecting right now.';
+          }
+
+          spokenThisTurn.push({ agentId: agId, name: ag.name, response });
+          spokenIds.add(agId);
+          totalCalls++;
+
+          setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
+          setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
+
+          // Detect which real agents were addressed — they join the next wave
+          const lower = response.toLowerCase();
           for (const candidate of AGENTS) {
-            if (!alreadyQueued.has(candidate.id) && responseLower.includes(candidate.name.toLowerCase())) {
-              queue.push(candidate.id);
-              extrasAdded++;
-              if (extrasAdded >= MAX_EXTRAS) break;
+            if (!spokenIds.has(candidate.id) && lower.includes(candidate.name.toLowerCase())) {
+              nextWaveIds.add(candidate.id);
             }
           }
         }
+
+        pendingIds = Array.from(nextWaveIds);
       }
+
+      // AXIOM closes with a 1-2 sentence consensus summary
+      if (spokenThisTurn.length > 1) {
+        try {
+          const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated. Deliver a single crisp consensus summary (2 sentences max) that answers the investor's original question based on what the team concluded. No fluff.`;
+          const closingCtx = `Investor asked: "${text}"\n\nCouncil discussion:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nDeliver the consensus.`;
+          const closing = await callAgent(closingSys, closingCtx, false, 200);
+          setChat(p => [...p, { role:'pm', text:closing }]);
+          setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:closing }]);
+          speak(closing);
+        } catch {}
+      }
+
       setChatBusy(false);
       return;
     }

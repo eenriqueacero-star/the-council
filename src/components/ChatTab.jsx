@@ -280,8 +280,8 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
 
           // Build a clear shared knowledge base so agents don't re-ask answered questions
           const knowledgeBase = spokenThisTurn.length > 0
-            ? `${liveContext}\n\nSHARED COUNCIL KNOWLEDGE (already established — do NOT re-ask these, do NOT repeat them, BUILD on them):\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYour job NOW: add what is genuinely missing from the above. If a specific question was just directed at you by a colleague, answer it directly. Only invite another colleague if their domain hasn't been covered yet.`
-            : `${liveContext}\n\nYou are opening the discussion. Use the live context above. Be specific — name tickers, dates, prices. If another specialist's input would complete the picture, invite them by name at the end.`;
+            ? `${liveContext}\n\nSHARED COUNCIL KNOWLEDGE (already established — do NOT re-ask these, do NOT repeat them, BUILD on them):\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYour job NOW: add what is genuinely missing from the above. If a specific question was just directed at you by a colleague, answer it directly. If you're making a concrete recommendation (specific ticker, action, or dollar amount), invite at least one colleague to validate or push back before you finish.`
+            : `${liveContext}\n\nYou are opening the discussion. Use the live context above. Be specific — name tickers, dates, prices. If you're making a concrete recommendation, invite a colleague to validate or challenge it at the end.`;
 
           const userMsg = wave === 0
             ? text
@@ -317,9 +317,8 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         if (pendingIds.length === 0) naturalEnd = true;
       }
 
-      // AXIOM only closes when agents reached a natural stopping point (stopped calling each other)
-      // or when the call cap was hit — NOT when the last message was an unanswered question
-      if (spokenThisTurn.length > 1 && (naturalEnd || totalCalls >= MAX_CALLS)) {
+      // AXIOM closes when the discussion reached a natural end or hit the call cap
+      if (spokenThisTurn.length > 0 && (naturalEnd || totalCalls >= MAX_CALLS)) {
         try {
           const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated and reached a conclusion. Deliver a single crisp summary (2-3 sentences) that directly answers the investor's original question based on everything the team established. Be specific — include tickers, dates, or numbers if they came up. No fluff.`;
           const closingCtx = `Investor asked: "${text}"\n\nFull council discussion:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nDeliver the consensus answer.`;

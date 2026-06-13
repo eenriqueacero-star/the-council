@@ -1,21 +1,47 @@
 import React from 'react';
 import { CY } from '../constants/styles.js';
 
-export default function ArcReactor({ size = 30 }) {
-  const spokes = [0, 45, 90, 135, 180, 225, 270, 315];
+export default function CouncilMark({ size = 30, className }) {
+  // Hexagon vertices for a regular hexagon centered at (50,50) with radius 42
+  const r = 42;
+  const cx = 50, cy = 50;
+  const hexPoints = Array.from({ length: 6 }, (_, i) => {
+    const angle = (Math.PI / 180) * (60 * i - 30);
+    return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
+  }).join(' ');
+
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" style={{ filter: `drop-shadow(0 0 ${size / 6}px rgba(63,224,255,0.7))` }}>
-      <circle className="spin-slow" cx="50" cy="50" r="45" fill="none" stroke={CY} strokeOpacity="0.45" strokeWidth="1.4" strokeDasharray="5 6" />
-      <circle className="spin-rev"  cx="50" cy="50" r="35" fill="none" stroke={CY} strokeOpacity="0.7"  strokeWidth="2"   strokeDasharray="22 9" />
-      <circle cx="50" cy="50" r="24" fill="none" stroke={CY} strokeOpacity="0.35" strokeWidth="1" />
-      {spokes.map(a => (
-        <line key={a}
-          x1={50 + 12 * Math.cos(a * Math.PI / 180)} y1={50 + 12 * Math.sin(a * Math.PI / 180)}
-          x2={50 + 23 * Math.cos(a * Math.PI / 180)} y2={50 + 23 * Math.sin(a * Math.PI / 180)}
-          stroke={CY} strokeOpacity="0.45" strokeWidth="1.2" />
-      ))}
-      <circle className="core-pulse" cx="50" cy="50" r="12" fill={CY} fillOpacity="0.85" />
-      <circle cx="50" cy="50" r="12" fill="none" stroke="#cdf6ff" strokeWidth="1.6" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      className={className}
+      style={{ filter: `drop-shadow(0 0 ${size / 6}px rgba(56,224,212,0.6))` }}
+    >
+      {/* Outer hexagon */}
+      <polygon
+        points={hexPoints}
+        fill="none"
+        stroke={CY}
+        strokeWidth="2.5"
+        strokeOpacity="0.8"
+      />
+      {/* Inner circle */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r="10"
+        fill={CY}
+        fillOpacity="0.9"
+      />
+      <circle
+        cx={cx}
+        cy={cy}
+        r="10"
+        fill="none"
+        stroke="#cdf6ff"
+        strokeWidth="1.5"
+      />
     </svg>
   );
 }

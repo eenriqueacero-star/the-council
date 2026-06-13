@@ -7,15 +7,27 @@ async function authHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 }
 
-export async function callAgent(system, userContent, useSearch, maxTokens = 512) {
+// 45s in-memory quote cache
+const quoteCache = new Map(); // key: sorted tickers string → { data, ts }
+
+export async function callAgent(system, userContent, useSearch, maxTokens = 512, signal) {
   let headers;
   try { headers = await authHeaders(); }
   catch { throw new Error('ERR-401: Not authenticated'); }
 
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
-    try { res = await fetch('/api/run-agent', { method: 'POST', headers, body: JSON.stringify({ system, userContent, useSearch: !!useSearch, maxTokens }) }); }
-    catch { throw new Error('ERR-NET: No response from server'); }
+    try {
+      res = await fetch('/api/run-agent', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ system, userContent, useSearch: !!useSearch, maxTokens }),
+        signal,
+      });
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      throw new Error('ERR-NET: No response from server');
+    }
 
     if (res.status === 429 && attempt === 0) {
       const retryAfter = res.headers?.get?.('retry-after');
@@ -36,14 +48,15 @@ export async function callAgent(system, userContent, useSearch, maxTokens = 512)
 }
 
 export async function getQuotes(tickers) {
+  const key = [...tickers].sort().join(',');
+  const cached = quoteCache.get(key);
+  if (cached && Date.now() - cached.ts < 45000) return cached.data;
   const headers = await authHeaders();
-  const res = await fetch('/api/get-quotes', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ tickers }),
-  });
+  const res = await fetch('/api/get-quotes', { method: 'POST', headers, body: JSON.stringify({ tickers }) });
   if (!res.ok) throw new Error(`api_unreachable_${res.status}`);
-  return res.json();
+  const data = await res.json();
+  quoteCache.set(key, { data, ts: Date.now() });
+  return data;
 }
 
 export async function getCandles(tickers, range) {
@@ -56,3 +69,6 @@ export async function getCandles(tickers, range) {
   if (!res.ok) throw new Error(`api_unreachable_${res.status}`);
   return res.json();
 }
+
+// Stagger helper
+export const sleep = ms => new Promise(r => setTimeout(r, ms));

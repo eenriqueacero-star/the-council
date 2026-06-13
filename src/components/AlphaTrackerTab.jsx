@@ -3,6 +3,7 @@ import { collection, query, orderBy, getDocs, doc, updateDoc } from 'firebase/fi
 import { db, auth } from '../firebase.js';
 import { getQuotes } from '../api.js';
 import { AGENTS, STANCE_STYLE } from '../constants/agents.js';
+import { writeAgentLesson, updateAgentAccuracy } from '../utils/agentMemory.js';
 import { theme } from '../utils/theme.js';
 import { Loader2, BarChart2 } from 'lucide-react';
 
@@ -92,20 +93,37 @@ export default function AlphaTrackerTab({ account, dark }) {
           return;
         }
 
-        await Promise.allSettled(needs.map(r => {
+        await Promise.allSettled(needs.map(async r => {
           const q     = gq[r.ticker];
           const price = q?.price > 0 ? q.price : q?.prevClose;
-          if (!price) return Promise.resolve();
+          if (!price) return;
           const tp = parsePrice(r.takeProfit);
           const sl = parsePrice(r.stopLoss);
           let outcome = 'expired';
           if (!isNaN(tp) && price >= tp) outcome = 'target';
           else if (!isNaN(sl) && price <= sl) outcome = 'stop';
-          return updateDoc(doc(db, 'users', uid, 'rulings', r.id), {
+          await updateDoc(doc(db, 'users', uid, 'rulings', r.id), {
             outcomeCheckedAt: new Date().toISOString(),
             priceAt30d: price,
             outcome,
           });
+
+          // Write agent lessons and accuracy
+          if (r.agentStances) {
+            Object.entries(r.agentStances).forEach(([agentId, stanceObj]) => {
+              const stance = stanceObj?.stance;
+              if (!stance) return;
+              const agentWasBullish = stance !== 'PASS' && stance !== 'FAIL' && stance !== 'BEARISH';
+              const outcomeWasGood  = outcome === 'target';
+              const wasCorrect = agentWasBullish === outcomeWasGood;
+              const priceStr = r.priceAtCall != null ? `$${r.priceAtCall.toFixed(2)}` : 'unknown price';
+              const lesson = wasCorrect
+                ? `Called ${stance} on ${r.ticker} @ ${priceStr} — hit ${outcome}. Good read.`
+                : `Called ${stance} on ${r.ticker} @ ${priceStr} — outcome: ${outcome}. Review your thesis.`;
+              writeAgentLesson(uid, agentId, lesson);
+              updateAgentAccuracy(uid, agentId, wasCorrect);
+            });
+          }
         }));
 
         setGrading(false);
@@ -225,7 +243,7 @@ export default function AlphaTrackerTab({ account, dark }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginBottom: 4 }}>
-                          <span style={{ ...MFONT, color: T.text2, fontSize: 10 }}>{a.name.split(' ')[0]}</span>
+                          <span style={{ ...MFONT, color: T.text2, fontSize: 10 }}>{a.emoji} {a.name}</span>
                           <span style={{ ...MFONT, color: barColor, fontSize: 10, fontWeight: 700 }}>
                             {s.pct != null ? `${s.pct}%` : '—'}
                           </span>

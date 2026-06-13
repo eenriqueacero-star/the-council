@@ -1,4 +1,4 @@
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
 const AGENT_SHORT = { technical: 'Tech', catalyst: 'Cat', risk: 'Risk', macro: 'Mac', bear: 'Bear', sizer: 'Siz' };
@@ -8,7 +8,8 @@ export async function loadTickerHistory(uid, ticker, currentPrice) {
     const q = query(
       collection(db, 'users', uid, 'rulings'),
       where('ticker', '==', ticker),
-      orderBy('ts', 'desc')
+      orderBy('ts', 'desc'),
+      limit(50)
     );
     const snap = await getDocs(q);
     if (snap.empty) return '';

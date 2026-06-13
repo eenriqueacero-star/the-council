@@ -85,6 +85,13 @@ export default function AlphaTrackerTab({ account, dark }) {
         const gradeTickers = [...new Set(needs.map(r => r.ticker).filter(Boolean))];
         const gq = await getQuotes(gradeTickers).catch(() => ({}));
 
+        // If quotes failed entirely, skip grading this load — don't leave
+        // outcomeCheckedAt null or every reload re-attempts indefinitely
+        if (Object.keys(gq).length === 0) {
+          setGrading(false);
+          return;
+        }
+
         await Promise.allSettled(needs.map(r => {
           const q     = gq[r.ticker];
           const price = q?.price > 0 ? q.price : q?.prevClose;

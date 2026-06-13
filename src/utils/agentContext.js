@@ -7,7 +7,8 @@ function pct(v) {
 
 export async function loadAgentContext(ticker, tickerQuote) {
   let q = {};
-  try { q = await getQuotes(['SPY', 'TLT', 'GLD', 'VIX', 'SOXX', 'SMH', 'XLK']); } catch {}
+  try { q = await getQuotes(['SPY', 'TLT', 'GLD', 'VIX', 'SOXX', 'SMH', 'XLK']); }
+  catch (e) { console.warn('agentContext: market tape fetch failed, agents will lack live context:', e?.message); }
   return { q, tickerQuote };
 }
 

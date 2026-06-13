@@ -42,6 +42,9 @@ export default async function handler(req, res) {
 
   const { system, userContent, useSearch = false, maxTokens = 700 } = req.body || {};
   if (!system || !userContent) return res.status(400).json({ error: 'Missing system or userContent' });
+  if (system.length + userContent.length > 20_000) {
+    return res.status(400).json({ code: 'ERR-SIZE', error: 'Prompt exceeds maximum allowed length' });
+  }
 
   const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
   const model  = useSearch ? MODEL_SEARCH : MODEL_BASE;

@@ -303,10 +303,11 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
           setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
 
-          // Detect which real agents were addressed — they join the next wave
+          // Detect which other agents were addressed — they join the next wave
+          // Exclude the current speaker to prevent self-re-queuing
           const lower = response.toLowerCase();
           for (const candidate of AGENTS) {
-            if (lower.includes(candidate.name.toLowerCase())) {
+            if (candidate.id !== agId && lower.includes(candidate.name.toLowerCase())) {
               nextWaveIds.add(candidate.id);
             }
           }

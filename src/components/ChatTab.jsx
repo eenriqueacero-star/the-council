@@ -283,7 +283,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           try {
             const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). Speak in first person as ${ag.name}. Never refer to yourself in the third person. Address colleagues directly by name when needed — but never re-ask a question that's already been answered in the shared knowledge above. Keep your response to 3-4 sentences MAX — tight, direct, no padding.\n\n`;
             const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
-            response = await callAgent(sys, userMsg, ag.search, 280);
+            response = await callAgent(sys, userMsg, wave === 0 && ag.search, 280);
           } catch {
             flagApiDown();
             response = 'Having trouble connecting right now.';

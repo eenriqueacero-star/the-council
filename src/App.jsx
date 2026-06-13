@@ -152,7 +152,7 @@ export default function App() {
       if (dayChange < 0) return 'rgba(255,59,48,0.18)';
       return 'transparent';
     }
-    if (mktState === 'premarket')  return 'rgba(245,158,11,0.22)';
+    if (mktState === 'premarket')  return 'rgba(245,158,11,0.16)';
     if (mktState === 'afterhours') return 'rgba(124,58,237,0.20)';
     if (isNight)                   return 'rgba(88,28,135,0.28)';
     return 'rgba(107,114,128,0.08)';

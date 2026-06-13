@@ -111,15 +111,14 @@ function PremarketEffect({ dark }) {
         background:'linear-gradient(to top, rgba(251,146,60,0.18) 0%, transparent 100%)',
         filter:'blur(12px)',
       }} />
-      {/* Horizontal scan sweep */}
+      {/* Horizontal scan sweep — kept very faint so it only shows in gaps between content */}
       <div className="scan-bar" style={{
         position:'absolute', top:0, bottom:0, width:200,
-        background:'linear-gradient(to right, transparent, rgba(245,158,11,0.035), rgba(251,191,36,0.06), rgba(245,158,11,0.035), transparent)',
+        background:'linear-gradient(to right, transparent, rgba(245,158,11,0.022), rgba(251,191,36,0.038), rgba(245,158,11,0.022), transparent)',
       }} />
-      {/* Second sweep, offset */}
       <div className="scan-bar-slow" style={{
         position:'absolute', top:0, bottom:0, width:120,
-        background:'linear-gradient(to right, transparent, rgba(251,191,36,0.03), transparent)',
+        background:'linear-gradient(to right, transparent, rgba(251,191,36,0.018), transparent)',
       }} />
     </>
   );

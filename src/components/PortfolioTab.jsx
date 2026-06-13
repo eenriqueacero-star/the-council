@@ -184,9 +184,9 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   }).filter(m => Math.abs(m.pct) > 0.01).sort((a,b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 4);
 
   return (
-    <div style={{ ...FONT, background: T.bg, minHeight:'100vh' }}>
-      {/* Hero */}
-      <div style={{ padding:'20px 16px 0', maxWidth:760, margin:'0 auto' }}>
+    <div style={{ ...FONT, minHeight:'100vh' }}>
+      {/* Hero — opaque so text is always readable */}
+      <div style={{ padding:'20px 16px 0', maxWidth:760, margin:'0 auto', background: T.bg }}>
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
           <div>
             <div style={{ fontSize:36, fontWeight:700, color: T.text, lineHeight:1.1, letterSpacing:'-0.02em' }}>
@@ -231,7 +231,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         </div>
 
         {/* Breakdown */}
-        <div style={{ border: `1px solid ${T.border}`, borderRadius:12, padding:'0 16px', marginBottom:16 }}>
+        <div style={{ border: `1px solid ${T.border}`, borderRadius:12, padding:'0 16px', marginBottom:16, background: T.bg }}>
           {[
             ['Equity',       `$${totalValue.toFixed(2)}`],
             ['Cash',         `$${buyingPower.toLocaleString()}`],
@@ -247,11 +247,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
       {/* Movers */}
       {movers.length > 0 && (
-        <div style={{ padding:'0 16px 16px', maxWidth:760, margin:'0 auto' }}>
+        <div style={{ padding:'0 16px 16px', maxWidth:760, margin:'0 auto', background: T.bg }}>
           <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>{"TODAY'S MOVERS"}</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
             {movers.map(({ t, pct, price }) => (
-              <div key={t} style={{ border: `1px solid ${T.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
+              <div key={t} style={{ border: `1px solid ${T.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10, background: T.bgCard }}>
                 <TickerLogo ticker={t} dark={dark} />
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:14, fontWeight:600, color: T.text }}>{t}</div>
@@ -268,7 +268,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       )}
 
       {/* Positions */}
-      <div style={{ maxWidth:760, margin:'0 auto', paddingBottom:24 }}>
+      <div style={{ maxWidth:760, margin:'0 auto', paddingBottom:24, background: T.bg }}>
         <div style={{ padding:'0 16px 8px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:'uppercase', letterSpacing:'0.08em' }}>POSITIONS</div>
           <button onClick={() => setAddMode(!addMode)}

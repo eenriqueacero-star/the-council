@@ -6,6 +6,24 @@ const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const ENTRIES = [
   {
+    version: '0.1.1', date: '2026-06-13', label: 'FIX',
+    changes: [
+      { type: 'FIX',  text: 'Portfolio positions now persist correctly — Firestore offline persistence enabled; writes queue to IndexedDB and auto-retry on reconnect instead of failing silently on any network hiccup' },
+      { type: 'FIX',  text: 'Save status indicator in portfolio header: SAVING… / SAVED ✓ / SAVE FAILED ✕ so you always know if a write went through' },
+      { type: 'FIX',  text: 'Account selection (Edwin / Dad / Bro) now persisted in localStorage — no longer resets to Edwin on every page reload' },
+      { type: 'FIX',  text: 'Race condition: positions ref now stays in sync with merged Firestore state so a slow initial snapshot can never cause a pending save to overwrite other accounts with empty data' },
+      { type: 'FIX',  text: 'Council and Chat rulings were silently dropped on save failure — errors now surface to console instead of vanishing into .catch(() => {})' },
+      { type: 'FIX',  text: 'Alpha Tracker infinite re-grade loop: when getQuotes fails entirely, grading is skipped for that load instead of leaving outcomeCheckedAt null and retrying on every page open' },
+      { type: 'FIX',  text: 'Ticker history query capped at 50 results — unbounded Firestore read would grow forever and bloat agent prompts' },
+      { type: 'FIX',  text: 'CY style constant corrected to #38e0d4 (was hardcoded black #000000)' },
+      { type: 'FIX',  text: 'agentContext market tape fetch errors now log a warning instead of silently proceeding with no live context' },
+      { type: 'SEC',  text: 'run-agent: added 20,000-char combined prompt limit to prevent Groq API bill abuse by authenticated users' },
+      { type: 'SEC',  text: 'send-push: subscriptions now loaded server-side from Firestore using the verified UID — client no longer supplies them, eliminating any ability to target arbitrary push endpoints' },
+      { type: 'SEC',  text: 'send-push: replaced decode-only JWT check (forgeable) with proper Firebase Identity Toolkit signature verification' },
+      { type: 'SEC',  text: 'get-quotes / get-candles: added ticker format validation (/^[A-Z0-9.]{1,10}$/), 50-ticker cap, and range allowlist' },
+    ],
+  },
+  {
     version: '0.1.0', date: '2026-06-12', label: 'BETA',
     changes: [
       { type: 'FEAT', text: 'Public.com-style portfolio dashboard with equity curve, Clearbit logos, and expand-to-detail' },
@@ -31,6 +49,7 @@ const ENTRIES = [
 const BADGE = {
   FEAT: { bg: 'rgba(0,200,5,0.1)',    fg: '#00C805' },
   FIX:  { bg: 'rgba(245,158,11,0.1)', fg: '#B45309' },
+  SEC:  { bg: 'rgba(255,59,48,0.1)',  fg: '#FF3B30' },
 };
 
 export default function ChangelogTab({ dark }) {

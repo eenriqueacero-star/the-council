@@ -254,12 +254,26 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       // The roster line injected into every agent call so they never hallucinate fake names
       const ROSTER = `\nTHE COUNCIL ROSTER (ONLY these six exist — never reference any other name): REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro/Geopolitics), VEGA 🐻 (Bear case), ZEN ⚖️ (Sizing).`;
 
-      // ONE live search before the loop — all agents share this fresh context
+      // Fetch live price via Finnhub if AXIOM identified a specific ticker (fast, accurate)
       let liveContext = '';
+      if (router.ticker) {
+        try {
+          const q = await getQuotes([router.ticker.toUpperCase()]);
+          const quote = q[router.ticker.toUpperCase()];
+          if (quote?.price) {
+            liveContext = `\nLIVE PRICE: ${router.ticker.toUpperCase()} = $${quote.price.toFixed(2)} (prev close $${(quote.prevClose || 0).toFixed(2)}, change ${quote.change >= 0 ? '+' : ''}${(quote.change || 0).toFixed(2)}%)`;
+          }
+        } catch {}
+      }
+
+      // ONE compound-beta search — targeted at the ticker if known, general otherwise
       try {
-        const searchSys = `You are a market research assistant. Search for the most relevant, current information to help answer this question. Return 3-4 bullet points of key recent facts — prices, news, earnings dates, macro data, whatever is most relevant.`;
-        const raw = await callAgent(searchSys, text, true, 300);
-        if (raw) liveContext = `\n\nLIVE MARKET CONTEXT (just searched):\n${raw}`;
+        const searchQuery = router.ticker
+          ? `Current price, recent news, and key catalysts for ${router.ticker.toUpperCase()}. Today: ${new Date().toDateString()}.`
+          : text;
+        const searchSys = `You are a market research assistant. Search for the most relevant, current information. Return 3-4 bullet points of key facts — prices, news, earnings dates, macro data.`;
+        const raw = await callAgent(searchSys, searchQuery, true, 280);
+        if (raw) liveContext += `\n\nLIVE MARKET CONTEXT:\n${raw}`;
       } catch {}
 
       const spokenThisTurn = []; // { agentId, name, response } — ordered, agents can appear multiple times

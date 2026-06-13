@@ -17,6 +17,9 @@ import RoadmapTab from './components/RoadmapTab.jsx';
 import ChangelogTab from './components/ChangelogTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import MarketOverlay from './components/MarketOverlay.jsx';
+import AmbientBackground from './components/AmbientBackground.jsx';
+import { motion, LayoutGroup } from 'framer-motion';
+import gsap from 'gsap';
 import { ChevronRight, LogOut } from 'lucide-react';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
@@ -156,6 +159,17 @@ export default function App() {
     return next;
   });
 
+  // ── refs for boot animation ──────────────────────────────────────────────
+  const sidebarRef = useRef(null);
+  const mainRef    = useRef(null);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    if (sidebarRef.current) tl.fromTo(sidebarRef.current, { x: -28, opacity: 0 }, { x: 0, opacity: 1, duration: 0.65 }, 0.08);
+    if (mainRef.current)    tl.fromTo(mainRef.current,    { y: 18, opacity: 0 },  { y: 0, opacity: 1, duration: 0.72 }, 0.22);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const acct         = ACCOUNTS[account];
   const posMap       = positions[account] || {};
   const acctHoldings = Object.keys(posMap).length ? Object.keys(posMap) : (acct?.holdings || []);
@@ -180,16 +194,17 @@ export default function App() {
     return 'rgba(107,114,128,0.08)';
   })();
 
-  // Background shifts slightly for overnight in dark mode
-  const rootBg = dark
-    ? (isNight ? '#0d0b14' : '#111111')
-    : '#FFFFFF';
+  const portfolioDirection = dayChange > 0.01 ? 'up' : dayChange < -0.01 ? 'down' : 'flat';
+
+  // In dark mode the ambient canvas provides the background; keep solid bg only in light mode
+  const rootBg = dark ? 'transparent' : '#FFFFFF';
 
   const accounts = Object.entries(ACCOUNTS).map(([id, v]) => ({ id, label: v.label }));
   const padded   = { maxWidth:760, margin:'0 auto', padding:'16px' };
 
   return (
     <div style={{ ...FONT, background: rootBg, minHeight:'100vh', color: dark ? '#F2F2F7' : '#000', transition:'background 3s ease' }}>
+      {dark && <AmbientBackground marketState={mktState} portfolioDirection={portfolioDirection} />}
       <div className="ambient-glow" style={{
         background: glowColor,
         // Larger, lower-positioned glow for pre-market (horizon feel)
@@ -202,7 +217,7 @@ export default function App() {
       <MarketOverlay state={mktState} dark={dark} />
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background: dark ? (isNight ? '#12101c' : '#1C1C1E') : '#FFFFFF', borderRight: `1px solid ${dark ? (isNight ? '#2a2040' : '#2C2C2E') : '#EEEEEE'}`, zIndex:10, padding:'24px 0', transition:'background 3s ease, border-color 3s ease' }}>
+      <div ref={sidebarRef} className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background: dark ? (isNight ? '#12101c' : '#1C1C1E') : '#FFFFFF', borderRight: `1px solid ${dark ? (isNight ? '#2a2040' : '#2C2C2E') : '#EEEEEE'}`, zIndex:10, padding:'24px 0', transition:'background 3s ease, border-color 3s ease' }}>
         <div style={{ padding:'0 20px 24px', display:'flex', alignItems:'center', gap:10 }}>
           <ArcReactor size={28} />
           <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.06em' }}>THE COUNCIL</span>
@@ -221,15 +236,23 @@ export default function App() {
         </nav>
         <div style={{ padding:'16px 12px', borderTop: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}` }}>
           <div style={{ ...MFONT, fontSize:11, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Account</div>
-          {accounts.map(({ id, label }) => (
-            <button key={id} onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
-              ...FONT, display:'block', width:'100%', textAlign:'left', padding:'7px 10px', borderRadius:6,
-              border:'none', cursor:'pointer', fontSize:13, fontWeight: account===id ? 600 : 400,
-              background: account===id ? (dark ? '#F2F2F7' : '#000') : 'transparent',
-              color:      account===id ? (dark ? '#000' : '#fff') : '#757575',
-              marginBottom:2, transition: 'background .15s ease, color .15s ease',
-            }}>{label}</button>
-          ))}
+          <LayoutGroup id="sidebar-acct">
+            {accounts.map(({ id, label }) => (
+              <div key={id} style={{ position:'relative', marginBottom:2 }}>
+                {account === id && (
+                  <motion.div layoutId="sidebar-acct-bg"
+                    style={{ position:'absolute', inset:0, borderRadius:6, background: dark ? '#F2F2F7' : '#000', zIndex:0 }}
+                    transition={{ type:'spring', duration:0.38, bounce:0.12 }} />
+                )}
+                <button onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
+                  ...FONT, display:'block', width:'100%', textAlign:'left', padding:'7px 10px', borderRadius:6,
+                  border:'none', cursor:'pointer', fontSize:13, fontWeight: account===id ? 600 : 400,
+                  background:'transparent', position:'relative', zIndex:1,
+                  color: account===id ? (dark ? '#000' : '#fff') : '#757575',
+                }}>{label}</button>
+              </div>
+            ))}
+          </LayoutGroup>
           <button onClick={() => signOut(auth)} style={{ ...FONT, marginTop:8, display:'flex', alignItems:'center', gap:6, color:'#AAAAAA', border:'none', background:'none', cursor:'pointer', fontSize:13, padding:'4px 2px' }}>
             <LogOut size={14} /> Sign out
           </button>
@@ -237,7 +260,7 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <div className="lg:ml-[240px]" style={{ position:'relative', zIndex:1 }}>
+      <div ref={mainRef} className="lg:ml-[240px]" style={{ position:'relative', zIndex:1 }}>
         {/* Mobile header */}
         <div className="lg:hidden" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', borderBottom: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`, background: dark ? '#1C1C1E' : '#FFFFFF', position:'sticky', top:0, zIndex:40 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>

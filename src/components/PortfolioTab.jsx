@@ -3,6 +3,38 @@ import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, Trend
 import { getQuotes, getCandles } from '../api.js';
 import { theme } from '../utils/theme.js';
 
+// Scrambles digits for `dur`ms before settling on the real formatted value
+function useScrambleNumber(value, trigger) {
+  const [display, setDisplay] = useState('');
+  const rafRef  = useRef(null);
+
+  useEffect(() => {
+    if (value == null) return;
+    const fmt = v => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const target = '$' + fmt(value);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setDisplay(target); return; }
+    const DIGITS = '0123456789';
+    const start  = performance.now();
+    const dur    = 680;
+    cancelAnimationFrame(rafRef.current);
+    function tick(now) {
+      const prog    = Math.min((now - start) / dur, 1);
+      const settled = Math.ceil(prog * target.length);
+      const result  = target.split('').map((c, i) => {
+        if (i < settled || '.,$ '.includes(c)) return c;
+        return DIGITS[Math.floor(Math.random() * DIGITS.length)];
+      }).join('');
+      setDisplay(result);
+      if (prog < 1) rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [trigger]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!display) return '$' + (value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return display;
+}
+
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', 'Fira Code', monospace" };
 const GRN = '#00C805';
@@ -51,6 +83,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [editTicker, setEditTicker] = useState(null);
   const [editShares, setEditShares] = useState('');
   const [editCost,   setEditCost]   = useState('');
+  const [quoteTick,  setQuoteTick]  = useState(0);
   const timerRef = useRef(null);
 
   const tickers = acctHoldings.filter(t => posMap[t]);
@@ -58,7 +91,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
   const fetchQuotes = useCallback(async () => {
     if (!tickers.length) return;
-    try { setQuotes(await getQuotes(tickers)); } catch { flagApiDown?.(); }
+    try { setQuotes(await getQuotes(tickers)); setQuoteTick(n => n + 1); } catch { flagApiDown?.(); }
   }, [tickers.join(',')]);
 
   useEffect(() => {
@@ -105,8 +138,9 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
   useEffect(() => { onDayChange?.(dayChange); }, [dayChange]);
 
-  const chartPoints  = candles.map(c => c.c);
-  const displayValue = (scrubIdx !== null && chartPoints[scrubIdx]) ? chartPoints[scrubIdx] : totalValue;
+  const chartPoints    = candles.map(c => c.c);
+  const displayValue   = (scrubIdx !== null && chartPoints[scrubIdx]) ? chartPoints[scrubIdx] : totalValue;
+  const scrambledValue = useScrambleNumber(displayValue, quoteTick);
 
   // SVG chart
   const W = 400, H = 180;
@@ -189,8 +223,8 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       <div style={{ padding:'20px 16px 0', maxWidth:760, margin:'0 auto', background: T.bg }}>
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
           <div>
-            <div style={{ fontSize:36, fontWeight:700, color: T.text, lineHeight:1.1, letterSpacing:'-0.02em' }}>
-              ${displayValue.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
+            <div style={{ fontSize:36, fontWeight:700, color: T.text, lineHeight:1.1, letterSpacing:'-0.02em', ...MFONT, fontVariantNumeric:'tabular-nums' }}>
+              {scrambledValue}
             </div>
             <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:8 }}>
               <span style={{ fontSize:15, fontWeight:500, color: dayChange >= 0 ? GRN : RED }}>

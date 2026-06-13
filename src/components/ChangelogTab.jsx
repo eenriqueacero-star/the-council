@@ -6,6 +6,26 @@ const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const ENTRIES = [
   {
+    version: '0.2.0', date: '2026-06-13', label: 'MAJOR',
+    changes: [
+      { type: 'FEAT', text: 'Named agents: REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro), VEGA 🐻 (Devil\'s Advocate), ZEN ⚖️ (Sizer) — each with distinct personality, color, and domain expertise' },
+      { type: 'FEAT', text: '3-round council deliberation: Round 1 = independent analysis, Round 2 = cross-examination (agents challenge each other by name), Round 3 = final consensus position. Applies to both Council and Chat tabs' },
+      { type: 'FEAT', text: 'Agent selector chips in Chat: talk directly to any agent (AXIOM / REX / NOVA / SAGE / ATLAS / VEGA / ZEN) or trigger a full COUNCIL roundtable' },
+      { type: 'FEAT', text: 'Direct agent chat: agents respond conversationally in-character — no JSON, no routing, just the expert you selected' },
+      { type: 'FEAT', text: 'Roundtable mode: send any question to all 6 agents simultaneously, responses shown as a threaded conversation' },
+      { type: 'FEAT', text: 'Conversation memory: last 10 turns injected into every agent call — no more context amnesia between messages' },
+      { type: 'FEAT', text: 'Autonomous domain research: each agent runs a live web search on their specialty area (rates, sector tape, catalysts, etc.) every 4 hours and injects the fresh intel into council runs' },
+      { type: 'FEAT', text: 'Agent learning system: after AlphaTracker grades a ruling, each agent receives a personalised lesson (what they called, what happened, what to review). Lessons accumulate up to 8 per agent and are injected into future council prompts' },
+      { type: 'FEAT', text: 'Agent accuracy tracking: correct/total graded calls stored per agent in Firestore and shown in their council context so they self-calibrate over time' },
+      { type: 'FEAT', text: 'PM renamed AXIOM — a genuine portfolio manager with knowledge, not just a router. Answers market and strategy questions directly; only convenes council for actual BUY/SELL/HOLD decisions' },
+      { type: 'FEAT', text: 'CouncilMark replaces ArcReactor — clean hexagon SVG, no Iron Man references anywhere' },
+      { type: 'FIX',  text: 'Groq free-tier rate limit protection: agents called sequentially with 1.5s stagger per round; 429 errors trigger a visible cooldown banner and automatic retry instead of crashing the session' },
+      { type: 'FIX',  text: 'Quote cache (45s in-memory) prevents redundant Finnhub calls when convening multiple councils in quick succession' },
+      { type: 'FIX',  text: 'AbortController signal support on callAgent — requests can now be cancelled cleanly' },
+      { type: 'FIX',  text: 'Parallel prep: quotes, ticker history, agent context, and all 6 agent profiles load simultaneously before Round 1 starts — recovers 3–5s per council run' },
+    ],
+  },
+  {
     version: '0.1.11', date: '2026-06-13', label: 'GUI',
     changes: [
       { type: 'FEAT', text: 'AmbientBackground canvas scene behind all UI: sunrise gradient + crepuscular rays + drifting clouds (premarket), portfolio-direction particles (open), sunset beach + ocean shimmer + birds (afterhours), deep space + twinkling stars + moon + shooting stars (overnight/evening), cool dark (closed/weekend)' },

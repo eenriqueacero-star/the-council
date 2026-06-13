@@ -1,5 +1,5 @@
 import { db, auth } from './firebase.js';
-import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 
 // VAPID public key — pairs with VAPID_PRIVATE_KEY in Vercel env vars (public by design)
 const VAPID_PUBLIC_KEY = 'BGvxW_tilgAmowmt1MY0s2ONNBdqLBkXwS6Ft6mypzuk7NSTamlgvfIVG9MX8H9HGoD3gMmZDO5AT9T2Y--YMUQ';
@@ -69,22 +69,23 @@ export async function disablePush() {
 
 export async function notifyDevices(title, body, url = '/') {
   try {
-    const ref = subsRef();
-    if (!ref) return;
-    const snap = await getDoc(ref);
-    const subs = snap.exists() ? Object.values(snap.data().subs || {}).map(s => s.sub).filter(Boolean) : [];
-    if (!subs.length) return;
+    if (!auth.currentUser) return;
     const token = await auth.currentUser.getIdToken();
     const res = await fetch('/api/send-push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ subs, title, body, url }),
+      // Server loads subscriptions from Firestore using the verified UID
+      body: JSON.stringify({ title, body, url }),
     });
     const data = await res.json().catch(() => ({}));
+    // Prune stale endpoints from our local Firestore record
     if (Array.isArray(data.stale) && data.stale.length) {
-      const updates = {};
-      data.stale.forEach(ep => { updates[`subs.${subKey(ep)}`] = deleteField(); });
-      await updateDoc(ref, updates).catch(() => {});
+      const ref = subsRef();
+      if (ref) {
+        const updates = {};
+        data.stale.forEach(ep => { updates[`subs.${subKey(ep)}`] = deleteField(); });
+        await updateDoc(ref, updates).catch(() => {});
+      }
     }
   } catch {}
 }

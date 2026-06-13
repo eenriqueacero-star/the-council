@@ -19,6 +19,15 @@ export default async function handler(req, res) {
 
   const { tickers, range = '1D' } = req.body || {};
   if (!Array.isArray(tickers) || !tickers.length) return res.status(400).json({ error: 'tickers required' });
+  if (tickers.length > 50) return res.status(400).json({ error: 'Too many tickers (max 50)' });
+  const TICKER_RE = /^[A-Z0-9.]{1,10}$/;
+  for (const t of tickers) {
+    if (typeof t !== 'string' || !TICKER_RE.test(t.toUpperCase())) {
+      return res.status(400).json({ error: `Invalid ticker: ${t}` });
+    }
+  }
+  const VALID_RANGES = new Set(['1D','1W','1M','3M','1Y','ALL']);
+  if (!VALID_RANGES.has(range)) return res.status(400).json({ error: `Invalid range: ${range}` });
 
   const now = Math.floor(Date.now() / 1000);
   let resolution, from;

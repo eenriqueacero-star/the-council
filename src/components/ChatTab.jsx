@@ -242,7 +242,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       return;
     }
 
-    // === SPECIALIST ROUTE ===
+    // === SPECIALIST ROUTE (with cross-talk) ===
     const routeIds = Array.isArray(router.route) ? router.route.filter(id => AGENTS.find(a => a.id === id)) : [];
     if (routeIds.length > 0) {
       // Show AXIOM's intro line first
@@ -251,21 +251,46 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:router.speak }]);
       }
 
-      // Call each routed agent sequentially (staggered for rate limits)
-      for (let idx = 0; idx < routeIds.length; idx++) {
-        const ag = AGENTS.find(a => a.id === routeIds[idx]);
+      // Queue starts with AXIOM's routed agents; agents can invite others by name (max 2 extras)
+      const queue = [...routeIds];
+      const spoken = []; // { agentId, name, response }
+      const MAX_EXTRAS = 2;
+      let extrasAdded = 0;
+
+      for (let idx = 0; idx < queue.length; idx++) {
+        const ag = AGENTS.find(a => a.id === queue[idx]);
         if (!ag) continue;
         if (idx > 0) await sleep(1500);
+
+        // Build context of what colleagues already said in this turn
+        const colleagueContext = spoken.length > 0
+          ? `\n\nYOUR COLLEAGUES HAVE ALREADY WEIGHED IN ON THIS:\n${spoken.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nYou may agree, challenge, or build on their points — address them by name if relevant. Keep it conversational and direct.`
+          : `\n\nYou are the first to respond. Speak directly and concisely. If another council member's expertise is relevant, you may invite them by name (e.g. "ATLAS, what's the macro picture here?").`;
+
         let response;
         try {
-          const sys = ag.conversationalPrompt + `\n\nIMPORTANT: Respond directly to the investor. Do NOT address or reference other council members by name — just give your expert answer.` + historyBlock;
-          response = await callAgent(sys, text, false, 400);
+          const sys = ag.conversationalPrompt + colleagueContext + historyBlock;
+          response = await callAgent(sys, text, false, 450);
         } catch {
           flagApiDown();
           response = 'Having trouble connecting right now.';
         }
+
+        spoken.push({ agentId: ag.id, name: ag.name, response });
         setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
         setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
+
+        // Detect if this agent addressed another agent by name — auto-queue them
+        if (extrasAdded < MAX_EXTRAS) {
+          const alreadyQueued = new Set(queue);
+          for (const candidate of AGENTS) {
+            if (!alreadyQueued.has(candidate.id) && response.includes(candidate.name)) {
+              queue.push(candidate.id);
+              extrasAdded++;
+              if (extrasAdded >= MAX_EXTRAS) break;
+            }
+          }
+        }
       }
       setChatBusy(false);
       return;

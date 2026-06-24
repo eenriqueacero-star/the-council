@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
 
-const MODEL_BASE   = 'llama-3.3-70b-versatile';
-const MODEL_SEARCH = 'compound-beta'; // Groq compound model with live web search
+const MODEL_BASE   = 'openai/gpt-oss-120b';
+const MODEL_SEARCH = 'groq/compound'; // Groq compound model with live web search
 const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SYNTH_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -118,13 +118,13 @@ export default async function handler(req, res) {
     const apiKey = keyOrder[k];
     try {
       const text = await callGroq(apiKey, model, system, userContent, maxTokens);
-      return res.status(200).json({ text });
+      return res.status(200).json({ text, grounded: useSearch });
     } catch (err) {
-      // compound-beta unavailable — fall back to base model on first key tried
+      // groq/compound unavailable — fall back to base model but signal ungrounded to the frontend
       if (useSearch && (err.status === 404 || err.status === 400) && k === 0) {
         try {
           const text = await callGroq(apiKey, MODEL_BASE, system, userContent, maxTokens);
-          return res.status(200).json({ text });
+          return res.status(200).json({ text, grounded: false, warning: 'Live web search unavailable — answer is from model memory, not live data' });
         } catch (fe) {
           return res.status(500).json({ error: fe.message });
         }
@@ -147,7 +147,7 @@ export default async function handler(req, res) {
   // All keys hit 429 — one final retry on a random key after backoff
   try {
     const text = await callGroq(keyOrder[0], model, system, userContent, maxTokens);
-    return res.status(200).json({ text });
+    return res.status(200).json({ text, grounded: useSearch });
   } catch (err) {
     console.error('runAgent: all keys exhausted', err.status, err.message);
     return res.status(429).json({ code: 'ERR-429', error: 'Rate limited on all keys' });

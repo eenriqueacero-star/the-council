@@ -2,6 +2,8 @@ import Groq from 'groq-sdk';
 
 const MODEL_BASE   = 'llama-3.3-70b-versatile';
 const MODEL_SEARCH = 'compound-beta'; // Groq compound model with live web search
+const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
+const GROQ_SYNTH_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -54,6 +56,32 @@ async function callGroq(apiKey, model, system, userContent, maxTokens) {
   return completion.choices[0]?.message?.content || '';
 }
 
+async function callGroqSynthesis(system, userContent, maxTokens) {
+  const res = await fetch(GROQ_SYNTH_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROQ_SYNTH_MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user',   content: userContent },
+      ],
+      max_tokens: Math.max(maxTokens || 700, 1500),
+      reasoning_effort: 'high',
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Groq synthesis error ${res.status}`);
+  }
+  const data = await res.json();
+  // Parse final answer only — reasoning traces are separate and not in content
+  return data.choices?.[0]?.message?.content || '';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await verifyAuth(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -63,10 +91,21 @@ export default async function handler(req, res) {
     return res.status(500).json({ code: 'ERR-CFG', error: 'No GROQ_API_KEY configured' });
   }
 
-  const { system, userContent, useSearch = false, maxTokens = 700 } = req.body || {};
+  const { system, userContent, useSearch = false, maxTokens = 700, model: requestedModel } = req.body || {};
   if (!system || !userContent) return res.status(400).json({ error: 'Missing system or userContent' });
   if (system.length + userContent.length > 20_000) {
     return res.status(400).json({ code: 'ERR-SIZE', error: 'Prompt exceeds maximum allowed length' });
+  }
+
+  // Synthesis-only path: gpt-oss-120b with high reasoning effort, bypasses key rotation
+  if (requestedModel === GROQ_SYNTH_MODEL) {
+    try {
+      const text = await callGroqSynthesis(system, userContent, maxTokens);
+      return res.status(200).json({ text });
+    } catch (err) {
+      console.error('synthesis error:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
   }
 
   const model = useSearch ? MODEL_SEARCH : MODEL_BASE;

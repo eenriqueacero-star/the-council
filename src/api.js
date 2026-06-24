@@ -10,18 +10,20 @@ async function authHeaders() {
 // 45s in-memory quote cache
 const quoteCache = new Map(); // key: sorted tickers string → { data, ts }
 
-export async function callAgent(system, userContent, useSearch, maxTokens = 512, signal) {
+export async function callAgent(system, userContent, useSearch, maxTokens = 512, signal, model = null) {
   let headers;
   try { headers = await authHeaders(); }
   catch { throw new Error('ERR-401: Not authenticated'); }
 
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
+    const payload = { system, userContent, useSearch: !!useSearch, maxTokens };
+    if (model) payload.model = model;
     try {
       res = await fetch('/api/run-agent', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ system, userContent, useSearch: !!useSearch, maxTokens }),
+        body: JSON.stringify(payload),
         signal,
       });
     } catch (err) {

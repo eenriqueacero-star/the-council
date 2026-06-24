@@ -143,7 +143,7 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
 
     let synth;
     try {
-      const txt = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 400);
+      const txt = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 400, null, 'openai/gpt-oss-120b');
       synth = extractJSON(txt) || { speak: 'The council is split — I\'d hold off.', verdict: 'WATCH', conviction: 5 };
     } catch {
       synth = { speak: 'Could not finalize the ruling.', verdict: 'WATCH', conviction: 5 };

@@ -210,7 +210,7 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
       const txt = await callAgent(
         synthSys,
         `Full council deliberation:\n${fullCouncilContext}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
-        false, 500
+        false, 500, null, 'openai/gpt-oss-120b'
       );
       const result = extractJSON(txt) || { verdict: 'WATCH', conviction: 5, headline: 'Council inconclusive', rationale: 'Could not parse synthesis.' };
       setSynthesis({ status: 'done', result });

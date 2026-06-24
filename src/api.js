@@ -45,7 +45,7 @@ export async function callAgent(system, userContent, useSearch, maxTokens = 512,
       throw new Error(`${code}: ${body.error || res.statusText}`);
     }
     const data = await res.json();
-    return data.text;
+    return { text: data.text, grounded: data.grounded ?? null, warning: data.warning ?? null };
   }
 }
 

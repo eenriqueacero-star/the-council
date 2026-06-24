@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send, Crown } from 'lucide-react';
+import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send, Crown, AlertTriangle } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
@@ -83,6 +83,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
     // 3-round council (compact for chat — show only final stances)
     const allRounds = [];
+    let hasUngrounded = false;
 
     const summariseRound = (r, idx) => {
       const s = AGENTS.map(ag => { const res = r[ag.id] || {}; return `${ag.name}: ${res.stance || '?'} — ${res.headline || ''}`; }).join('\n');
@@ -113,7 +114,8 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
         try {
-          const txt = await callAgent(ag.system, userMsg, ag.search, 500);
+          const { text: txt, grounded } = await callAgent(ag.system, userMsg, ag.search, 500);
+          if (ag.search && grounded === false) hasUngrounded = true;
           roundResults[ag.id] = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
         } catch {
           roundResults[ag.id] = { stance: 'CAUTION', score: 5, headline: 'Error', points: [] };
@@ -143,7 +145,7 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
 
     let synth;
     try {
-      const txt = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 400, null, 'openai/gpt-oss-120b');
+      const { text: txt } = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 400, null, 'openai/gpt-oss-120b');
       synth = extractJSON(txt) || { speak: 'The council is split — I\'d hold off.', verdict: 'WATCH', conviction: 5 };
     } catch {
       synth = { speak: 'Could not finalize the ruling.', verdict: 'WATCH', conviction: 5 };
@@ -168,7 +170,7 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
     }
 
     // Update council message with synth result
-    setChat(p => p.map(m => m.runId === runId ? { ...m, synth } : m));
+    setChat(p => p.map(m => m.runId === runId ? { ...m, synth, hasUngrounded } : m));
     setChat(p => [...p, { role: 'pm', text: synth.speak, verdict: synth.verdict, conviction: synth.conviction, ticker: tkr }]);
     speak(synth.speak);
 
@@ -221,7 +223,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
 
     let router;
     try {
-      const txt = await callAgent(axiomSys, `Investor: "${text}". ${acctLine} Return ONLY the JSON.`, false);
+      const { text: txt } = await callAgent(axiomSys, `Investor: "${text}". ${acctLine} Return ONLY the JSON.`, false);
       router = extractJSON(txt) || { speak: "I didn't quite catch that.", fullCouncil: false, ticker: null, route: [] };
     } catch {
       flagApiDown();
@@ -276,7 +278,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
           ? `Current price, recent news, and key catalysts for ${router.ticker.toUpperCase()}. Today: ${new Date().toDateString()}.`
           : text;
         const searchSys = `You are a market research assistant. Search for the most relevant, current information. Return 3-4 bullet points of key facts — prices, news, earnings dates, macro data.`;
-        const raw = await callAgent(searchSys, searchQuery, true, 280);
+        const { text: raw } = await callAgent(searchSys, searchQuery, true, 280);
         if (raw) liveContext += `\n\nLIVE MARKET CONTEXT:\n${raw}`;
       } catch {}
 
@@ -311,7 +313,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         try {
           const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). First person only. 3-4 sentences max. Reference your colleagues by name when responding to their points.\n\n`;
           const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
-          response = await callAgent(sys, userMsg, false, 280);
+          response = (await callAgent(sys, userMsg, false, 280)).text;
         } catch {
           flagApiDown();
           response = 'Having trouble connecting right now.';
@@ -348,7 +350,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
         try {
           const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated and reached a conclusion. Deliver a single crisp summary (2-3 sentences) that directly answers the investor's original question based on everything the team established. Be specific — include tickers, dates, or numbers if they came up. No fluff.`;
           const closingCtx = `Investor asked: "${text}"\n\nFull council discussion:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nDeliver the consensus answer.`;
-          const closing = await callAgent(closingSys, closingCtx, false, 250);
+          const { text: closing } = await callAgent(closingSys, closingCtx, false, 250);
           setChat(p => [...p, { role:'pm', text:closing }]);
           setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:closing }]);
           speak(closing);
@@ -483,6 +485,12 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
                         );
                       })}
                     </div>
+                    {m.hasUngrounded && !m.synth && (
+                      <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5, ...MONO, fontSize:9, color:'#B45309' }}>
+                        <AlertTriangle size={10} style={{ color:'#B45309', flexShrink:0 }} />
+                        <span>⚠ Some agents lacked live data this run</span>
+                      </div>
+                    )}
                     {m.synth && (
                       <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${T.border}` }}>
                         {(() => {
@@ -493,6 +501,12 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
                             </span>
                           ) : null;
                         })()}
+                        {m.hasUngrounded && (
+                          <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5, ...MONO, fontSize:9, color:'#B45309' }}>
+                            <AlertTriangle size={10} style={{ color:'#B45309', flexShrink:0 }} />
+                            <span>⚠ Some agents lacked live data this run</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

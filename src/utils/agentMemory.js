@@ -42,7 +42,7 @@ export async function updateAgentAccuracy(uid, agentId, wasCorrect) {
 export async function refreshAgentResearch(uid, agentId, researchPrompt, callAgentFn) {
   try {
     const ref = doc(db, 'users', uid, 'agentProfiles', agentId);
-    const content = await callAgentFn(
+    const { text: content } = await callAgentFn(
       `You are a market research analyst. ${researchPrompt} Be concise — max 4 sentences.`,
       `Current date: ${new Date().toDateString()}. Run the search and return the briefing.`,
       true, 200

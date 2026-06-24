@@ -43,6 +43,9 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const upperTicker = ticker.trim().toUpperCase();
   const verdictKey = synthesis.result ? (synthesis.result.verdict === 'PASS' ? 'PASS_FINAL' : synthesis.result.verdict) : null;
   const vStyle     = verdictKey ? (PS[verdictKey] || PS.WATCH) : null;
+  const anyUngrounded = Object.values(agentState).some(st =>
+    st.r1?.grounded === false || st.r2?.grounded === false || st.r3?.grounded === false
+  );
   const quickPicks = ['AAPL','TSLA','OKLO','PLTR','AVGO','SMCI'];
 
   async function convene() {
@@ -145,12 +148,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
 
         try {
-          const txt = await callAgent(ag.system, userMsg, ag.search, 600);
+          const { text: txt, grounded } = await callAgent(ag.system, userMsg, ag.search, 600);
           const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
           roundResults[ag.id] = result;
           setAgentState(prev => ({
             ...prev,
-            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result } },
+            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null } },
           }));
         } catch (err) {
           const isRateLimit = err?.message?.includes('429') || err?.message?.includes('ERR-429');
@@ -159,12 +162,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             await sleep(35000);
             setSynthesis({ status: 'idle', result: null });
             try {
-              const txt = await callAgent(ag.system, userMsg, ag.search, 600);
+              const { text: txt, grounded } = await callAgent(ag.system, userMsg, ag.search, 600);
               const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] };
               roundResults[ag.id] = result;
               setAgentState(prev => ({
                 ...prev,
-                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result } },
+                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null } },
               }));
             } catch {
               roundResults[ag.id] = { stance: 'TIMEOUT', score: 5, headline: 'Agent unavailable', points: [] };
@@ -207,7 +210,7 @@ The council ran 3 deliberation rounds. Synthesize their evolving positions into 
 Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}`;
 
     try {
-      const txt = await callAgent(
+      const { text: txt } = await callAgent(
         synthSys,
         `Full council deliberation:\n${fullCouncilContext}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
         false, 500, null, 'openai/gpt-oss-120b'
@@ -336,6 +339,7 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
               const r1 = st.r1?.result;
               const finalResult = r3 || r2 || r1;
               const finalSS = finalResult ? (PS[finalResult.stance] || PS.CAUTION) : null;
+              const finalGrounded = st.r3?.grounded ?? st.r2?.grounded ?? st.r1?.grounded;
 
               const isCurrentlyRunning =
                 (st.r1?.status === 'running') ||
@@ -435,6 +439,14 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
                           </p>
                         </div>
                       )}
+
+                      {/* Ungrounded warning */}
+                      {finalGrounded === false && (
+                        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px', background: 'rgba(245,158,11,0.1)', borderRadius: 6 }}>
+                          <AlertTriangle size={10} style={{ color: '#B45309', flexShrink: 0 }} />
+                          <span style={{ ...MONO, fontSize: 9, color: '#B45309' }}>⚠ Ungrounded — live search unavailable, answer may be stale</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -486,6 +498,12 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
                 <p style={{ marginTop: 16, fontSize: 16, fontWeight: 600, color: vStyle.fg, lineHeight: 1.4 }}>{synthesis.result.headline}</p>
               )}
               <p style={{ marginTop: 8, fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1.65 }}>{synthesis.result.rationale}</p>
+              {anyUngrounded && (
+                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'rgba(245,158,11,0.12)', borderRadius: 6 }}>
+                  <AlertTriangle size={11} style={{ color: '#B45309', flexShrink: 0 }} />
+                  <span style={{ ...MONO, fontSize: 11, color: '#B45309' }}>⚠ Some agents lacked live data this run — ruling may reflect stale inputs</span>
+                </div>
+              )}
             </div>
           )}
         </div>

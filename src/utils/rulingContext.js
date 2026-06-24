@@ -9,14 +9,14 @@ export async function loadTickerHistory(uid, ticker, currentPrice) {
       collection(db, 'users', uid, 'rulings'),
       where('ticker', '==', ticker),
       orderBy('ts', 'desc'),
-      limit(50)
+      limit(20)
     );
     const snap = await getDocs(q);
     if (snap.empty) return '';
 
     const docs = snap.docs.map(d => d.data());
-    const recent = docs.slice(0, 5);
-    const older  = docs.slice(5);
+    const recent = docs.slice(0, 3);
+    const older  = docs.slice(3);
 
     const lines = recent.map(r => {
       const daysAgo = r.ts?.toDate ? Math.round((Date.now() - r.ts.toDate().getTime()) / 86400000) : null;
@@ -47,7 +47,7 @@ export async function loadTickerHistory(uid, ticker, currentPrice) {
     }
 
     const out = `\nCOUNCIL HISTORY ON ${ticker} (${docs.length} prior call${docs.length > 1 ? 's' : ''}):\n${lines.join('\n')}${olderLine}\nReference this history to calibrate confidence — do not anchor to prior stance.`;
-    return out.length > 6000 ? out.slice(0, 6000) + '\n[history truncated]' : out;
+    return out.length > 2000 ? out.slice(0, 2000) + '\n[history truncated]' : out;
   } catch {
     return '';
   }

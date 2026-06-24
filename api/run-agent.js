@@ -5,6 +5,27 @@ const MODEL_SEARCH = 'groq/compound'; // Groq compound model with live web searc
 const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SYNTH_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
+// groq/compound accepts far less input than plain models; trim prompts before sending
+const COMPOUND_SEARCH_CAP = 6000;
+const HISTORY_END_MARKER  = '\nReference this history to calibrate confidence — do not anchor to prior stance.';
+
+function trimForCompound(system, userContent) {
+  if (system.length + userContent.length <= COMPOUND_SEARCH_CAP) return userContent;
+
+  // Strip the COUNCIL HISTORY block first — biggest payload, least essential for a live search call
+  const histStart = userContent.indexOf('\nCOUNCIL HISTORY ON');
+  const histEnd   = userContent.indexOf(HISTORY_END_MARKER);
+  if (histStart !== -1 && histEnd !== -1) {
+    const after = userContent.slice(histEnd + HISTORY_END_MARKER.length);
+    userContent = userContent.slice(0, histStart) + after;
+  }
+
+  // Hard-truncate to budget if still over cap
+  const budget = COMPOUND_SEARCH_CAP - system.length;
+  if (userContent.length > budget) userContent = userContent.slice(0, budget);
+  return userContent;
+}
+
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return false;
@@ -110,6 +131,9 @@ export default async function handler(req, res) {
 
   const model = useSearch ? MODEL_SEARCH : MODEL_BASE;
 
+  // For groq/compound, strip the history block and hard-cap so we stay under its input limit
+  const sendContent = useSearch ? trimForCompound(system, userContent) : userContent;
+
   // Shuffle keys so load is distributed randomly across invocations
   const keyOrder = shuffled(keys);
   let lastErr;
@@ -117,13 +141,13 @@ export default async function handler(req, res) {
   for (let k = 0; k < keyOrder.length; k++) {
     const apiKey = keyOrder[k];
     try {
-      const text = await callGroq(apiKey, model, system, userContent, maxTokens);
+      const text = await callGroq(apiKey, model, system, sendContent, maxTokens);
       return res.status(200).json({ text, grounded: useSearch });
     } catch (err) {
-      // groq/compound unavailable — fall back to base model but signal ungrounded to the frontend
-      if (useSearch && (err.status === 404 || err.status === 400) && k === 0) {
+      // groq/compound unavailable or still too large — fall back to base model, signal ungrounded
+      if (useSearch && (err.status === 404 || err.status === 400 || err.status === 413) && k === 0) {
         try {
-          const text = await callGroq(apiKey, MODEL_BASE, system, userContent, maxTokens);
+          const text = await callGroq(apiKey, MODEL_BASE, system, sendContent, maxTokens);
           return res.status(200).json({ text, grounded: false, warning: 'Live web search unavailable — answer is from model memory, not live data' });
         } catch (fe) {
           return res.status(500).json({ error: fe.message });
@@ -146,7 +170,7 @@ export default async function handler(req, res) {
 
   // All keys hit 429 — one final retry on a random key after backoff
   try {
-    const text = await callGroq(keyOrder[0], model, system, userContent, maxTokens);
+    const text = await callGroq(keyOrder[0], model, system, sendContent, maxTokens);
     return res.status(200).json({ text, grounded: useSearch });
   } catch (err) {
     console.error('runAgent: all keys exhausted', err.status, err.message);

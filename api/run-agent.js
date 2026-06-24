@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 const MODEL = 'claude-haiku-4-5-20251001';
+const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 async function verifyAuth(req) {
   const authHeader = req.headers.authorization;
@@ -46,14 +48,45 @@ async function callWithRetry(client, body, useSearch, retries = 3) {
   }
 }
 
+async function callGroqSynthesis(system, userContent, maxTokens) {
+  const res = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROQ_SYNTH_MODEL,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userContent },
+      ],
+      max_tokens: Math.max(maxTokens || 900, 1500),
+      reasoning_effort: 'high',
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Groq error ${res.status}`);
+  }
+  const data = await res.json();
+  // Use choices[0].message.content — the final answer, not any reasoning trace
+  return data.choices?.[0]?.message?.content || '';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await verifyAuth(req)) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { system, userContent, useSearch } = req.body || {};
+  const { system, userContent, useSearch, maxTokens, model } = req.body || {};
   if (!system || !userContent) return res.status(400).json({ error: 'Missing system or userContent' });
 
   try {
+    if (model === GROQ_SYNTH_MODEL) {
+      const text = await callGroqSynthesis(system, userContent, maxTokens);
+      return res.status(200).json({ text });
+    }
+
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const body = { model: MODEL, max_tokens: 1000, system, messages: [{ role: 'user', content: userContent }] };
     const response = await callWithRetry(client, body, useSearch);

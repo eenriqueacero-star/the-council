@@ -7,14 +7,16 @@ async function authHeaders() {
   return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 }
 
-export async function callAgent(system, userContent, useSearch, maxTokens = 512) {
+export async function callAgent(system, userContent, useSearch, maxTokens = 512, model = null) {
   let headers;
   try { headers = await authHeaders(); }
   catch { throw new Error('ERR-401: Not authenticated'); }
 
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
-    try { res = await fetch('/api/run-agent', { method: 'POST', headers, body: JSON.stringify({ system, userContent, useSearch: !!useSearch, maxTokens }) }); }
+    const payload = { system, userContent, useSearch: !!useSearch, maxTokens };
+    if (model) payload.model = model;
+    try { res = await fetch('/api/run-agent', { method: 'POST', headers, body: JSON.stringify(payload) }); }
     catch { throw new Error('ERR-NET: No response from server'); }
 
     if (res.status === 429 && attempt === 0) {

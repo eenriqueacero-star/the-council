@@ -162,7 +162,7 @@ If verdict is BUY and capital is stated, include exact position size (dollar amo
 If the thesis is long-term (multi-month hold), include a timeframe. Otherwise set timeframe to null.
 Respond ONLY with JSON in a \`\`\`json block: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"sizing":"<one line>","entry":"<aggressive entry zone>","conservativeEntry":"<confirmation-based entry>","stopLoss":"<price>","takeProfit":"<price or target>","invalidation":"<exact price where bull thesis is dead>","mindChanger":"<one data point that would flip this verdict>","positionSize":"<$ amount + approx shares if capital known, else null>","timeframe":"<e.g. 3-6 months or null>","summary":"<2-3 sentences, plain, direct>","bull":["<for>","<for>"],"risks":["<risk>","<risk>"]}`;
     try {
-      const txt = await callAgent(synthSystem, `Council ${roundWord} for ${t}:\n${debateTranscript}\n\n${acctLine}\n${capLine}\n${priceLine}Final ruling. Return ONLY the JSON.`, false, 900);
+      const txt = await callAgent(synthSystem, `Council ${roundWord} for ${t}:\n${debateTranscript}\n\n${acctLine}\n${capLine}\n${priceLine}Final ruling. Return ONLY the JSON.`, false, 900, 'openai/gpt-oss-120b');
       const p = extractJSON(txt);
       setSynthesis({ status: 'done', result: p || { verdict: 'WATCH', conviction: 5, sizing: 'n/a', summary: 'Could not parse synthesis.', bull: [], risks: [] } });
       if (p) notifyDevices(`${t}: ${p.verdict} · ${p.conviction}/10`, p.summary || 'Council ruling is in.');

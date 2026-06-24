@@ -253,7 +253,7 @@ Then add a followUp: one short natural question or suggestion — e.g. offer to 
 Respond ONLY with JSON in a \`\`\`json block: {"speak":"<ruling>","verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"followUp":"<one sentence>"}`;
       let synth;
       try {
-        const txt = await callAgent(synthSys, `Council ${roundWord} for ${tkr}:\n${council}\n\n${priceLine}Deliver the ruling. Return ONLY the JSON.`, false, 900);
+        const txt = await callAgent(synthSys, `Council ${roundWord} for ${tkr}:\n${council}\n\n${priceLine}Deliver the ruling. Return ONLY the JSON.`, false, 900, 'openai/gpt-oss-120b');
         synth = extractJSON(txt) || { speak: 'The council is split, sir — I\'d hold off for now.', verdict: 'WATCH', conviction: 5, followUp: null };
       } catch (e) {
         flagApiDown();

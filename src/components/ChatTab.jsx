@@ -224,7 +224,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
     let router;
     try {
       const { text: txt } = await callAgent(axiomSys, `Investor: "${text}". ${acctLine} Return ONLY the JSON.`, false);
-      router = extractJSON(txt) || { speak: "I didn't quite catch that.", fullCouncil: false, ticker: null, route: [] };
+      const parsed = extractJSON(txt);
+      if (!parsed) console.error('[AXIOM router] JSON parse failed. Raw txt:', JSON.stringify(txt));
+      router = parsed || { speak: "I didn't quite catch that.", fullCouncil: false, ticker: null, route: [] };
     } catch {
       flagApiDown();
       router = { speak: "I can't reach the council right now.", fullCouncil: false, ticker: null, route: [] };

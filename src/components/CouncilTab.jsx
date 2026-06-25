@@ -190,7 +190,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         }
 
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 1800);
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000);
           let result = extractJSON(txt);
           if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] }; }
           roundResults[ag.id] = result;
@@ -205,7 +205,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             await sleep(35000);
             setSynthesis({ status: 'idle', result: null });
             try {
-              const { text: txt } = await callAgent(ag.system, userMsg, false, 1800);
+              const { text: txt } = await callAgent(ag.system, userMsg, false, 1000);
               let result = extractJSON(txt);
               if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} retry raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] }; }
               roundResults[ag.id] = result;
@@ -239,15 +239,19 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       allRounds.push(roundResults);
     }
 
-    // 4. Synthesis
-    setProgressLabel('AXIOM synthesizing…');
+    // 4. Synthesis — pace the TPM budget before calling so the per-minute window partially resets
+    setProgressLabel('AXIOM deliberating…');
     setActive('synthesis');
     setSynthesis({ status: 'running', result: null });
     setTimeout(() => synthRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+    await sleep(18000); // let ~18s of the 60s TPM window expire before synthesis adds to the budget
+    setProgressLabel('AXIOM synthesizing…');
 
-    const fullCouncilContext = allRounds.map((r, i) =>
-      `=== ROUND ${i + 1} ===\n` + AGENTS.map(ag => `${ag.name} (${ag.role}): ${JSON.stringify(r[ag.id])}`).join('\n')
-    ).join('\n\n');
+    // Only send each agent's FINAL round output — keeps synthesis prompt ~3x smaller than all-rounds
+    const finalCouncilSummary = AGENTS.map(ag => {
+      const r = allRounds[2]?.[ag.id] || allRounds[1]?.[ag.id] || allRounds[0]?.[ag.id] || {};
+      return `${ag.name} (${ag.role}): ${JSON.stringify(r)}`;
+    }).join('\n');
 
     const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final investment ruling on ${upperTicker} for ${acct.label}. ${PROTOCOLS}
 The council ran 3 deliberation rounds. Synthesize their evolving positions into a decisive verdict.
@@ -256,7 +260,7 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
     try {
       const { text: txt, warning: synthWarn } = await callAgent(
         synthSys,
-        `Full council deliberation:\n${fullCouncilContext}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
+        `Council final positions:\n${finalCouncilSummary}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
         false, 2000, null, 'openai/gpt-oss-120b'
       );
       let result = extractJSON(txt);
@@ -518,7 +522,7 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
           {synthesis.status === 'running' && (
             <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: 24, display: 'flex', alignItems: 'center', gap: 12, ...MONO, color: '#B45309' }}>
               <Loader2 size={18} className="animate-spin" />
-              <span style={{ fontSize: 14 }}>AXIOM synthesizing the council's 3-round deliberation…</span>
+              <span style={{ fontSize: 14 }}>{progressLabel || 'AXIOM synthesizing…'}</span>
             </div>
           )}
           {synthesis.status === 'error' && (

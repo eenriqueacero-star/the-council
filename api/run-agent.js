@@ -223,7 +223,8 @@ export default async function handler(req, res) {
         const isTimeout = err.name === 'AbortError' || Boolean(err.message?.toLowerCase().includes('timeout'));
         console.error(`[synthesis] attempt ${attempt + 1} error: status=${err.status ?? 'none'} timeout=${isTimeout} msg=${err.message}`);
         if (attempt === 0) {
-          await sleep(1500); // brief pause before retry
+          // 429 = TPM rate limit — need the 60s window to partially reset before retrying
+          await sleep(err.status === 429 ? 20000 : 2000);
           continue;
         }
         // Both attempts failed — return 200+warning so the frontend can show the error

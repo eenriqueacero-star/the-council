@@ -146,7 +146,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 1800);
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000);
           const parsed = extractJSON(txt);
           if (!parsed) console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt));
           roundResults[ag.id] = parsed || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
@@ -167,10 +167,13 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
       allRounds.push(roundResults);
     }
 
-    // Synthesis
-    const fullCouncilContext = allRounds.map((r, i) =>
-      `=== ROUND ${i + 1} ===\n` + AGENTS.map(ag => `${ag.name} (${ag.role}): ${JSON.stringify(r[ag.id])}`).join('\n')
-    ).join('\n\n');
+    // Synthesis — pace TPM budget: 18s delay lets the per-minute window partially reset
+    await sleep(18000);
+    // Only send each agent's final round output to keep the synthesis prompt small
+    const finalCouncilSummary = AGENTS.map(ag => {
+      const r = allRounds[2]?.[ag.id] || allRounds[1]?.[ag.id] || allRounds[0]?.[ag.id] || {};
+      return `${ag.name} (${ag.role}): ${JSON.stringify(r)}`;
+    }).join('\n');
 
     const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final ruling on ${tkr} for ${acct.label}. ${PROTOCOLS}
 The council ran 3 deliberation rounds. Synthesize into a decisive verdict. Speak the ruling conversationally (2-4 sentences).
@@ -178,7 +181,7 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
 
     let synth;
     try {
-      const { text: txt, warning: synthWarn } = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 2000, null, 'openai/gpt-oss-120b');
+      const { text: txt, warning: synthWarn } = await callAgent(synthSys, `Council final positions:\n${finalCouncilSummary}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 2000, null, 'openai/gpt-oss-120b');
       synth = extractJSON(txt);
       if (!synth) {
         console.error('[synthesis parse fail] ChatTab raw txt:', JSON.stringify(txt), 'warn:', synthWarn);

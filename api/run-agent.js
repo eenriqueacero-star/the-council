@@ -6,8 +6,8 @@ const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SYNTH_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
 // groq/compound accepts far less input than plain models; trim prompts aggressively before sending
-const COMPOUND_SEARCH_CAP = 2500; // combined system + userContent character limit for groq/compound
-const COMPOUND_SYS_MAX    = 800;  // max chars kept from system prompt when hard-trimming
+const COMPOUND_SEARCH_CAP = 2000; // combined system + userContent character limit for groq/compound
+const COMPOUND_SYS_MAX    = 700;  // max chars kept from system prompt when hard-trimming
 const HISTORY_END_MARKER  = '\nReference this history to calibrate confidence — do not anchor to prior stance.';
 
 // Returns { system, userContent } trimmed to fit within COMPOUND_SEARCH_CAP.
@@ -171,6 +171,11 @@ export default async function handler(req, res) {
     sendContent = trimmed.userContent;
   }
 
+  // Log exact char count right before sending to compound so Vercel logs confirm enforcement
+  if (useSearch) {
+    console.error(`[compound] sending ${sendSystem.length + sendContent.length} chars (sys=${sendSystem.length} user=${sendContent.length}) — cap=${COMPOUND_SEARCH_CAP}`);
+  }
+
   // Shuffle keys so load is distributed randomly across invocations
   const keyOrder = shuffled(keys);
   let lastErr;
@@ -198,7 +203,9 @@ export default async function handler(req, res) {
           const text = await callGroq(apiKey, MODEL_BASE, system, sendContent, maxTokens);
           return res.status(200).json({ text, grounded: false, warning });
         } catch (fe) {
-          return res.status(500).json({ error: fe.message });
+          // MODEL_BASE fallback also failed — guarantee a 200 so the agent card shows something
+          console.error('runAgent: base model fallback also failed:', fe.status, fe.message);
+          return res.status(200).json({ text: '', grounded: false, warning: 'Ungrounded — agent failed, no data' });
         }
       }
 
@@ -211,8 +218,9 @@ export default async function handler(req, res) {
         continue;
       }
 
+      // Non-search, non-429 error — return empty result rather than hard error
       console.error('runAgent error:', err.status, err.message);
-      return res.status(500).json({ error: err.message });
+      return res.status(200).json({ text: '', grounded: false, warning: `Agent error [${err.status || 'unknown'}]: ${(err.message || '').slice(0, 150)}` });
     }
   }
 
@@ -222,6 +230,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ text, grounded: useSearch });
   } catch (err) {
     console.error('runAgent: all keys exhausted', err.status, err.message);
-    return res.status(429).json({ code: 'ERR-429', error: 'Rate limited on all keys' });
+    return res.status(200).json({ text: '', grounded: false, warning: 'Rate-limited on all keys — try again shortly' });
   }
 }

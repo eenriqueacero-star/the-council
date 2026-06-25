@@ -147,7 +147,7 @@ async function callGroqBase(apiKey, system, userContent, maxTokens) {
 
 // Synthesis: gpt-oss-120b with reasoning_effort: 'medium', primary key only.
 // 'medium' gives quality deliberation while keeping latency well inside the 60s function limit.
-async function callGroqSynthesis(system, userContent, maxTokens) {
+async function callGroqSynthesis(apiKey, system, userContent, maxTokens) {
   const effectiveMax = Math.max(maxTokens || 2000, 2000);
   const t0 = Date.now();
   let httpStatus = 0;
@@ -155,7 +155,7 @@ async function callGroqSynthesis(system, userContent, maxTokens) {
     const res = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -206,18 +206,20 @@ export default async function handler(req, res) {
     return res.status(500).json({ code: 'ERR-CFG', error: 'No GROQ_API_KEY configured' });
   }
 
-  const { system, userContent, useSearch = false, maxTokens = 700, model: requestedModel } = req.body || {};
+  const { system, userContent, useSearch = false, maxTokens = 700, model: requestedModel, agentIndex = null } = req.body || {};
   if (!system || !userContent) return res.status(400).json({ error: 'Missing system or userContent' });
   if (system.length + userContent.length > 20_000) {
     return res.status(400).json({ code: 'ERR-SIZE', error: 'Prompt exceeds maximum allowed length' });
   }
 
-  // Synthesis path: medium-effort reasoning for final verdict, bypasses key rotation.
+  // Synthesis path: medium-effort reasoning for final verdict, uses dedicated last key.
   // Retries once on any failure before returning a warning so the UI can still display something.
   if (requestedModel === GROQ_SYNTH_MODEL) {
+    // Dedicate the last key to synthesis — it sees no agent TPM from this run
+    const synthKey = keys[keys.length - 1];
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const text = await callGroqSynthesis(system, userContent, maxTokens);
+        const text = await callGroqSynthesis(synthKey, system, userContent, maxTokens);
         return res.status(200).json({ text });
       } catch (err) {
         const isTimeout = err.name === 'AbortError' || Boolean(err.message?.toLowerCase().includes('timeout'));
@@ -281,8 +283,17 @@ export default async function handler(req, res) {
 
   // ── Non-search path ──────────────────────────────────────────────────────────
   // MODEL_BASE (gpt-oss-120b) with key rotation for 429 handling.
+  // If agentIndex is provided, start from the assigned key (round-robin across keys) so each agent
+  // uses a different key and no single key bears all 6 agents' TPM load.
   // reasoning_effort: 'low' keeps thinking brief so agents don't exhaust token budget on reasoning.
-  const keyOrder = shuffled(keys);
+  let keyOrder;
+  if (agentIndex !== null && keys.length > 0) {
+    const start = agentIndex % keys.length;
+    // Build rotation starting from assigned slot so 429 fallback still tries other keys
+    keyOrder = [...keys.slice(start), ...keys.slice(0, start)];
+  } else {
+    keyOrder = shuffled(keys);
+  }
 
   for (let k = 0; k < keyOrder.length; k++) {
     const apiKey = keyOrder[k];

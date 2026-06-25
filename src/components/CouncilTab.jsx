@@ -190,7 +190,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         }
 
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000);
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
           let result = extractJSON(txt);
           if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] }; }
           roundResults[ag.id] = result;
@@ -205,7 +205,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             await sleep(35000);
             setSynthesis({ status: 'idle', result: null });
             try {
-              const { text: txt } = await callAgent(ag.system, userMsg, false, 1000);
+              const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
               let result = extractJSON(txt);
               if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} retry raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] }; }
               roundResults[ag.id] = result;
@@ -244,7 +244,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     setActive('synthesis');
     setSynthesis({ status: 'running', result: null });
     setTimeout(() => synthRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
-    await sleep(18000); // let ~18s of the 60s TPM window expire before synthesis adds to the budget
+    await sleep(4000); // brief pause; agents ran on separate keys so synthesis key has fresh TPM budget
     setProgressLabel('AXIOM synthesizing…');
 
     // Only send each agent's FINAL round output — keeps synthesis prompt ~3x smaller than all-rounds

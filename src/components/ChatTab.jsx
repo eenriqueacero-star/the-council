@@ -146,7 +146,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000);
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
           const parsed = extractJSON(txt);
           if (!parsed) console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt));
           roundResults[ag.id] = parsed || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
@@ -167,8 +167,8 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
       allRounds.push(roundResults);
     }
 
-    // Synthesis — pace TPM budget: 18s delay lets the per-minute window partially reset
-    await sleep(18000);
+    // Brief pause before synthesis — agents ran on separate keys so synthesis key has fresh TPM budget
+    await sleep(4000);
     // Only send each agent's final round output to keep the synthesis prompt small
     const finalCouncilSummary = AGENTS.map(ag => {
       const r = allRounds[2]?.[ag.id] || allRounds[1]?.[ag.id] || allRounds[0]?.[ag.id] || {};

@@ -84,6 +84,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
     // 3-round council (compact for chat — show only final stances)
     const allRounds = [];
     let hasUngrounded = false;
+    const ungroundedWarnings = [];
 
     const summariseRound = (r, idx) => {
       const s = AGENTS.map(ag => { const res = r[ag.id] || {}; return `${ag.name}: ${res.stance || '?'} — ${res.headline || ''}`; }).join('\n');
@@ -114,8 +115,8 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
         try {
-          const { text: txt, grounded } = await callAgent(ag.system, userMsg, ag.search, 500);
-          if (ag.search && grounded === false) hasUngrounded = true;
+          const { text: txt, grounded, warning } = await callAgent(ag.system, userMsg, ag.search, 500);
+          if (ag.search && grounded === false) { hasUngrounded = true; if (warning) ungroundedWarnings.push(warning); }
           roundResults[ag.id] = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
         } catch {
           roundResults[ag.id] = { stance: 'CAUTION', score: 5, headline: 'Error', points: [] };
@@ -170,7 +171,7 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
     }
 
     // Update council message with synth result
-    setChat(p => p.map(m => m.runId === runId ? { ...m, synth, hasUngrounded } : m));
+    setChat(p => p.map(m => m.runId === runId ? { ...m, synth, hasUngrounded, ungroundedWarnings } : m));
     setChat(p => [...p, { role: 'pm', text: synth.speak, verdict: synth.verdict, conviction: synth.conviction, ticker: tkr }]);
     speak(synth.speak);
 
@@ -490,7 +491,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
                     {m.hasUngrounded && !m.synth && (
                       <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5, ...MONO, fontSize:9, color:'#B45309' }}>
                         <AlertTriangle size={10} style={{ color:'#B45309', flexShrink:0 }} />
-                        <span>⚠ Some agents lacked live data this run</span>
+                        <span>⚠ {(m.ungroundedWarnings?.length > 0 ? m.ungroundedWarnings[0] + (m.ungroundedWarnings.length > 1 ? ` (+${m.ungroundedWarnings.length - 1} more)` : '') : 'Some agents lacked live data this run')}</span>
                       </div>
                     )}
                     {m.synth && (
@@ -506,7 +507,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
                         {m.hasUngrounded && (
                           <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5, ...MONO, fontSize:9, color:'#B45309' }}>
                             <AlertTriangle size={10} style={{ color:'#B45309', flexShrink:0 }} />
-                            <span>⚠ Some agents lacked live data this run</span>
+                            <span>⚠ {(m.ungroundedWarnings?.length > 0 ? m.ungroundedWarnings[0] + (m.ungroundedWarnings.length > 1 ? ` (+${m.ungroundedWarnings.length - 1} more)` : '') : 'Some agents lacked live data this run')}</span>
                           </div>
                         )}
                       </div>

@@ -148,12 +148,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
 
         try {
-          const { text: txt, grounded } = await callAgent(ag.system, userMsg, ag.search, 600);
+          const { text: txt, grounded, warning } = await callAgent(ag.system, userMsg, ag.search, 600);
           const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
           roundResults[ag.id] = result;
           setAgentState(prev => ({
             ...prev,
-            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null } },
+            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null, warning: ag.search ? (warning ?? null) : null } },
           }));
         } catch (err) {
           const isRateLimit = err?.message?.includes('429') || err?.message?.includes('ERR-429');
@@ -162,12 +162,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             await sleep(35000);
             setSynthesis({ status: 'idle', result: null });
             try {
-              const { text: txt, grounded } = await callAgent(ag.system, userMsg, ag.search, 600);
+              const { text: txt, grounded, warning } = await callAgent(ag.system, userMsg, ag.search, 600);
               const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] };
               roundResults[ag.id] = result;
               setAgentState(prev => ({
                 ...prev,
-                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null } },
+                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null, warning: ag.search ? (warning ?? null) : null } },
               }));
             } catch {
               roundResults[ag.id] = { stance: 'TIMEOUT', score: 5, headline: 'Agent unavailable', points: [] };
@@ -340,6 +340,7 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
               const finalResult = r3 || r2 || r1;
               const finalSS = finalResult ? (PS[finalResult.stance] || PS.CAUTION) : null;
               const finalGrounded = st.r3?.grounded ?? st.r2?.grounded ?? st.r1?.grounded;
+              const finalWarning  = st.r3?.warning  ?? st.r2?.warning  ?? st.r1?.warning;
 
               const isCurrentlyRunning =
                 (st.r1?.status === 'running') ||
@@ -444,7 +445,7 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
                       {finalGrounded === false && (
                         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px', background: 'rgba(245,158,11,0.1)', borderRadius: 6 }}>
                           <AlertTriangle size={10} style={{ color: '#B45309', flexShrink: 0 }} />
-                          <span style={{ ...MONO, fontSize: 9, color: '#B45309' }}>⚠ Ungrounded — live search unavailable, answer may be stale</span>
+                          <span style={{ ...MONO, fontSize: 9, color: '#B45309' }}>⚠ {finalWarning || 'Ungrounded — live search unavailable, answer may be stale'}</span>
                         </div>
                       )}
                     </div>

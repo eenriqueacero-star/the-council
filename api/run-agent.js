@@ -145,10 +145,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ text, grounded: useSearch });
     } catch (err) {
       // groq/compound unavailable or still too large — fall back to base model, signal ungrounded
-      if (useSearch && (err.status === 404 || err.status === 400 || err.status === 413) && k === 0) {
+      if (useSearch && err.status !== 429 && k === 0) {
+        const isTimeout = err.name === 'AbortError' || Boolean(err.message?.toLowerCase().includes('timeout'));
+        const statusStr = err.status != null ? String(err.status) : 'unknown';
+        const msgStr    = (err.error?.message || err.message || 'unknown error').slice(0, 200);
+        const warning   = isTimeout
+          ? 'Ungrounded — compound timed out'
+          : `Ungrounded — compound failed [${statusStr}]: ${msgStr}`;
+        console.error('groq/compound error (falling back):', statusStr, err.message, err);
         try {
           const text = await callGroq(apiKey, MODEL_BASE, system, sendContent, maxTokens);
-          return res.status(200).json({ text, grounded: false, warning: 'Live web search unavailable — answer is from model memory, not live data' });
+          return res.status(200).json({ text, grounded: false, warning });
         } catch (fe) {
           return res.status(500).json({ error: fe.message });
         }

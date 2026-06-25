@@ -124,7 +124,10 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
     const priceNote = livePrice ? ` Price: $${livePrice.toFixed(2)}.` : '';
     const acctLine  = `Account: ${acct.label}. Holdings: ${positionsLine}. Capital: $${capital.trim() || acct.capital || 'unspecified'}.`;
-    const baseContent = `Ticker: ${upperTicker}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}${liveDataBlock}`;
+    const liveDataOverride = liveDataBlock
+      ? liveDataBlock + '\nIMPORTANT: The LIVE DATA block above is the current ground truth. If any historical ruling, prior call, or context conflicts with the price, trend, or news in LIVE DATA — IGNORE the history and reason from LIVE DATA only. Never cite prices or news from historical rulings as if they are current.\n'
+      : '';
+    const baseContent = `Ticker: ${upperTicker}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}${liveDataOverride}`;
     console.error('[recon][CouncilTab] baseContent tail (last 400 chars):', baseContent.slice(-400));
 
     // Mark all agents as pending
@@ -262,7 +265,7 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
       AGENTS.forEach(ag => {
         agentStances[ag.id] = { stance: allRounds[2]?.[ag.id]?.stance || allRounds[0]?.[ag.id]?.stance || '?' };
       });
-      if (uid && result.verdict) {
+      if (uid && result.verdict && reconGrounded) {
         addDoc(collection(db, 'users', uid, 'rulings'), {
           ticker: upperTicker, account,
           verdict: result.verdict, conviction: result.conviction,
@@ -274,6 +277,8 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
           date: new Date().toISOString().slice(0, 10),
           outcomeCheckedAt: null, priceAt30d: null, outcome: null,
         }).catch(e => console.error('Failed to save ruling:', e));
+      } else if (uid && result.verdict && !reconGrounded) {
+        console.error('[ruling] skipped Firestore save — recon not grounded, ruling may be stale');
       }
     } catch {
       flagApiDown();

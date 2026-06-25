@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purge Council Rulings</title>
+  <style>
+    body { font-family: monospace; background: #070a0c; color: #ccc; padding: 32px; max-width: 680px; }
+    h2 { color: #f5c451; }
+    button { background: #c0392b; color: #fff; border: none; padding: 12px 28px; font-size: 15px; font-family: monospace; cursor: pointer; border-radius: 6px; margin: 8px 4px 0 0; }
+    button#loginBtn { background: #1a73e8; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #log { margin-top: 20px; white-space: pre-wrap; background: #0d1117; border: 1px solid #222; padding: 16px; border-radius: 6px; min-height: 120px; font-size: 13px; line-height: 1.7; }
+    .ok { color: #00C805; } .err { color: #FF3B30; } .info { color: #38e0d4; }
+  </style>
+</head>
+<body>
+  <h2>⚠ Purge All Council Rulings</h2>
+  <p>This deletes every document in <code>users/{uid}/rulings</code> in Firestore.<br>
+     Use it to wipe poisoned/hallucinated rulings. <strong>This cannot be undone.</strong></p>
+  <button id="loginBtn">1. Sign in with Google</button>
+  <button id="purgeBtn" disabled>2. PURGE ALL RULINGS</button>
+  <div id="log">Waiting…</div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+    import { getFirestore, collection, getDocs, deleteDoc, doc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey:            'AIzaSyB6KEbMzfSlOo6UdXhHjHAnziDfJIU-EmM',
+      authDomain:        'the-council-89570.firebaseapp.com',
+      projectId:         'the-council-89570',
+      storageBucket:     'the-council-89570.firebasestorage.app',
+      messagingSenderId: '882011984204',
+      appId:             '1:882011984204:web:e74ff2059ffb0ff1c7ffe9',
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db   = getFirestore(app);
+    const log  = document.getElementById('log');
+
+    function print(msg, cls = '') {
+      const line = document.createElement('span');
+      if (cls) line.className = cls;
+      line.textContent = msg + '\n';
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    let currentUser = null;
+
+    document.getElementById('loginBtn').onclick = async () => {
+      try {
+        const result = await signInWithPopup(auth, new GoogleAuthProvider());
+        currentUser = result.user;
+        print(`✓ Signed in as ${currentUser.email} (uid: ${currentUser.uid})`, 'ok');
+        document.getElementById('purgeBtn').disabled = false;
+      } catch (e) {
+        print('Sign-in failed: ' + e.message, 'err');
+      }
+    };
+
+    document.getElementById('purgeBtn').onclick = async () => {
+      if (!currentUser) { print('Sign in first.', 'err'); return; }
+      document.getElementById('purgeBtn').disabled = true;
+      log.innerHTML = '';
+      print(`Starting purge for uid=${currentUser.uid}…`, 'info');
+
+      try {
+        const rulingsColl = collection(db, 'users', currentUser.uid, 'rulings');
+        const snap = await getDocs(rulingsColl);
+        print(`Found ${snap.size} ruling documents.`, 'info');
+
+        if (snap.size === 0) {
+          print('Nothing to delete.', 'ok');
+          document.getElementById('purgeBtn').disabled = false;
+          return;
+        }
+
+        let deleted = 0;
+        for (const d of snap.docs) {
+          await deleteDoc(doc(db, 'users', currentUser.uid, 'rulings', d.id));
+          deleted++;
+          if (deleted % 10 === 0) print(`  deleted ${deleted}/${snap.size}…`);
+        }
+
+        print(`\n✓ DONE — deleted ${deleted} rulings. Clean slate.`, 'ok');
+        print('You can close this tab and reload the app.', 'ok');
+      } catch (e) {
+        print('Purge error: ' + e.message, 'err');
+        document.getElementById('purgeBtn').disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>

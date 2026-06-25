@@ -107,7 +107,10 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
     }
 
     const priceNote   = livePrice ? ` Price: $${livePrice.toFixed(2)}.` : '';
-    const baseContent = `Ticker: ${tkr}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}${liveDataBlock}`;
+    const liveDataOverride = liveDataBlock
+      ? liveDataBlock + '\nIMPORTANT: The LIVE DATA block above is the current ground truth. If any historical ruling, prior call, or context conflicts with the price, trend, or news in LIVE DATA — IGNORE the history and reason from LIVE DATA only. Never cite prices or news from historical rulings as if they are current.\n'
+      : '';
+    const baseContent = `Ticker: ${tkr}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}${liveDataOverride}`;
 
     // 3-round council (compact for chat — show only final stances)
     const allRounds = [];
@@ -180,8 +183,8 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
       flagApiDown();
     }
 
-    // Save ruling
-    if (uid && synth.verdict) {
+    // Save ruling only if recon was grounded (live price + news confirmed)
+    if (uid && synth.verdict && reconGrounded) {
       const agentStances = {};
       AGENTS.forEach(ag => { agentStances[ag.id] = { stance: allRounds[2]?.[ag.id]?.stance || allRounds[0]?.[ag.id]?.stance || '?' }; });
       addDoc(collection(db, 'users', uid, 'rulings'), {
@@ -195,6 +198,8 @@ Return ONLY JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","convi
         summary: synth.speak || '',
         outcomeCheckedAt: null, priceAt30d: null, outcome: null,
       }).catch(e => console.error('Failed to save ruling:', e));
+    } else if (uid && synth.verdict && !reconGrounded) {
+      console.error('[ruling] skipped Firestore save — recon not grounded, ruling may be stale');
     }
 
     // Update council message with synth result

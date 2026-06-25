@@ -78,13 +78,39 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
       }
     }
 
+    // Shared recon: ONE compound call for live news, then inject into all agents
+    let liveDataBlock = '';
+    let reconGrounded = false;
+    try {
+      const now = new Date();
+      const timeStr = now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+      let priceStr = livePrice ? `$${livePrice.toFixed(2)}` : 'N/A';
+      let changeStr = rawQuote?.changePct != null ? `${rawQuote.changePct >= 0 ? '+' : ''}${rawQuote.changePct.toFixed(2)}% today` : '';
+      let rangeStr = rawQuote?.low && rawQuote?.high ? ` range $${rawQuote.low.toFixed(2)}-$${rawQuote.high.toFixed(2)}` : '';
+
+      let newsText = '';
+      try {
+        const reconSys = 'Financial news summarizer. Return 3-4 bullet headlines only, no JSON.';
+        const reconQuery = `Latest news, catalysts, and analyst moves for ${tkr} past 7 days.`;
+        const { text: newsRaw } = await callAgent(reconSys, reconQuery, true, 350);
+        if (newsRaw?.trim()) newsText = newsRaw.trim();
+      } catch (newsErr) {
+        console.error('[recon] news call failed:', newsErr.message);
+      }
+
+      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news:\n' + newsText : ' Recent news: unavailable.'}\n`;
+      reconGrounded = !!(livePrice && newsText);
+    } catch (reconErr) {
+      console.error('[recon] recon step failed:', reconErr.message);
+    }
+
     const priceNote   = livePrice ? ` Price: $${livePrice.toFixed(2)}.` : '';
-    const baseContent = `Ticker: ${tkr}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}`;
+    const baseContent = `Ticker: ${tkr}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}${liveDataBlock}`;
 
     // 3-round council (compact for chat — show only final stances)
     const allRounds = [];
-    let hasUngrounded = false;
-    const ungroundedWarnings = [];
+    let hasUngrounded = !reconGrounded;
+    const ungroundedWarnings = reconGrounded ? [] : ['Live data unavailable for this run'];
 
     const summariseRound = (r, idx) => {
       const s = AGENTS.map(ag => { const res = r[ag.id] || {}; return `${ag.name}: ${res.stance || '?'} — ${res.headline || ''}`; }).join('\n');
@@ -115,8 +141,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
         try {
-          const { text: txt, grounded, warning } = await callAgent(ag.system, userMsg, ag.search, 500);
-          if (ag.search && grounded === false) { hasUngrounded = true; if (warning) ungroundedWarnings.push(warning); }
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 500);
           roundResults[ag.id] = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
         } catch {
           roundResults[ag.id] = { stance: 'CAUTION', score: 5, headline: 'Error', points: [] };

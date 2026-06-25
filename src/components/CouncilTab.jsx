@@ -90,9 +90,39 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       }
     }
 
+    // Shared recon: ONE compound call for live news, then inject into all agents
+    setProgressLabel('Fetching live data…');
+    let liveDataBlock = '';
+    let reconGrounded = false;
+    try {
+      const now = new Date();
+      const timeStr = now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+      let priceStr = livePrice ? `$${livePrice.toFixed(2)}` : 'N/A';
+      let changeStr = rawQuote?.changePct != null ? `${rawQuote.changePct >= 0 ? '+' : ''}${rawQuote.changePct.toFixed(2)}% today` : '';
+      let rangeStr = rawQuote?.low && rawQuote?.high ? ` range $${rawQuote.low.toFixed(2)}-$${rawQuote.high.toFixed(2)}` : '';
+
+      let newsText = '';
+      try {
+        const reconSys = 'Financial news summarizer. Return 3-4 bullet headlines only, no JSON.';
+        const reconQuery = `Latest news, catalysts, and analyst moves for ${upperTicker} past 7 days.`;
+        const { text: newsRaw } = await callAgent(reconSys, reconQuery, true, 350);
+        if (newsRaw?.trim()) newsText = newsRaw.trim();
+      } catch (newsErr) {
+        console.error('[recon] news call failed:', newsErr.message);
+        newsText = '';
+      }
+
+      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${upperTicker} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news:\n' + newsText : ' Recent news: unavailable.'}\n`;
+      reconGrounded = !!(livePrice && newsText);
+    } catch (reconErr) {
+      console.error('[recon] recon step failed:', reconErr.message);
+      liveDataBlock = '';
+      reconGrounded = false;
+    }
+
     const priceNote = livePrice ? ` Price: $${livePrice.toFixed(2)}.` : '';
     const acctLine  = `Account: ${acct.label}. Holdings: ${positionsLine}. Capital: $${capital.trim() || acct.capital || 'unspecified'}.`;
-    const baseContent = `Ticker: ${upperTicker}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}`;
+    const baseContent = `Ticker: ${upperTicker}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}${liveDataBlock}`;
 
     // Mark all agents as pending
     const initState = {};
@@ -148,12 +178,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
 
         try {
-          const { text: txt, grounded, warning } = await callAgent(ag.system, userMsg, ag.search, 600);
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 600);
           const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
           roundResults[ag.id] = result;
           setAgentState(prev => ({
             ...prev,
-            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null, warning: ag.search ? (warning ?? null) : null } },
+            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: reconGrounded, warning: reconGrounded ? null : 'Ungrounded — live data unavailable' } },
           }));
         } catch (err) {
           const isRateLimit = err?.message?.includes('429') || err?.message?.includes('ERR-429');
@@ -162,12 +192,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             await sleep(35000);
             setSynthesis({ status: 'idle', result: null });
             try {
-              const { text: txt, grounded, warning } = await callAgent(ag.system, userMsg, ag.search, 600);
+              const { text: txt } = await callAgent(ag.system, userMsg, false, 600);
               const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] };
               roundResults[ag.id] = result;
               setAgentState(prev => ({
                 ...prev,
-                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: ag.search ? grounded : null, warning: ag.search ? (warning ?? null) : null } },
+                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: reconGrounded, warning: reconGrounded ? null : 'Ungrounded — live data unavailable' } },
               }));
             } catch {
               roundResults[ag.id] = { stance: 'TIMEOUT', score: 5, headline: 'Agent unavailable', points: [] };

@@ -181,14 +181,17 @@ export default async function handler(req, res) {
       const text = await callGroq(apiKey, model, sendSystem, sendContent, maxTokens);
       return res.status(200).json({ text, grounded: useSearch });
     } catch (err) {
-      // groq/compound unavailable or still too large — fall back to base model, signal ungrounded
-      if (useSearch && err.status !== 429 && k === 0) {
+      // compound path: ANY failure degrades immediately to base model + grounded:false.
+      // Key rotation cannot help compound — its rate limits are per-model, not per-key.
+      if (useSearch) {
         const isTimeout = err.name === 'AbortError' || Boolean(err.message?.toLowerCase().includes('timeout'));
         const statusStr = err.status != null ? String(err.status) : 'unknown';
         const msgStr    = (err.error?.message || err.message || 'unknown error').slice(0, 200);
         const warning   = isTimeout
           ? 'Ungrounded — compound timed out'
-          : `Ungrounded — compound failed [${statusStr}]: ${msgStr}`;
+          : err.status === 429
+            ? 'Ungrounded — compound rate-limited [429]'
+            : `Ungrounded — compound failed [${statusStr}]: ${msgStr}`;
         console.error('groq/compound error (falling back):', statusStr, err.message, err);
         try {
           // Use original system for fallback quality; sendContent is already trimmed

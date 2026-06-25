@@ -145,34 +145,56 @@ async function callGroqBase(apiKey, system, userContent, maxTokens) {
   return { text, finishReason };
 }
 
-// Synthesis: gpt-oss-120b with reasoning_effort: 'high', primary key only
+// Synthesis: gpt-oss-120b with reasoning_effort: 'medium', primary key only.
+// 'medium' gives quality deliberation while keeping latency well inside the 60s function limit.
 async function callGroqSynthesis(system, userContent, maxTokens) {
-  const res = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: GROQ_SYNTH_MODEL,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user',   content: userContent },
-      ],
-      max_tokens: Math.max(maxTokens || 2500, 2500),
-      reasoning_effort: 'high',
-    }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Groq synthesis error ${res.status}`);
+  const effectiveMax = Math.max(maxTokens || 2000, 2000);
+  const t0 = Date.now();
+  let httpStatus = 0;
+  try {
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: GROQ_SYNTH_MODEL,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user',   content: userContent },
+        ],
+        max_tokens: effectiveMax,
+        reasoning_effort: 'medium',
+      }),
+    });
+    httpStatus = res.status;
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      const msg = errBody.error?.message || `Groq synthesis HTTP ${res.status}`;
+      console.error(`[synthesis] FAILED ${res.status} after ${Date.now() - t0}ms: ${msg}`);
+      const e = new Error(msg);
+      e.status = res.status;
+      throw e;
+    }
+    const data = await res.json();
+    const choice = data.choices?.[0];
+    const text = choice?.message?.content || '';
+    const finishReason = choice?.finish_reason || 'unknown';
+    console.error(`[synthesis] ${Date.now() - t0}ms finish_reason=${finishReason} max_tokens=${effectiveMax} text_len=${text.length}`);
+    if (!text) {
+      // Empty content — throw so the caller can retry
+      const e = new Error(`Empty synthesis response (finish_reason=${finishReason})`);
+      e.status = null;
+      throw e;
+    }
+    return text;
+  } catch (err) {
+    if (err.status !== undefined) throw err; // already annotated — re-throw
+    // Network/abort error
+    console.error(`[synthesis] network error after ${Date.now() - t0}ms:`, err.message);
+    throw err;
   }
-  const data = await res.json();
-  const choice = data.choices?.[0];
-  const text = choice?.message?.content || '';
-  const finishReason = choice?.finish_reason || 'unknown';
-  if (!text) console.error(`[empty synthesis] finish_reason=${finishReason} max_tokens=${Math.max(maxTokens || 2500, 2500)}`);
-  return text;
 }
 
 export default async function handler(req, res) {
@@ -190,14 +212,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ code: 'ERR-SIZE', error: 'Prompt exceeds maximum allowed length' });
   }
 
-  // Synthesis path: high-effort reasoning for final verdict, bypasses key rotation
+  // Synthesis path: medium-effort reasoning for final verdict, bypasses key rotation.
+  // Retries once on any failure before returning a warning so the UI can still display something.
   if (requestedModel === GROQ_SYNTH_MODEL) {
-    try {
-      const text = await callGroqSynthesis(system, userContent, maxTokens);
-      return res.status(200).json({ text });
-    } catch (err) {
-      console.error('synthesis error:', err.message);
-      return res.status(500).json({ error: err.message });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const text = await callGroqSynthesis(system, userContent, maxTokens);
+        return res.status(200).json({ text });
+      } catch (err) {
+        const isTimeout = err.name === 'AbortError' || Boolean(err.message?.toLowerCase().includes('timeout'));
+        console.error(`[synthesis] attempt ${attempt + 1} error: status=${err.status ?? 'none'} timeout=${isTimeout} msg=${err.message}`);
+        if (attempt === 0) {
+          await sleep(1500); // brief pause before retry
+          continue;
+        }
+        // Both attempts failed — return 200+warning so the frontend can show the error
+        const warnMsg = isTimeout
+          ? 'Synthesis timed out after retry — try convening again'
+          : `Synthesis error [${err.status ?? 'unknown'}]: ${(err.message || 'unknown').slice(0, 200)}`;
+        return res.status(200).json({ text: '', warning: warnMsg });
+      }
     }
   }
 

@@ -178,13 +178,14 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
 
     let synth;
     try {
-      const { text: txt } = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 2800, null, 'openai/gpt-oss-120b');
+      const { text: txt, warning: synthWarn } = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 2000, null, 'openai/gpt-oss-120b');
       synth = extractJSON(txt);
       if (!synth) {
-        console.error('[synthesis parse fail] ChatTab raw txt:', JSON.stringify(txt));
-        synth = { speak: txt ? txt.slice(0, 400) : 'The council is split — I\'d hold off.', verdict: 'WATCH', conviction: 5 };
+        console.error('[synthesis parse fail] ChatTab raw txt:', JSON.stringify(txt), 'warn:', synthWarn);
+        synth = { speak: synthWarn || (txt ? txt.slice(0, 400) : 'The council is split — I\'d hold off.'), verdict: 'WATCH', conviction: 5 };
       }
-    } catch {
+    } catch (err) {
+      console.error('[synthesis] ChatTab callAgent threw:', err?.message);
       synth = { speak: 'Could not finalize the ruling.', verdict: 'WATCH', conviction: 5 };
       flagApiDown();
     }

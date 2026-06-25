@@ -254,15 +254,19 @@ The council ran 3 deliberation rounds. Synthesize their evolving positions into 
 Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}`;
 
     try {
-      const { text: txt } = await callAgent(
+      const { text: txt, warning: synthWarn } = await callAgent(
         synthSys,
         `Full council deliberation:\n${fullCouncilContext}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
-        false, 2800, null, 'openai/gpt-oss-120b'
+        false, 2000, null, 'openai/gpt-oss-120b'
       );
       let result = extractJSON(txt);
       if (!result) {
-        console.error('[synthesis parse fail] CouncilTab raw txt:', JSON.stringify(txt));
-        result = { verdict: 'WATCH', conviction: 5, headline: 'Council deliberation complete', rationale: txt ? txt.slice(0, 600) : 'Could not parse synthesis.' };
+        console.error('[synthesis parse fail] CouncilTab raw txt:', JSON.stringify(txt), 'warn:', synthWarn);
+        result = {
+          verdict: 'WATCH', conviction: 5,
+          headline: synthWarn ? 'Synthesis error — see details' : 'Council deliberation complete',
+          rationale: synthWarn || (txt ? txt.slice(0, 600) : 'Could not parse synthesis response.'),
+        };
       }
       setSynthesis({ status: 'done', result });
 
@@ -286,7 +290,8 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
       } else if (uid && result.verdict && !reconGrounded) {
         console.error('[ruling] skipped Firestore save — recon not grounded, ruling may be stale');
       }
-    } catch {
+    } catch (err) {
+      console.error('[synthesis] callAgent threw:', err?.message);
       flagApiDown();
       setSynthesis({ status: 'error', result: null });
     }

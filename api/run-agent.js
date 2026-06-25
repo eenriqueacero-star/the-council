@@ -6,8 +6,8 @@ const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SYNTH_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
 // groq/compound accepts far less input than plain models; trim prompts aggressively before sending
-const COMPOUND_SEARCH_CAP = 2000; // combined system + userContent character limit for groq/compound
-const COMPOUND_SYS_MAX    = 700;  // max chars kept from system prompt when hard-trimming
+const COMPOUND_SEARCH_CAP = 600; // combined system + userContent character limit for groq/compound
+const COMPOUND_SYS_MAX    = 250; // max chars kept from system prompt when hard-trimming
 const HISTORY_END_MARKER  = '\nReference this history to calibrate confidence — do not anchor to prior stance.';
 
 // Returns { system, userContent } trimmed to fit within COMPOUND_SEARCH_CAP.

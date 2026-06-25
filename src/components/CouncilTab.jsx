@@ -187,9 +187,9 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
           }
         }
 
-        // Stagger between agents (not after last agent in last round)
+        // Stagger between agents — longer delay throttles compound RPM (not after last agent in last round)
         if (!(round === 2 && i === AGENTS.length - 1)) {
-          await sleep(1500);
+          await sleep(2500);
         }
       }
       allRounds.push(roundResults);

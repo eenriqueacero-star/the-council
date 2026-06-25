@@ -130,7 +130,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
           return { ...m, agents: updatedAgents };
         }));
 
-        if (!(round === 2 && i === AGENTS.length - 1)) await sleep(1500);
+        if (!(round === 2 && i === AGENTS.length - 1)) await sleep(2500);
       }
       allRounds.push(roundResults);
     }

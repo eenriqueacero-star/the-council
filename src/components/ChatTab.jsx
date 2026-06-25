@@ -100,6 +100,8 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
       liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news:\n' + newsText : ' Recent news: unavailable.'}\n`;
       reconGrounded = !!(livePrice && newsText);
+      console.error('[recon][ChatTab] rawQuote:', JSON.stringify(rawQuote));
+      console.error('[recon][ChatTab] liveDataBlock:', liveDataBlock);
     } catch (reconErr) {
       console.error('[recon] recon step failed:', reconErr.message);
     }

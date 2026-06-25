@@ -58,16 +58,16 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
     const uid = auth.currentUser?.uid;
 
-    // 1. Parallel prep — no LLM calls
-    const [quotesRes, history, ctx, profiles] = await Promise.all([
+    // 1. Parallel prep — fetch price, history, profiles concurrently; agentContext needs rawQuote so runs after
+    const [quotesRes, history, profiles] = await Promise.all([
       getQuotes([upperTicker]).catch(() => ({})),
       uid ? loadTickerHistory(uid, upperTicker, null) : Promise.resolve(''),
-      loadAgentContext(upperTicker, null),
       uid ? loadAllAgentProfiles(uid, AGENTS.map(a => a.id)) : Promise.resolve({}),
     ]);
 
     const rawQuote = quotesRes[upperTicker] || null;
     const livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
+    const ctx = await loadAgentContext(upperTicker, rawQuote);
 
     // 2. Refresh research for the single most-stale agent (background, no await).
     // Limited to 1 compound-beta call per council run to avoid rate limit bursts.
@@ -114,6 +114,8 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
       liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${upperTicker} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news:\n' + newsText : ' Recent news: unavailable.'}\n`;
       reconGrounded = !!(livePrice && newsText);
+      console.error('[recon][CouncilTab] rawQuote:', JSON.stringify(rawQuote));
+      console.error('[recon][CouncilTab] liveDataBlock:', liveDataBlock);
     } catch (reconErr) {
       console.error('[recon] recon step failed:', reconErr.message);
       liveDataBlock = '';
@@ -123,6 +125,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     const priceNote = livePrice ? ` Price: $${livePrice.toFixed(2)}.` : '';
     const acctLine  = `Account: ${acct.label}. Holdings: ${positionsLine}. Capital: $${capital.trim() || acct.capital || 'unspecified'}.`;
     const baseContent = `Ticker: ${upperTicker}. Investor considering BUYING.${priceNote} ${acctLine} Today: ${new Date().toDateString()}.${history}${liveDataBlock}`;
+    console.error('[recon][CouncilTab] baseContent tail (last 400 chars):', baseContent.slice(-400));
 
     // Mark all agents as pending
     const initState = {};
@@ -176,6 +179,12 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         }
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
+
+        // Log first agent of round 1 to confirm LIVE DATA reaches the prompt
+        if (round === 0 && i === 0) {
+          console.error(`[recon][CouncilTab] agent[0] userMsg contains LIVE DATA: ${userMsg.includes('LIVE DATA')}`);
+          console.error(`[recon][CouncilTab] agent[0] userMsg first 600 chars:`, userMsg.slice(0, 600));
+        }
 
         try {
           const { text: txt } = await callAgent(ag.system, userMsg, false, 600);

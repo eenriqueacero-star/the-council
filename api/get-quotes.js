@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       const r = await fetch(url);
       if (!r.ok) throw new Error(`Finnhub ${r.status}`);
       const data = await r.json();
+      console.error(`[get-quotes] ${ticker} raw Finnhub: c=${data.c} dp=${data.dp} h=${data.h} l=${data.l} pc=${data.pc} t=${data.t}`);
       results[ticker] = { price: data.c, changePct: data.dp, high: data.h, low: data.l, open: data.o, prevClose: data.pc };
 
       if (withEarnings) {

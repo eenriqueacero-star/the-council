@@ -190,7 +190,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         }
 
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 600);
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 1800);
           let result = extractJSON(txt);
           if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] }; }
           roundResults[ag.id] = result;
@@ -205,7 +205,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             await sleep(35000);
             setSynthesis({ status: 'idle', result: null });
             try {
-              const { text: txt } = await callAgent(ag.system, userMsg, false, 600);
+              const { text: txt } = await callAgent(ag.system, userMsg, false, 1800);
               let result = extractJSON(txt);
               if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} retry raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] }; }
               roundResults[ag.id] = result;
@@ -257,7 +257,7 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
       const { text: txt } = await callAgent(
         synthSys,
         `Full council deliberation:\n${fullCouncilContext}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
-        false, 500, null, 'openai/gpt-oss-120b'
+        false, 2800, null, 'openai/gpt-oss-120b'
       );
       let result = extractJSON(txt);
       if (!result) {

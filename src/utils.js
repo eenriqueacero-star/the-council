@@ -23,7 +23,11 @@ export function extractJSON(text) {
   try {
     return JSON.parse(candidate);
   } catch {
-    // Retry once on the raw original text (in case stripping mangled something)
+    // Retry 1: unescape double-encoded JSON (model returned {\"key\":\"val\"} with literal backslashes)
+    try {
+      return JSON.parse(candidate.replace(/\\"/g, '"').replace(/\\\\/g, '\\'));
+    } catch {}
+    // Retry 2: fall back to raw original text in case fence-stripping mangled something
     try {
       const f = text.indexOf('{'), l = text.lastIndexOf('}');
       if (f !== -1 && l > f) return JSON.parse(text.slice(f, l + 1));

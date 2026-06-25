@@ -1,9 +1,9 @@
 import Groq from 'groq-sdk';
 
-const MODEL_BASE   = 'openai/gpt-oss-120b';
-const MODEL_SEARCH = 'groq/compound'; // Groq compound model with live web search
+const MODEL_BASE       = 'openai/gpt-oss-120b';
+const MODEL_SEARCH     = 'groq/compound'; // Groq compound model with live web search
 const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
-const GROQ_SYNTH_URL   = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_API_URL     = 'https://api.groq.com/openai/v1/chat/completions';
 
 // groq/compound accepts far less input than plain models; trim prompts aggressively before sending
 const COMPOUND_SEARCH_CAP = 600; // combined system + userContent character limit for groq/compound
@@ -95,6 +95,7 @@ function shuffled(arr) {
   return a;
 }
 
+// groq/compound (non-reasoning) via SDK — returns { text, finishReason }
 async function callGroq(apiKey, model, system, userContent, maxTokens) {
   const client = new Groq({ apiKey });
   const completion = await client.chat.completions.create({
@@ -105,11 +106,48 @@ async function callGroq(apiKey, model, system, userContent, maxTokens) {
       { role: 'user',   content: userContent },
     ],
   });
-  return completion.choices[0]?.message?.content || '';
+  const choice = completion.choices[0];
+  const text = choice?.message?.content || '';
+  const finishReason = choice?.finish_reason || 'unknown';
+  if (!text) console.error(`[empty response] model=${model} finish_reason=${finishReason} max_tokens=${maxTokens}`);
+  return { text, finishReason };
 }
 
+// gpt-oss-120b agent calls — raw fetch so we can set reasoning_effort: 'low'.
+// Low effort keeps thinking brief, leaving output-token budget for the JSON answer.
+// Returns { text, finishReason }; throws with .status on HTTP error.
+async function callGroqBase(apiKey, system, userContent, maxTokens) {
+  const res = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL_BASE,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user',   content: userContent },
+      ],
+      max_tokens: maxTokens,
+      reasoning_effort: 'low',
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const e = new Error(err.error?.message || `Groq base error ${res.status}`);
+    e.status = res.status;
+    e.error  = err.error;
+    throw e;
+  }
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  const text = choice?.message?.content || '';
+  const finishReason = choice?.finish_reason || 'unknown';
+  if (!text) console.error(`[empty response] model=${MODEL_BASE} finish_reason=${finishReason} max_tokens=${maxTokens}`);
+  return { text, finishReason };
+}
+
+// Synthesis: gpt-oss-120b with reasoning_effort: 'high', primary key only
 async function callGroqSynthesis(system, userContent, maxTokens) {
-  const res = await fetch(GROQ_SYNTH_URL, {
+  const res = await fetch(GROQ_API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
@@ -121,7 +159,7 @@ async function callGroqSynthesis(system, userContent, maxTokens) {
         { role: 'system', content: system },
         { role: 'user',   content: userContent },
       ],
-      max_tokens: Math.max(maxTokens || 700, 1500),
+      max_tokens: Math.max(maxTokens || 2500, 2500),
       reasoning_effort: 'high',
     }),
   });
@@ -130,8 +168,11 @@ async function callGroqSynthesis(system, userContent, maxTokens) {
     throw new Error(err.error?.message || `Groq synthesis error ${res.status}`);
   }
   const data = await res.json();
-  // Parse final answer only — reasoning traces are separate and not in content
-  return data.choices?.[0]?.message?.content || '';
+  const choice = data.choices?.[0];
+  const text = choice?.message?.content || '';
+  const finishReason = choice?.finish_reason || 'unknown';
+  if (!text) console.error(`[empty synthesis] finish_reason=${finishReason} max_tokens=${Math.max(maxTokens || 2500, 2500)}`);
+  return text;
 }
 
 export default async function handler(req, res) {
@@ -149,7 +190,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ code: 'ERR-SIZE', error: 'Prompt exceeds maximum allowed length' });
   }
 
-  // Synthesis-only path: gpt-oss-120b with high reasoning effort, bypasses key rotation
+  // Synthesis path: high-effort reasoning for final verdict, bypasses key rotation
   if (requestedModel === GROQ_SYNTH_MODEL) {
     try {
       const text = await callGroqSynthesis(system, userContent, maxTokens);
@@ -160,74 +201,86 @@ export default async function handler(req, res) {
     }
   }
 
-  const model = useSearch ? MODEL_SEARCH : MODEL_BASE;
-
-  // For groq/compound, aggressively trim both system and userContent to fit under its input limit
+  // Prepare prompt (compound trims heavily; base model uses full prompt)
   let sendSystem = system;
   let sendContent = userContent;
   if (useSearch) {
     const trimmed = trimForCompound(system, userContent);
     sendSystem  = trimmed.system;
     sendContent = trimmed.userContent;
-  }
-
-  // Log exact char count right before sending to compound so Vercel logs confirm enforcement
-  if (useSearch) {
     console.error(`[compound] sending ${sendSystem.length + sendContent.length} chars (sys=${sendSystem.length} user=${sendContent.length}) — cap=${COMPOUND_SEARCH_CAP}`);
   }
 
-  // Shuffle keys so load is distributed randomly across invocations
+  // ── Search path ──────────────────────────────────────────────────────────────
+  // Single compound attempt; any failure falls back to MODEL_BASE immediately.
+  // Key rotation cannot help compound — rate limits are per-model, not per-key.
+  if (useSearch) {
+    const apiKey = shuffled(keys)[0];
+    try {
+      const { text } = await callGroq(apiKey, MODEL_SEARCH, sendSystem, sendContent, maxTokens);
+      return res.status(200).json({ text, grounded: true });
+    } catch (err) {
+      const isTimeout = err.name === 'AbortError' || Boolean(err.message?.toLowerCase().includes('timeout'));
+      const statusStr = err.status != null ? String(err.status) : 'unknown';
+      const msgStr    = (err.error?.message || err.message || 'unknown error').slice(0, 200);
+      const warning   = isTimeout
+        ? 'Ungrounded — compound timed out'
+        : err.status === 429
+          ? 'Ungrounded — compound rate-limited [429]'
+          : `Ungrounded — compound failed [${statusStr}]: ${msgStr}`;
+      console.error('groq/compound error (falling back):', statusStr, err.message);
+      try {
+        // Use original (untrimmed) system for fallback quality; sendContent already trimmed
+        let { text } = await callGroqBase(apiKey, system, sendContent, maxTokens);
+        if (!text) {
+          await sleep(500);
+          ({ text } = await callGroqBase(apiKey, system, sendContent, maxTokens));
+        }
+        return res.status(200).json({ text, grounded: false, warning });
+      } catch (fe) {
+        console.error('runAgent: base model fallback also failed:', fe.status, fe.message);
+        return res.status(200).json({ text: '', grounded: false, warning: 'Ungrounded — agent failed, no data' });
+      }
+    }
+  }
+
+  // ── Non-search path ──────────────────────────────────────────────────────────
+  // MODEL_BASE (gpt-oss-120b) with key rotation for 429 handling.
+  // reasoning_effort: 'low' keeps thinking brief so agents don't exhaust token budget on reasoning.
   const keyOrder = shuffled(keys);
-  let lastErr;
 
   for (let k = 0; k < keyOrder.length; k++) {
     const apiKey = keyOrder[k];
     try {
-      const text = await callGroq(apiKey, model, sendSystem, sendContent, maxTokens);
-      return res.status(200).json({ text, grounded: useSearch });
-    } catch (err) {
-      // compound path: ANY failure degrades immediately to base model + grounded:false.
-      // Key rotation cannot help compound — its rate limits are per-model, not per-key.
-      if (useSearch) {
-        const isTimeout = err.name === 'AbortError' || Boolean(err.message?.toLowerCase().includes('timeout'));
-        const statusStr = err.status != null ? String(err.status) : 'unknown';
-        const msgStr    = (err.error?.message || err.message || 'unknown error').slice(0, 200);
-        const warning   = isTimeout
-          ? 'Ungrounded — compound timed out'
-          : err.status === 429
-            ? 'Ungrounded — compound rate-limited [429]'
-            : `Ungrounded — compound failed [${statusStr}]: ${msgStr}`;
-        console.error('groq/compound error (falling back):', statusStr, err.message, err);
-        try {
-          // Use original system for fallback quality; sendContent is already trimmed
-          const text = await callGroq(apiKey, MODEL_BASE, system, sendContent, maxTokens);
-          return res.status(200).json({ text, grounded: false, warning });
-        } catch (fe) {
-          // MODEL_BASE fallback also failed — guarantee a 200 so the agent card shows something
-          console.error('runAgent: base model fallback also failed:', fe.status, fe.message);
-          return res.status(200).json({ text: '', grounded: false, warning: 'Ungrounded — agent failed, no data' });
-        }
+      let { text } = await callGroqBase(apiKey, sendSystem, sendContent, maxTokens);
+      if (!text) {
+        // Single retry — reasoning models sometimes exhaust tokens on first pass and succeed on retry
+        await sleep(500);
+        ({ text } = await callGroqBase(apiKey, sendSystem, sendContent, maxTokens));
       }
-
+      return res.status(200).json({ text, grounded: false });
+    } catch (err) {
       if (err.status === 429) {
-        lastErr = err;
-        // Still have more keys to try — rotate immediately, no sleep needed
+        // Still have more keys to try — rotate immediately
         if (k < keyOrder.length - 1) continue;
-        // All keys exhausted — wait before giving up
+        // All keys exhausted — wait before final attempt
         await sleep(8000);
         continue;
       }
-
-      // Non-search, non-429 error — return empty result rather than hard error
+      // Non-429 error — return empty result rather than hard error
       console.error('runAgent error:', err.status, err.message);
       return res.status(200).json({ text: '', grounded: false, warning: `Agent error [${err.status || 'unknown'}]: ${(err.message || '').slice(0, 150)}` });
     }
   }
 
-  // All keys hit 429 — one final retry on a random key after backoff
+  // All keys hit 429 — one final attempt after backoff
   try {
-    const text = await callGroq(keyOrder[0], model, sendSystem, sendContent, maxTokens);
-    return res.status(200).json({ text, grounded: useSearch });
+    let { text } = await callGroqBase(keyOrder[0], sendSystem, sendContent, maxTokens);
+    if (!text) {
+      await sleep(500);
+      ({ text } = await callGroqBase(keyOrder[0], sendSystem, sendContent, maxTokens));
+    }
+    return res.status(200).json({ text, grounded: false });
   } catch (err) {
     console.error('runAgent: all keys exhausted', err.status, err.message);
     return res.status(200).json({ text: '', grounded: false, warning: 'Rate-limited on all keys — try again shortly' });

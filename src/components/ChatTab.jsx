@@ -146,7 +146,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 500);
+          const { text: txt } = await callAgent(ag.system, userMsg, false, 1800);
           const parsed = extractJSON(txt);
           if (!parsed) console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt));
           roundResults[ag.id] = parsed || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
@@ -178,7 +178,7 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
 
     let synth;
     try {
-      const { text: txt } = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 400, null, 'openai/gpt-oss-120b');
+      const { text: txt } = await callAgent(synthSys, `Full council deliberation:\n${fullCouncilContext}\n${livePrice ? `Live price: $${livePrice.toFixed(2)}.` : ''} Deliver the ruling.`, false, 2800, null, 'openai/gpt-oss-120b');
       synth = extractJSON(txt);
       if (!synth) {
         console.error('[synthesis parse fail] ChatTab raw txt:', JSON.stringify(txt));

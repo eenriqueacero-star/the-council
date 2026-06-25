@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Moon, Sun, Trash2 } from 'lucide-react';
 import { theme } from '../utils/theme.js';
 import { auth, db } from '../firebase.js';
-import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocsFromCache, deleteDoc, doc } from 'firebase/firestore';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
@@ -23,7 +23,7 @@ export default function SettingsTab({ dark, setDark }) {
     try {
       const uid = user.uid;
       console.error('[purge] uid:', uid);
-      const snap = await getDocs(collection(db, 'users', uid, 'rulings'));
+      const snap = await getDocsFromCache(collection(db, 'users', uid, 'rulings'));
       console.error('[purge] found', snap.size, 'rulings');
       let deleted = 0;
       for (const d of snap.docs) {

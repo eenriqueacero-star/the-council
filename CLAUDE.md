@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workflow rules (always follow)
+
+- Always work on the **main** branch. Never create or switch to other branches.
+- At the **START** of any task, read `CHANGELOG.md` and `ROADMAP.md` to understand current state.
+- After completing **ANY** task, BEFORE finishing: (a) add a dated entry to `CHANGELOG.md` describing what changed and why, and (b) update `ROADMAP.md` — check off completed items and update statuses.
+- Always **commit AND push to main** yourself, then confirm the push succeeded.
+
+---
+
 ## Commands
 
 ```bash
@@ -14,9 +23,15 @@ No test suite. No lint step. Type-check via IDE only (no tsc script).
 
 For Vercel serverless functions (`api/*.js`), they run in Node.js on Vercel but cannot be run locally without a Vercel dev environment. Use `vercel dev` if the CLI is installed.
 
+---
+
 ## Architecture
 
-**Stack:** React 18 + Vite + Tailwind · Firebase Auth + Firestore · Vercel serverless · Groq (`llama-3.3-70b-versatile`) via `api/run-agent.js` · Finnhub prices via `api/get-quotes.js`
+**Stack:** React 18 + Vite + Tailwind · Firebase Auth + Firestore · Vercel serverless · Groq API via `api/run-agent.js` · Finnhub prices via `api/get-quotes.js`
+
+**Models:**
+- `openai/gpt-oss-120b` — all 6 specialist agents (reasoning_effort: 'low') and synthesis/AXIOM (reasoning_effort: 'medium')
+- `groq/compound` — live web-search recon run once before the agent loop; falls back to `gpt-oss-120b` on any failure
 
 ### Request flow
 
@@ -28,7 +43,13 @@ Browser (React)
   → src/firebase.js → Firestore (direct SDK, user-scoped rules)
 ```
 
-All API keys live **only** in Vercel environment variables (`GROQ_API_KEY`, `FINNHUB_KEY`, `FIREBASE_WEB_API_KEY`). The browser never touches them. Both `/api/*` routes verify the Firebase Auth JWT before forwarding.
+All API keys live **only** in Vercel environment variables (`GROQ_API_KEY` through `GROQ_API_KEY_5`, `FINNHUB_KEY`, `FIREBASE_WEB_API_KEY`). The browser never touches them. Both `/api/*` routes verify the Firebase Auth JWT before forwarding.
+
+### Groq key distribution
+
+5 keys (`GROQ_API_KEY` … `GROQ_API_KEY_5`) are loaded at runtime. Agent calls use round-robin assignment: `agent[i] → keys[i % keys.length]`. Synthesis (AXIOM) is pinned to `keys[keys.length - 1]` so it always has a fresh TPM budget. 429 key-rotation fallback is preserved for each call.
+
+- **Do NOT change model names, key rotation logic, or reasoning_effort settings** without explicit instruction.
 
 ### State management
 
@@ -45,13 +66,15 @@ All API keys live **only** in Vercel environment variables (`GROQ_API_KEY`, `FIN
 ### Agent orchestration (CouncilTab + ChatTab)
 
 Both tabs share the same council pattern:
-1. Fetch live price via `getQuotes([ticker])`
-2. Call `loadTickerHistory(uid, ticker, livePrice)` (Firestore — all prior rulings on this ticker)
-3. Call `loadAgentContext(ticker, rawQuote)` (live sector/macro quotes)
-4. Build `baseContent` string: account context + positions + capital + ticker history
-5. Loop AGENTS sequentially; each gets `baseContent + buildAgentContext(agentId, ctx)` as the user message
-6. Call synthesis agent with all 6 round results
-7. Save the completed ruling to `users/{uid}/rulings/{id}` in Firestore
+1. Recon: `callAgent(..., useSearch=true)` → `groq/compound` fetches live news for the ticker (falls back to `gpt-oss-120b` with `grounded: false` warning)
+2. Fetch live price via `getQuotes([ticker])`
+3. Call `loadTickerHistory(uid, ticker, livePrice)` (Firestore — all prior rulings on this ticker)
+4. Call `loadAgentContext(ticker, rawQuote)` (live sector/macro quotes: SPY, TLT, GLD, VIX, SOXX, SMH, XLK)
+5. Build `baseContent` string: account context + positions + capital + ticker history
+6. Loop 6 AGENTS × 3 rounds sequentially; each call passes `agentIndex=i` for key assignment
+7. 4 s pause (synthesis key has fresh TPM budget from key distribution)
+8. Call synthesis (AXIOM) via `callAgent(..., model='openai/gpt-oss-120b')` with final-round results only
+9. Save the completed ruling to `users/{uid}/rulings/{id}` in Firestore
 
 `ChatTab` additionally has a PM router: the first `callAgent` call goes to the PM, which returns a JSON router object (`{ reply, convene, ticker, ... }`). If `convene: true`, it kicks off the full council flow above inline in the chat.
 
@@ -59,6 +82,7 @@ Both tabs share the same council pattern:
 
 - `src/utils/agentContext.js` — fetches SPY, TLT, GLD, VIX, SOXX, SMH, XLK once before the agent loop; `buildAgentContext(agentId, ctx)` returns a per-agent context string suffix (sector tape for `technical`, macro tape for `macro`, intraday high/low for `bear`)
 - `src/utils/rulingContext.js` — queries all `users/{uid}/rulings` for a ticker (no limit, compounds forever); shows 5 most recent in detail, summarizes older as a one-liner
+- `src/utils.js` — `extractJSON`: strips markdown fences, balanced-brace scan, unescape retry, raw-text fallback
 
 ### Alpha Tracker tab
 
@@ -69,7 +93,7 @@ Both tabs share the same council pattern:
 ```
 users/{uid}/
   data/positions         # { positions: { account: { ticker: { shares, cost } } } }
-  rulings/{rulingId}     # one per completed council run (see plan for full shape)
+  rulings/{rulingId}     # one per completed council run
 ```
 
 Firestore rules: every path under `users/{uid}/**` requires `request.auth.uid == uid`. Composite index on `rulings`: `ticker ASC, ts DESC` (defined in `firestore.indexes.json`).

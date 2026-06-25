@@ -1,22 +1,11 @@
 import React, { useState } from 'react';
 import { Moon, Sun, Trash2 } from 'lucide-react';
 import { theme } from '../utils/theme.js';
-import { auth } from '../firebase.js';
-import { initializeFirestore, memoryLocalCache, collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { initializeApp, getApps } from 'firebase/app';
+import { auth, db } from '../firebase.js';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
-
-// Lazily created memory-only Firestore instance for purge (avoids persistent cache deadlock)
-let _purgeDb = null;
-function getPurgeDb() {
-  if (_purgeDb) return _purgeDb;
-  const cfg = { apiKey: 'AIzaSyB6KEbMzfSlOo6UdXhHjHAnziDfJIU-EmM', authDomain: 'the-council-89570.firebaseapp.com', projectId: 'the-council-89570' };
-  const app = getApps().find(a => a.name === 'purge') || initializeApp(cfg, 'purge');
-  _purgeDb = initializeFirestore(app, { localCache: memoryLocalCache() });
-  return _purgeDb;
-}
 
 export default function SettingsTab({ dark, setDark }) {
   const T = theme(dark);
@@ -32,11 +21,13 @@ export default function SettingsTab({ dark, setDark }) {
     setPurgeState('running');
     setPurgeMsg('');
     try {
-      const memDb = getPurgeDb();
-      const snap = await getDocs(collection(memDb, 'users', user.uid, 'rulings'));
+      const uid = user.uid;
+      console.error('[purge] uid:', uid);
+      const snap = await getDocs(collection(db, 'users', uid, 'rulings'));
+      console.error('[purge] found', snap.size, 'rulings');
       let deleted = 0;
       for (const d of snap.docs) {
-        await deleteDoc(doc(memDb, 'users', user.uid, 'rulings', d.id));
+        await deleteDoc(doc(db, 'users', uid, 'rulings', d.id));
         deleted++;
         setPurgeCount(deleted);
       }

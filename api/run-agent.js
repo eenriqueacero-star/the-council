@@ -5,14 +5,16 @@ const MODEL_SEARCH = 'groq/compound'; // Groq compound model with live web searc
 const GROQ_SYNTH_MODEL = 'openai/gpt-oss-120b';
 const GROQ_SYNTH_URL   = 'https://api.groq.com/openai/v1/chat/completions';
 
-// groq/compound accepts far less input than plain models; trim prompts before sending
-const COMPOUND_SEARCH_CAP = 6000;
+// groq/compound accepts far less input than plain models; trim prompts aggressively before sending
+const COMPOUND_SEARCH_CAP = 2500; // combined system + userContent character limit for groq/compound
+const COMPOUND_SYS_MAX    = 800;  // max chars kept from system prompt when hard-trimming
 const HISTORY_END_MARKER  = '\nReference this history to calibrate confidence — do not anchor to prior stance.';
 
+// Returns { system, userContent } trimmed to fit within COMPOUND_SEARCH_CAP.
+// Priority kept: ticker, live price, core instruction, agent role definition.
+// Dropped in order: history block, round context, agent/profile suffixes, account details, system tail.
 function trimForCompound(system, userContent) {
-  if (system.length + userContent.length <= COMPOUND_SEARCH_CAP) return userContent;
-
-  // Strip the COUNCIL HISTORY block first — biggest payload, least essential for a live search call
+  // Step 1: strip COUNCIL HISTORY block — biggest payload, not needed for a live web search
   const histStart = userContent.indexOf('\nCOUNCIL HISTORY ON');
   const histEnd   = userContent.indexOf(HISTORY_END_MARKER);
   if (histStart !== -1 && histEnd !== -1) {
@@ -20,10 +22,39 @@ function trimForCompound(system, userContent) {
     userContent = userContent.slice(0, histStart) + after;
   }
 
-  // Hard-truncate to budget if still over cap
-  const budget = COMPOUND_SEARCH_CAP - system.length;
-  if (userContent.length > budget) userContent = userContent.slice(0, budget);
-  return userContent;
+  // Step 2: strip multi-round prior context blocks — irrelevant to a focused search call
+  for (const marker of ['\n\nEARLIER IN THIS ROUND:', '\n\nCOUNCIL ROUND 1 SUMMARY:', '\n\nCOUNCIL ROUNDS 1-2 SUMMARY:']) {
+    const idx = userContent.indexOf(marker);
+    if (idx !== -1) userContent = userContent.slice(0, idx);
+  }
+
+  // Step 3: strip agent/profile context suffixes (sector tape, macro tape, domain intel, lessons)
+  for (const marker of ['\nSECTOR CONTEXT TODAY:', '\nMARKET TAPE TODAY:', '\nINTRADAY CONTEXT:', '\nYOUR LATEST DOMAIN INTEL:', '\nYOUR TRACK RECORD:', '\nYOUR RECENT LESSONS:']) {
+    const idx = userContent.indexOf(marker);
+    if (idx !== -1) userContent = userContent.slice(0, idx);
+  }
+
+  // Restore the minimal instruction if it was stripped
+  if (!userContent.includes('Return ONLY the JSON')) userContent += ' Return ONLY the JSON.';
+
+  // Fast-exit if already under cap
+  if (system.length + userContent.length <= COMPOUND_SEARCH_CAP) {
+    console.error(`[compound] prompt OK after content trim: ${system.length + userContent.length} chars (sys=${system.length} user=${userContent.length})`);
+    return { system, userContent };
+  }
+
+  // Step 4: trim system prompt to COMPOUND_SYS_MAX (keeps role definition, drops protocols/examples)
+  const trimmedSys = system.slice(0, COMPOUND_SYS_MAX);
+  if (trimmedSys.length + userContent.length <= COMPOUND_SEARCH_CAP) {
+    console.error(`[compound] prompt OK after sys trim: ${trimmedSys.length + userContent.length} chars (sys=${trimmedSys.length} user=${userContent.length})`);
+    return { system: trimmedSys, userContent };
+  }
+
+  // Step 5: hard-truncate userContent to fill remaining budget
+  const budget = COMPOUND_SEARCH_CAP - trimmedSys.length;
+  userContent = userContent.slice(0, Math.max(budget, 0));
+  console.error(`[compound] hard-truncated: ${trimmedSys.length + userContent.length} chars (sys=${trimmedSys.length} user=${userContent.length})`);
+  return { system: trimmedSys, userContent };
 }
 
 async function verifyAuth(req) {
@@ -131,8 +162,14 @@ export default async function handler(req, res) {
 
   const model = useSearch ? MODEL_SEARCH : MODEL_BASE;
 
-  // For groq/compound, strip the history block and hard-cap so we stay under its input limit
-  const sendContent = useSearch ? trimForCompound(system, userContent) : userContent;
+  // For groq/compound, aggressively trim both system and userContent to fit under its input limit
+  let sendSystem = system;
+  let sendContent = userContent;
+  if (useSearch) {
+    const trimmed = trimForCompound(system, userContent);
+    sendSystem  = trimmed.system;
+    sendContent = trimmed.userContent;
+  }
 
   // Shuffle keys so load is distributed randomly across invocations
   const keyOrder = shuffled(keys);
@@ -141,7 +178,7 @@ export default async function handler(req, res) {
   for (let k = 0; k < keyOrder.length; k++) {
     const apiKey = keyOrder[k];
     try {
-      const text = await callGroq(apiKey, model, system, sendContent, maxTokens);
+      const text = await callGroq(apiKey, model, sendSystem, sendContent, maxTokens);
       return res.status(200).json({ text, grounded: useSearch });
     } catch (err) {
       // groq/compound unavailable or still too large — fall back to base model, signal ungrounded
@@ -154,6 +191,7 @@ export default async function handler(req, res) {
           : `Ungrounded — compound failed [${statusStr}]: ${msgStr}`;
         console.error('groq/compound error (falling back):', statusStr, err.message, err);
         try {
+          // Use original system for fallback quality; sendContent is already trimmed
           const text = await callGroq(apiKey, MODEL_BASE, system, sendContent, maxTokens);
           return res.status(200).json({ text, grounded: false, warning });
         } catch (fe) {
@@ -177,7 +215,7 @@ export default async function handler(req, res) {
 
   // All keys hit 429 — one final retry on a random key after backoff
   try {
-    const text = await callGroq(keyOrder[0], model, system, sendContent, maxTokens);
+    const text = await callGroq(keyOrder[0], model, sendSystem, sendContent, maxTokens);
     return res.status(200).json({ text, grounded: useSearch });
   } catch (err) {
     console.error('runAgent: all keys exhausted', err.status, err.message);

@@ -2,9 +2,21 @@ import React, { useState } from 'react';
 import { Moon, Sun, Trash2 } from 'lucide-react';
 import { theme } from '../utils/theme.js';
 import { auth } from '../firebase.js';
+import { initializeFirestore, memoryLocalCache, collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { initializeApp, getApps } from 'firebase/app';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
+
+// Lazily created memory-only Firestore instance for purge (avoids persistent cache deadlock)
+let _purgeDb = null;
+function getPurgeDb() {
+  if (_purgeDb) return _purgeDb;
+  const cfg = { apiKey: 'AIzaSyB6KEbMzfSlOo6UdXhHjHAnziDfJIU-EmM', authDomain: 'the-council-89570.firebaseapp.com', projectId: 'the-council-89570' };
+  const app = getApps().find(a => a.name === 'purge') || initializeApp(cfg, 'purge');
+  _purgeDb = initializeFirestore(app, { localCache: memoryLocalCache() });
+  return _purgeDb;
+}
 
 export default function SettingsTab({ dark, setDark }) {
   const T = theme(dark);
@@ -20,28 +32,13 @@ export default function SettingsTab({ dark, setDark }) {
     setPurgeState('running');
     setPurgeMsg('');
     try {
-      const token = await user.getIdToken();
-      const uid = user.uid;
-      const project = 'the-council-89570';
-      const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}/rulings`;
-      const headers = { Authorization: `Bearer ${token}` };
-
-      // List all ruling docs via REST (bypasses SDK persistent cache deadlock)
-      let pageToken = null;
-      let allNames = [];
-      do {
-        const url = base + `?pageSize=300${pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''}`;
-        const r = await fetch(url, { headers });
-        if (!r.ok) throw new Error(`List failed: ${r.status} ${await r.text()}`);
-        const data = await r.json();
-        (data.documents || []).forEach(d => allNames.push(d.name));
-        pageToken = data.nextPageToken || null;
-      } while (pageToken);
-
+      const memDb = getPurgeDb();
+      const snap = await getDocs(collection(memDb, 'users', user.uid, 'rulings'));
       let deleted = 0;
-      for (const name of allNames) {
-        const r = await fetch(`https://firestore.googleapis.com/v1/${name}`, { method: 'DELETE', headers });
-        if (r.ok) { deleted++; setPurgeCount(deleted); }
+      for (const d of snap.docs) {
+        await deleteDoc(doc(memDb, 'users', user.uid, 'rulings', d.id));
+        deleted++;
+        setPurgeCount(deleted);
       }
       setPurgeMsg(`Deleted ${deleted} ruling${deleted !== 1 ? 's' : ''}. Clean slate.`);
       setPurgeState('done');

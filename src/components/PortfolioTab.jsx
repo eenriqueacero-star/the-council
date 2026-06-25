@@ -30,7 +30,7 @@ function TickerLogo({ ticker, dark }) {
       </div>
     );
   }
-  return <img src={`https://logo.clearbit.com/${domain}`} onError={() => setErr(true)} style={{ width:36, height:36, borderRadius:'50%', objectFit:'contain', flexShrink:0, background: T.bgCard }} alt={ticker} />;
+  return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} onError={() => setErr(true)} style={{ width:36, height:36, borderRadius:'50%', objectFit:'contain', flexShrink:0, background: T.bgCard }} alt={ticker} />;
 }
 
 function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }

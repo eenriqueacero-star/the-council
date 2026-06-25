@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Moon, Sun, Trash2 } from 'lucide-react';
 import { theme } from '../utils/theme.js';
-import { auth, db } from '../firebase.js';
-import { collection, getDocsFromServer, deleteDoc, doc } from 'firebase/firestore';
+import { auth } from '../firebase.js';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
@@ -16,19 +15,34 @@ export default function SettingsTab({ dark, setDark }) {
   const row = { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px' };
 
   async function purgeAllRulings() {
-    const uid = auth.currentUser?.uid;
-    if (!uid) { setPurgeMsg('Not logged in.'); setPurgeState('error'); return; }
+    const user = auth.currentUser;
+    if (!user) { setPurgeMsg('Not logged in.'); setPurgeState('error'); return; }
     setPurgeState('running');
     setPurgeMsg('');
     try {
-      const snap = await getDocsFromServer(collection(db, 'users', uid, 'rulings'));
+      const token = await user.getIdToken();
+      const uid = user.uid;
+      const project = 'the-council-89570';
+      const base = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/users/${uid}/rulings`;
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // List all ruling docs via REST (bypasses SDK persistent cache deadlock)
+      let pageToken = null;
+      let allNames = [];
+      do {
+        const url = base + `?pageSize=300${pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''}`;
+        const r = await fetch(url, { headers });
+        if (!r.ok) throw new Error(`List failed: ${r.status} ${await r.text()}`);
+        const data = await r.json();
+        (data.documents || []).forEach(d => allNames.push(d.name));
+        pageToken = data.nextPageToken || null;
+      } while (pageToken);
+
       let deleted = 0;
-      for (const d of snap.docs) {
-        await deleteDoc(doc(db, 'users', uid, 'rulings', d.id));
-        deleted++;
-        setPurgeCount(deleted);
+      for (const name of allNames) {
+        const r = await fetch(`https://firestore.googleapis.com/v1/${name}`, { method: 'DELETE', headers });
+        if (r.ok) { deleted++; setPurgeCount(deleted); }
       }
-      setPurgeCount(deleted);
       setPurgeMsg(`Deleted ${deleted} ruling${deleted !== 1 ? 's' : ''}. Clean slate.`);
       setPurgeState('done');
     } catch (e) {

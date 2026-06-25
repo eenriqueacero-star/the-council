@@ -191,7 +191,8 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
         try {
           const { text: txt } = await callAgent(ag.system, userMsg, false, 600);
-          const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
+          let result = extractJSON(txt);
+          if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] }; }
           roundResults[ag.id] = result;
           setAgentState(prev => ({
             ...prev,
@@ -205,7 +206,8 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             setSynthesis({ status: 'idle', result: null });
             try {
               const { text: txt } = await callAgent(ag.system, userMsg, false, 600);
-              const result = extractJSON(txt) || { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] };
+              let result = extractJSON(txt);
+              if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} retry raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] }; }
               roundResults[ag.id] = result;
               setAgentState(prev => ({
                 ...prev,
@@ -249,7 +251,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
     const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final investment ruling on ${upperTicker} for ${acct.label}. ${PROTOCOLS}
 The council ran 3 deliberation rounds. Synthesize their evolving positions into a decisive verdict.
-Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}`;
+Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}`;
 
     try {
       const { text: txt } = await callAgent(
@@ -257,7 +259,11 @@ Return ONLY JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss"
         `Full council deliberation:\n${fullCouncilContext}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
         false, 500, null, 'openai/gpt-oss-120b'
       );
-      const result = extractJSON(txt) || { verdict: 'WATCH', conviction: 5, headline: 'Council inconclusive', rationale: 'Could not parse synthesis.' };
+      let result = extractJSON(txt);
+      if (!result) {
+        console.error('[synthesis parse fail] CouncilTab raw txt:', JSON.stringify(txt));
+        result = { verdict: 'WATCH', conviction: 5, headline: 'Council deliberation complete', rationale: txt ? txt.slice(0, 600) : 'Could not parse synthesis.' };
+      }
       setSynthesis({ status: 'done', result });
 
       // Save ruling to Firestore

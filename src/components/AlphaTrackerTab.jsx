@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { collection, query, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase.js';
 import { getQuotes } from '../api.js';
 import { AGENTS, STANCE_STYLE } from '../constants/agents.js';
 import { writeAgentLesson, updateAgentAccuracy } from '../utils/agentMemory.js';
 import { theme } from '../utils/theme.js';
-import { Loader2, BarChart2 } from 'lucide-react';
+import { Loader2, BarChart2, Trash2 } from 'lucide-react';
 
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
@@ -28,6 +28,16 @@ function parsePrice(v) {
   return parseFloat(String(v).replace(/[^0-9.]/g, ''));
 }
 
+function StatusBadge({ status }) {
+  if (status === 'entered') return (
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(56,224,212,0.12)', color: '#38e0d4', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>ENTERED</span>
+  );
+  if (status === 'watching') return (
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(176,131,255,0.12)', color: '#b083ff', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>WATCHING</span>
+  );
+  return null;
+}
+
 function OutcomeBadge({ outcome, T }) {
   if (!outcome) return (
     <span style={{ ...MFONT, fontSize: 9, color: T.text3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -35,11 +45,15 @@ function OutcomeBadge({ outcome, T }) {
       OPEN
     </span>
   );
-  if (outcome === 'target') return (
-    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(0,200,5,0.12)', color: '#00C805', padding: '2px 7px', borderRadius: 4 }}>TARGET ✓</span>
+  if (outcome === 'target' || outcome === 'win') return (
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(0,200,5,0.12)', color: '#00C805', padding: '2px 7px', borderRadius: 4 }}>
+      {outcome === 'win' ? 'WIN ✓' : 'TARGET ✓'}
+    </span>
   );
-  if (outcome === 'stop') return (
-    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(255,59,48,0.12)', color: '#FF3B30', padding: '2px 7px', borderRadius: 4 }}>STOP ✗</span>
+  if (outcome === 'stop' || outcome === 'loss') return (
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(255,59,48,0.12)', color: '#FF3B30', padding: '2px 7px', borderRadius: 4 }}>
+      {outcome === 'loss' ? 'LOSS ✗' : 'STOP ✗'}
+    </span>
   );
   return (
     <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: T.bgHover, color: T.text2, padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
@@ -52,6 +66,7 @@ export default function AlphaTrackerTab({ account, dark }) {
   const [loading,    setLoading]    = useState(true);
   const [grading,    setGrading]    = useState(false);
   const [liveQuotes, setLiveQuotes] = useState({});
+  const [deletePending, setDeletePending] = useState(new Set());
 
   useEffect(() => { loadData(); }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -77,7 +92,9 @@ export default function AlphaTrackerTab({ account, dark }) {
       }
 
       const cutoff = Date.now() - 30 * 86400 * 1000;
-      const needs  = forAcct.filter(r =>
+      // Only auto-grade trades the user explicitly entered — not "watching" or legacy auto-saved rulings
+      const needs = forAcct.filter(r =>
+        r.status === 'entered' &&
         !r.outcomeCheckedAt && r.ts?.toDate && r.ts.toDate().getTime() < cutoff
       );
 
@@ -86,8 +103,6 @@ export default function AlphaTrackerTab({ account, dark }) {
         const gradeTickers = [...new Set(needs.map(r => r.ticker).filter(Boolean))];
         const gq = await getQuotes(gradeTickers).catch(() => ({}));
 
-        // If quotes failed entirely, skip grading this load — don't leave
-        // outcomeCheckedAt null or every reload re-attempts indefinitely
         if (Object.keys(gq).length === 0) {
           setGrading(false);
           return;
@@ -108,7 +123,6 @@ export default function AlphaTrackerTab({ account, dark }) {
             outcome,
           });
 
-          // Write agent lessons and accuracy
           if (r.agentStances) {
             Object.entries(r.agentStances).forEach(([agentId, stanceObj]) => {
               const stance = stanceObj?.stance;
@@ -144,10 +158,52 @@ export default function AlphaTrackerTab({ account, dark }) {
     }
   }
 
+  async function deleteRuling(id) {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      await deleteDoc(doc(db, 'users', uid, 'rulings', id));
+      setRulings(prev => prev.filter(r => r.id !== id));
+      setDeletePending(prev => { const n = new Set(prev); n.delete(id); return n; });
+    } catch (e) {
+      console.error('Delete ruling failed:', e);
+    }
+  }
+
+  async function closeRuling(id, outcome) {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      await updateDoc(doc(db, 'users', uid, 'rulings', id), {
+        outcome,
+        outcomeCheckedAt: new Date().toISOString(),
+      });
+      setRulings(prev => prev.map(r =>
+        r.id === id ? { ...r, outcome, outcomeCheckedAt: new Date().toISOString() } : r
+      ));
+    } catch (e) {
+      console.error('Close ruling failed:', e);
+    }
+  }
+
+  async function markEntered(id) {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      await updateDoc(doc(db, 'users', uid, 'rulings', id), { status: 'entered' });
+      setRulings(prev => prev.map(r => r.id === id ? { ...r, status: 'entered' } : r));
+    } catch (e) {
+      console.error('Mark entered failed:', e);
+    }
+  }
+
   const stats = useMemo(() => {
-    const graded     = rulings.filter(r => r.outcome);
-    const targetHit  = graded.filter(r => r.outcome === 'target').length;
-    const stopped    = graded.filter(r => r.outcome === 'stop').length;
+    const entered  = rulings.filter(r => r.status === 'entered');
+    const watching = rulings.filter(r => r.status === 'watching');
+    // Graded = entered trades that have a final outcome (auto-graded or manually closed)
+    const graded     = entered.filter(r => r.outcome);
+    const targetHit  = graded.filter(r => r.outcome === 'target' || r.outcome === 'win').length;
+    const stopped    = graded.filter(r => r.outcome === 'stop'   || r.outcome === 'loss').length;
     const withReturn = graded.filter(r => r.priceAt30d && r.priceAtCall);
     const avgReturn  = withReturn.length
       ? withReturn.reduce((s, r) => s + (r.priceAt30d - r.priceAtCall) / r.priceAtCall * 100, 0) / withReturn.length
@@ -163,8 +219,8 @@ export default function AlphaTrackerTab({ account, dark }) {
         const bear = ['FAIL', 'BEARISH'].includes(st);
         if (bull || bear) {
           total++;
-          if (bull && r.outcome === 'target') correct++;
-          if (bear && (r.outcome === 'stop' || r.outcome === 'expired')) correct++;
+          if (bull && (r.outcome === 'target' || r.outcome === 'win')) correct++;
+          if (bear && (r.outcome === 'stop' || r.outcome === 'expired' || r.outcome === 'loss')) correct++;
         }
       });
       agentAcc[a.id] = { correct, total, pct: total > 0 ? Math.round(correct / total * 100) : null };
@@ -172,7 +228,9 @@ export default function AlphaTrackerTab({ account, dark }) {
 
     return {
       total: rulings.length,
-      buyCalls: rulings.filter(r => r.verdict === 'BUY').length,
+      enteredCount: entered.length,
+      watchingCount: watching.length,
+      buyCalls: entered.filter(r => r.verdict === 'BUY').length,
       graded: graded.length,
       targetHit,
       stopped,
@@ -187,6 +245,8 @@ export default function AlphaTrackerTab({ account, dark }) {
       <span style={{ fontSize: 12 }}>Loading alpha tracker…</span>
     </div>
   );
+
+  const btnBase = { ...MFONT, fontSize: 9, fontWeight: 700, borderRadius: 4, border: 'none', cursor: 'pointer', padding: '2px 7px' };
 
   return (
     <div style={{ ...FONT, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -206,17 +266,17 @@ export default function AlphaTrackerTab({ account, dark }) {
       {rulings.length === 0 ? (
         <div style={{ marginTop: 32, textAlign: 'center', padding: '48px 16px', border: `1px dashed ${T.border}`, borderRadius: 12 }}>
           <BarChart2 size={28} style={{ color: T.text3, margin: '0 auto 12px' }} />
-          <p style={{ ...FONT, color: T.text2, fontSize: 14 }}>No rulings yet.</p>
-          <p style={{ ...MFONT, color: T.text3, fontSize: 11, marginTop: 4 }}>Run a council on any ticker to start building your track record.</p>
+          <p style={{ ...FONT, color: T.text2, fontSize: 14 }}>No tracked trades yet.</p>
+          <p style={{ ...MFONT, color: T.text3, fontSize: 11, marginTop: 4 }}>Convene the council on any ticker, then click <strong style={{ color: T.text2 }}>Track This Trade</strong> on the AXIOM ruling.</p>
         </div>
       ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
             {[
-              { label: 'TOTAL CALLS',    value: String(stats.total), sub: `${stats.buyCalls} BUY · ${stats.total - stats.buyCalls} WATCH/PASS` },
-              { label: 'TARGET HIT',     value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} graded`, color: '#00C805' },
+              { label: 'TRACKED',        value: String(stats.total), sub: `${stats.enteredCount} entered · ${stats.watchingCount} watching`, color: undefined },
+              { label: 'WIN RATE',        value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} entered`, color: '#00C805' },
               { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped    / stats.graded * 100)}%` : '—', sub: `${stats.stopped} losses`, color: '#FF3B30' },
-              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `${stats.graded} graded`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#00C805' : '#FF3B30') : undefined },
+              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `entered trades only`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#00C805' : '#FF3B30') : undefined },
             ].map((c, i) => (
               <div key={i} style={{ borderRadius: 12, padding: 16, background: T.bgCard, border: `1px solid ${T.border}` }}>
                 <div style={{ ...MFONT, fontSize: 9, letterSpacing: '0.10em', color: T.text2, marginBottom: 6 }}>{c.label}</div>
@@ -228,7 +288,7 @@ export default function AlphaTrackerTab({ account, dark }) {
 
           {stats.graded >= 5 && (
             <div style={{ borderRadius: 12, padding: 16, background: T.bgCard, border: `1px solid ${T.border}` }}>
-              <div style={{ ...MFONT, fontSize: 10, letterSpacing: '0.10em', color: T.text2, marginBottom: 12 }}>AGENT ACCURACY · ALL-TIME</div>
+              <div style={{ ...MFONT, fontSize: 10, letterSpacing: '0.10em', color: T.text2, marginBottom: 12 }}>AGENT ACCURACY · ENTERED TRADES ONLY</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
                 {AGENTS.map(a => {
                   const s        = stats.agentAcc[a.id];
@@ -257,16 +317,16 @@ export default function AlphaTrackerTab({ account, dark }) {
                   );
                 })}
               </div>
-              <p style={{ ...MFONT, color: T.text3, fontSize: 9, marginTop: 12 }}>Bull calls (PASS/BUY) scored on target · Bear calls (FAIL/BEARISH) scored on stop or expired.</p>
+              <p style={{ ...MFONT, color: T.text3, fontSize: 9, marginTop: 12 }}>Bull calls (PASS/BUY) scored on target/win · Bear calls (FAIL/BEARISH) scored on stop/loss/expired. Entered trades only.</p>
             </div>
           )}
 
           <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.border}` }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
                 <thead>
                   <tr style={{ background: T.bgCard, borderBottom: `1px solid ${T.border}` }}>
-                    {['DATE', 'TICKER', 'VERDICT', 'CONV', 'PRICE@CALL', '30D / NOW', 'MOVE', 'OUTCOME'].map(h => (
+                    {['DATE', 'TICKER', 'VERDICT', 'STATUS', 'CONV', 'PRICE@CALL', '30D / NOW', 'MOVE', 'OUTCOME', ''].map(h => (
                       <th key={h} style={{ ...MFONT, fontSize: 9, letterSpacing: '0.08em', color: T.text2, padding: '10px 12px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -278,6 +338,11 @@ export default function AlphaTrackerTab({ account, dark }) {
                     const livePrice  = lq?.price > 0 ? lq.price : lq?.prevClose;
                     const displayPrice = r.outcome ? r.priceAt30d : livePrice;
                     const move       = moveStr(r.priceAtCall, displayPrice);
+                    const isPending  = deletePending.has(r.id);
+                    const isEntered  = r.status === 'entered';
+                    const isWatching = r.status === 'watching';
+                    const isOpen     = !r.outcome;
+
                     return (
                       <tr key={r.id} style={{
                         borderBottom: i < rulings.length - 1 ? `1px solid ${T.border}` : undefined,
@@ -288,6 +353,9 @@ export default function AlphaTrackerTab({ account, dark }) {
                         <td style={{ padding: '10px 12px' }}>
                           {vs && <span style={{ ...MFONT, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4 }}>{vs.label}</span>}
                         </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <StatusBadge status={r.status} />
+                        </td>
                         <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px' }}>{r.conviction ?? '—'}/10</td>
                         <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px' }}>{r.priceAtCall ? `$${r.priceAtCall.toFixed(2)}` : '—'}</td>
                         <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px' }}>{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
@@ -297,6 +365,54 @@ export default function AlphaTrackerTab({ account, dark }) {
                             : <span style={{ ...MFONT, color: T.text3, fontSize: 11 }}>—</span>}
                         </td>
                         <td style={{ padding: '10px 12px' }}><OutcomeBadge outcome={r.outcome} T={T} /></td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                            {/* Win/Loss close buttons — entered trades only, while open */}
+                            {isEntered && isOpen && !isPending && (
+                              <>
+                                <button
+                                  onClick={() => closeRuling(r.id, 'win')}
+                                  title="Mark as Win"
+                                  style={{ ...btnBase, background: 'rgba(0,200,5,0.12)', color: '#00C805' }}
+                                >WIN</button>
+                                <button
+                                  onClick={() => closeRuling(r.id, 'loss')}
+                                  title="Mark as Loss"
+                                  style={{ ...btnBase, background: 'rgba(255,59,48,0.12)', color: '#FF3B30' }}
+                                >LOSS</button>
+                              </>
+                            )}
+                            {/* Reclassify watching → entered */}
+                            {isWatching && !isPending && (
+                              <button
+                                onClick={() => markEntered(r.id)}
+                                title="Reclassify as Entered"
+                                style={{ ...btnBase, background: 'rgba(56,224,212,0.1)', color: '#38e0d4' }}
+                              >→ ENT</button>
+                            )}
+                            {/* Delete */}
+                            {!isPending ? (
+                              <button
+                                onClick={() => setDeletePending(prev => new Set([...prev, r.id]))}
+                                title="Delete entry"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: '2px 4px', display: 'flex', alignItems: 'center' }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <button
+                                  onClick={() => deleteRuling(r.id)}
+                                  style={{ ...btnBase, background: 'rgba(255,59,48,0.15)', color: '#FF3B30' }}
+                                >DEL</button>
+                                <button
+                                  onClick={() => setDeletePending(prev => { const n = new Set(prev); n.delete(r.id); return n; })}
+                                  style={{ ...btnBase, background: T.bgHover, color: T.text2 }}
+                                >×</button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}

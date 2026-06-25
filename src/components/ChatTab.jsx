@@ -28,12 +28,51 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
   const [chatInput,   setChatInput]  = useState('');
   const [chatBusy,    setChatBusy]   = useState(false);
   const [convHistory, setConvHistory]= useState([]);
+  const [chatTrackRunId,  setChatTrackRunId]  = useState(null);
+  const [chatTrackStatus, setChatTrackStatus] = useState(null); // null | 'entered' | 'watching'
+  const [chatTrackPrice,  setChatTrackPrice]  = useState('');
+  const [chatTrackShares, setChatTrackShares] = useState('');
+  const [chatTrackSaving, setChatTrackSaving] = useState(false);
+  const [chatTrackedMap,  setChatTrackedMap]  = useState({}); // { [runId]: 'entered' | 'watching' }
   const chatEndRef = useRef(null);
   const T = theme(dark);
 
   const { voiceOn, listening, speaking, srSupported, speak, stopSpeaking, toggleVoice, toggleListen } = useVoice();
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior:'smooth' }); }, [chat]);
+
+  async function saveFromChat(runId, rulingData, status, price, shares) {
+    const uid = auth.currentUser?.uid;
+    if (!uid || !rulingData) return;
+    setChatTrackSaving(true);
+    try {
+      await addDoc(collection(db, 'users', uid, 'rulings'), {
+        ticker: rulingData.ticker, account: rulingData.account,
+        verdict: rulingData.verdict, conviction: rulingData.conviction,
+        stopLoss: rulingData.stopLoss,
+        takeProfit: rulingData.takeProfit,
+        priceAtCall: rulingData.livePrice,
+        agentStances: rulingData.agentStances,
+        ts: serverTimestamp(),
+        date: new Date().toISOString().slice(0, 10),
+        status,
+        enteredPrice: status === 'entered' && price ? parseFloat(price) : null,
+        enteredShares: status === 'entered' && shares ? parseFloat(shares) : null,
+        outcome: null,
+        outcomeCheckedAt: null,
+        priceAt30d: null,
+      });
+      setChatTrackedMap(prev => ({ ...prev, [runId]: status }));
+      setChatTrackRunId(null);
+      setChatTrackStatus(null);
+      setChatTrackPrice('');
+      setChatTrackShares('');
+    } catch (e) {
+      console.error('saveFromChat failed:', e);
+    } finally {
+      setChatTrackSaving(false);
+    }
+  }
 
   function buildHistoryBlock(history) {
     if (!history.length) return '';
@@ -193,27 +232,18 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
       flagApiDown();
     }
 
-    // Save ruling only if recon was grounded (live price + news confirmed)
-    if (uid && synth.verdict && reconGrounded) {
-      const agentStances = {};
-      AGENTS.forEach(ag => { agentStances[ag.id] = { stance: allRounds[2]?.[ag.id]?.stance || allRounds[0]?.[ag.id]?.stance || '?' }; });
-      addDoc(collection(db, 'users', uid, 'rulings'), {
-        ticker: tkr, account,
-        date: new Date().toISOString().slice(0, 10),
-        ts: serverTimestamp(), priceAtCall: livePrice,
-        agentStances,
-        verdict: synth.verdict, conviction: synth.conviction ?? null,
-        stopLoss: parseFloat(synth.stopLoss) || null,
-        takeProfit: parseFloat(synth.takeProfit) || null,
-        summary: synth.speak || '',
-        outcomeCheckedAt: null, priceAt30d: null, outcome: null,
-      }).catch(e => console.error('Failed to save ruling:', e));
-    } else if (uid && synth.verdict && !reconGrounded) {
-      console.error('[ruling] skipped Firestore save — recon not grounded, ruling may be stale');
-    }
+    // Build agentStances for Track This Trade
+    const agentStances = {};
+    AGENTS.forEach(ag => { agentStances[ag.id] = { stance: allRounds[2]?.[ag.id]?.stance || allRounds[0]?.[ag.id]?.stance || '?' }; });
+    const rulingData = {
+      ticker: tkr, account, livePrice, agentStances,
+      stopLoss: parseFloat(synth.stopLoss) || null,
+      takeProfit: parseFloat(synth.takeProfit) || null,
+      verdict: synth.verdict, conviction: synth.conviction ?? null,
+    };
 
-    // Update council message with synth result
-    setChat(p => p.map(m => m.runId === runId ? { ...m, synth, hasUngrounded, ungroundedWarnings } : m));
+    // Update council message with synth result + rulingData (no auto-save — user clicks Track This Trade)
+    setChat(p => p.map(m => m.runId === runId ? { ...m, synth, hasUngrounded, ungroundedWarnings, rulingData } : m));
     setChat(p => [...p, { role: 'pm', text: synth.speak, verdict: synth.verdict, conviction: synth.conviction, ticker: tkr }]);
     speak(synth.speak);
 
@@ -550,6 +580,60 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
                           <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5, ...MONO, fontSize:9, color:'#B45309' }}>
                             <AlertTriangle size={10} style={{ color:'#B45309', flexShrink:0 }} />
                             <span>⚠ {(m.ungroundedWarnings?.length > 0 ? m.ungroundedWarnings[0] + (m.ungroundedWarnings.length > 1 ? ` (+${m.ungroundedWarnings.length - 1} more)` : '') : 'Some agents lacked live data this run')}</span>
+                          </div>
+                        )}
+                        {/* Track This Trade */}
+                        {m.rulingData && (
+                          <div style={{ marginTop:8, paddingTop:8, borderTop:`1px solid ${T.border}` }}>
+                            {chatTrackedMap[m.runId] ? (
+                              <span style={{ ...MONO, fontSize:9, color:'#38e0d4' }}>
+                                ✓ Saved · {chatTrackedMap[m.runId] === 'entered' ? 'ENTERED' : 'WATCHING'}
+                              </span>
+                            ) : chatTrackRunId === m.runId ? (
+                              <div>
+                                {chatTrackStatus === 'entered' && (
+                                  <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
+                                    <input
+                                      value={chatTrackPrice}
+                                      onChange={e => setChatTrackPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                                      placeholder="Entry price"
+                                      style={{ ...MONO, fontSize:11, background:T.input, border:`1px solid ${T.inputBorder}`, color:T.text, borderRadius:5, padding:'4px 8px', width:90, outline:'none' }}
+                                    />
+                                    <input
+                                      value={chatTrackShares}
+                                      onChange={e => setChatTrackShares(e.target.value.replace(/[^0-9.]/g, ''))}
+                                      placeholder="Shares (opt)"
+                                      style={{ ...MONO, fontSize:11, background:T.input, border:`1px solid ${T.inputBorder}`, color:T.text, borderRadius:5, padding:'4px 8px', width:100, outline:'none' }}
+                                    />
+                                  </div>
+                                )}
+                                <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                                  <button
+                                    onClick={() => saveFromChat(m.runId, m.rulingData, chatTrackStatus, chatTrackPrice, chatTrackShares)}
+                                    disabled={chatTrackSaving}
+                                    style={{ ...MONO, fontSize:9, fontWeight:700, background:'#38e0d4', color:'#000', border:'none', borderRadius:4, padding:'3px 10px', cursor: chatTrackSaving ? 'not-allowed' : 'pointer', opacity: chatTrackSaving ? 0.7 : 1 }}
+                                  >
+                                    {chatTrackSaving ? 'Saving…' : `Save · ${chatTrackStatus === 'entered' ? 'ENTERED' : 'WATCHING'}`}
+                                  </button>
+                                  <button
+                                    onClick={() => { setChatTrackRunId(null); setChatTrackStatus(null); }}
+                                    style={{ ...MONO, fontSize:9, color:T.text3, background:'none', border:'none', cursor:'pointer', padding:'3px 6px' }}
+                                  >Cancel</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <span style={{ ...MONO, fontSize:9, color:T.text3 }}>TRACK:</span>
+                                <button
+                                  onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('entered'); setChatTrackPrice(m.rulingData.livePrice ? m.rulingData.livePrice.toFixed(2) : ''); setChatTrackShares(''); }}
+                                  style={{ ...MONO, fontSize:9, fontWeight:600, background:'rgba(56,224,212,0.12)', color:'#38e0d4', border:'1px solid rgba(56,224,212,0.25)', borderRadius:4, padding:'3px 10px', cursor:'pointer' }}
+                                >▸ Entered</button>
+                                <button
+                                  onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('watching'); setChatTrackPrice(''); setChatTrackShares(''); }}
+                                  style={{ ...MONO, fontSize:9, fontWeight:600, background:'rgba(176,131,255,0.12)', color:'#b083ff', border:'1px solid rgba(176,131,255,0.25)', borderRadius:4, padding:'3px 10px', cursor:'pointer' }}
+                                >◎ Watching</button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

@@ -4,16 +4,14 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
-## IN PROGRESS
+## DONE (recent)
 
-### Alpha Tracker rework
-The current Alpha Tracker auto-logs every council run. The goal is to make it trade-intent-driven.
-
-- [ ] **"Track This Trade" button** on each council ruling — only committed trades enter the tracker
-- [ ] **Entered / Watching states** — "Entered" means shares were purchased; "Watching" means the ruling was saved but no position taken yet
-- [ ] **Delete + edit entries** — allow removing or correcting logged trades
-- [ ] **Real outcome states** — replace the always-"open" placeholder with: Open → Closed (manual) or Closed (auto-graded at 30 days). Show P&L and hit/miss vs stop/target.
-- [ ] Auto-grading should only fire on trades in "Entered" state, not "Watching"
+### Alpha Tracker rework ✓
+- [x] **"Track This Trade" button** — council no longer auto-saves; user explicitly clicks Entered or Watching on the AXIOM card
+- [x] **Entered / Watching states** — stored as `status` field on rulings doc; badge shown in tracker table
+- [x] **Delete + edit entries** — trash icon with two-click confirm; Watching rows show → ENT reclassify button
+- [x] **Real outcome states** — WIN / LOSS manual close buttons; auto-grade only fires on Entered trades
+- [x] **Stats filter to Entered trades only** — win rate and agent accuracy exclude Watching calls
 
 ---
 
@@ -52,6 +50,7 @@ Stop verdicts flip-flopping and agents hallucinating data they should fetch live
 
 ## DONE
 
+- [x] Alpha Tracker rework (see above)
 - [x] In-app ruling deletion removed (purge button)
 - [x] Firestore database created; cross-device sync via `users/{uid}/...`
 - [x] localStorage fallbacks removed — Firestore only

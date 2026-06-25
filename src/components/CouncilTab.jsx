@@ -39,6 +39,11 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const synthRef = useRef(null);
   const T = theme(dark);
   const [progressLabel, setProgressLabel] = useState('');
+  const [trackStatus, setTrackStatus] = useState(null); // null | 'entered' | 'watching'
+  const [trackPrice, setTrackPrice] = useState('');
+  const [trackShares, setTrackShares] = useState('');
+  const [trackSaving, setTrackSaving] = useState(false);
+  const [trackSaved, setTrackSaved] = useState(false);
 
   const upperTicker = ticker.trim().toUpperCase();
   const verdictKey = synthesis.result ? (synthesis.result.verdict === 'PASS' ? 'PASS_FINAL' : synthesis.result.verdict) : null;
@@ -48,6 +53,37 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   );
   const quickPicks = ['AAPL','TSLA','OKLO','PLTR','AVGO','SMCI'];
 
+  async function saveToTracker() {
+    if (!trackStatus || trackSaving || trackSaved) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid || !synthesis.rulingData) return;
+    setTrackSaving(true);
+    const rd = synthesis.rulingData;
+    try {
+      await addDoc(collection(db, 'users', uid, 'rulings'), {
+        ticker: rd.ticker, account: rd.account,
+        verdict: rd.verdict, conviction: rd.conviction,
+        stopLoss: rd.stopLoss,
+        takeProfit: rd.takeProfit,
+        priceAtCall: rd.livePrice,
+        agentStances: rd.agentStances,
+        ts: serverTimestamp(),
+        date: new Date().toISOString().slice(0, 10),
+        status: trackStatus,
+        enteredPrice: trackStatus === 'entered' && trackPrice ? parseFloat(trackPrice) : null,
+        enteredShares: trackStatus === 'entered' && trackShares ? parseFloat(trackShares) : null,
+        outcome: null,
+        outcomeCheckedAt: null,
+        priceAt30d: null,
+      });
+      setTrackSaved(true);
+    } catch (e) {
+      console.error('Track trade save failed:', e);
+    } finally {
+      setTrackSaving(false);
+    }
+  }
+
   async function convene() {
     if (running || !ticker.trim()) return;
     setRunning(true);
@@ -55,6 +91,10 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     setAgentState({});
     setSynthesis({ status: 'idle', result: null });
     setProgressLabel('Preparing…');
+    setTrackStatus(null);
+    setTrackPrice('');
+    setTrackShares('');
+    setTrackSaved(false);
 
     const uid = auth.currentUser?.uid;
 
@@ -272,28 +312,19 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
           rationale: synthWarn || (txt ? txt.slice(0, 600) : 'Could not parse synthesis response.'),
         };
       }
-      setSynthesis({ status: 'done', result });
 
-      // Save ruling to Firestore
+      // Build agentStances for when user clicks Track This Trade
       const agentStances = {};
       AGENTS.forEach(ag => {
         agentStances[ag.id] = { stance: allRounds[2]?.[ag.id]?.stance || allRounds[0]?.[ag.id]?.stance || '?' };
       });
-      if (uid && result.verdict && reconGrounded) {
-        addDoc(collection(db, 'users', uid, 'rulings'), {
-          ticker: upperTicker, account,
-          verdict: result.verdict, conviction: result.conviction,
-          stopLoss: parseFloat(result.stopLoss) || null,
-          takeProfit: parseFloat(result.takeProfit) || null,
-          priceAtCall: livePrice || null,
-          agentStances,
-          ts: serverTimestamp(),
-          date: new Date().toISOString().slice(0, 10),
-          outcomeCheckedAt: null, priceAt30d: null, outcome: null,
-        }).catch(e => console.error('Failed to save ruling:', e));
-      } else if (uid && result.verdict && !reconGrounded) {
-        console.error('[ruling] skipped Firestore save — recon not grounded, ruling may be stale');
-      }
+
+      setSynthesis({ status: 'done', result, rulingData: {
+        ticker: upperTicker, account, livePrice, agentStances,
+        stopLoss: parseFloat(result.stopLoss) || null,
+        takeProfit: parseFloat(result.takeProfit) || null,
+        verdict: result.verdict, conviction: result.conviction,
+      }});
     } catch (err) {
       console.error('[synthesis] callAgent threw:', err?.message);
       flagApiDown();
@@ -562,6 +593,68 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
                 <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'rgba(245,158,11,0.12)', borderRadius: 6 }}>
                   <AlertTriangle size={11} style={{ color: '#B45309', flexShrink: 0 }} />
                   <span style={{ ...MONO, fontSize: 11, color: '#B45309' }}>⚠ Some agents lacked live data this run — ruling may reflect stale inputs</span>
+                </div>
+              )}
+
+              {/* Track This Trade */}
+              {synthesis.rulingData && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  {trackSaved ? (
+                    <div style={{ ...MONO, fontSize: 11, color: '#38e0d4', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>✓</span>
+                      <span>Saved to Alpha Tracker · {trackStatus === 'entered' ? 'ENTERED' : 'WATCHING'}</span>
+                    </div>
+                  ) : !trackStatus ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ ...MONO, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>TRACK:</span>
+                      <button
+                        onClick={() => { setTrackStatus('entered'); setTrackPrice(synthesis.rulingData.livePrice ? synthesis.rulingData.livePrice.toFixed(2) : ''); }}
+                        style={{ ...MONO, fontSize: 11, fontWeight: 600, background: 'rgba(56,224,212,0.15)', color: '#38e0d4', border: '1px solid rgba(56,224,212,0.3)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}
+                      >
+                        ▸ Entered
+                      </button>
+                      <button
+                        onClick={() => setTrackStatus('watching')}
+                        style={{ ...MONO, fontSize: 11, fontWeight: 600, background: 'rgba(176,131,255,0.15)', color: '#b083ff', border: '1px solid rgba(176,131,255,0.3)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}
+                      >
+                        ◎ Watching
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      {trackStatus === 'entered' && (
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                          <input
+                            value={trackPrice}
+                            onChange={e => setTrackPrice(e.target.value.replace(/[^0-9.]/g, ''))}
+                            placeholder="Entry price"
+                            style={{ ...MONO, fontSize: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 6, padding: '6px 10px', width: 110, outline: 'none' }}
+                          />
+                          <input
+                            value={trackShares}
+                            onChange={e => setTrackShares(e.target.value.replace(/[^0-9.]/g, ''))}
+                            placeholder="Shares (optional)"
+                            style={{ ...MONO, fontSize: 12, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: 6, padding: '6px 10px', width: 140, outline: 'none' }}
+                          />
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button
+                          onClick={saveToTracker}
+                          disabled={trackSaving}
+                          style={{ ...MONO, fontSize: 11, fontWeight: 600, background: '#38e0d4', color: '#000', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: trackSaving ? 'not-allowed' : 'pointer', opacity: trackSaving ? 0.7 : 1 }}
+                        >
+                          {trackSaving ? 'Saving…' : `Save · ${trackStatus === 'entered' ? 'ENTERED' : 'WATCHING'}`}
+                        </button>
+                        <button
+                          onClick={() => setTrackStatus(null)}
+                          style={{ ...MONO, fontSize: 11, color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 8px' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

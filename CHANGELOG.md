@@ -4,6 +4,21 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-25 (session 7)
+
+### FIX — VEGA data-grounding + earnings estimated flag
+
+**FIX 1 — VEGA over-reach tightened** (`src/constants/agents.js`)
+- Previous rule allowed VEGA to "search for risks" — it was inferring specific events (insider selling, peer activity) from general knowledge and presenting them as current facts.
+- New BEAR CASE STANDARD: build the bear case ONLY on risks supported by LIVE DATA (price action, real news headlines, earnings timing, portfolio position). General structural risks (valuation, competition, concentration) are allowed but must be framed as "general risk, not confirmed in current data." Specific events (insider selling, downgrades, lawsuits, misses) must appear in LIVE DATA news to be cited. Fabricated or inferred events explicitly prohibited.
+
+**FIX 2 — Earnings estimated flag** (`api/get-news.js`, `src/api.js`, `CouncilTab.jsx`, `ChatTab.jsx`, `agents.js`)
+- Finnhub earnings calendar includes `dateConfirmed` (1 = company has officially announced, 0 = Finnhub estimate). Now read and propagate this flag as `earningsEstimated: boolean`.
+- LIVE DATA earnings line now reads: `Next earnings: 2026-08-25, est. (in 60 days — date estimated, not yet confirmed by company)` when unconfirmed, or plain `Next earnings: 2026-08-25 (in 60 days)` when confirmed.
+- NOVA prompt updated: estimated dates still PASS within ~60 days, but NOVA notes "date estimated" in its point so timing is not treated as certain near the boundary.
+
+---
+
 ## 2026-06-25 (session 6)
 
 ### FIX — NOVA catalyst gate now sees real upcoming earnings dates

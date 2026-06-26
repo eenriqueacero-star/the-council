@@ -62,19 +62,24 @@ export default async function handler(req, res) {
   }
 
   // --- Earnings calendar ---
-  let nextEarnings    = null; // 'YYYY-MM-DD' or null
-  let rawEarnings     = null;
+  let nextEarnings     = null;  // 'YYYY-MM-DD' or null
+  let earningsEstimated = false; // true when dateConfirmed !== 1
+  let rawEarnings      = null;
   try {
     if (earningsResult.status === 'fulfilled' && earningsResult.value.ok) {
       const eData = await earningsResult.value.json();
       rawEarnings = eData;
       const cal = eData?.earningsCalendar;
       if (Array.isArray(cal) && cal.length > 0) {
-        // Take the soonest date on or after today
         const upcoming = cal
           .filter(e => e.date >= todayStr)
           .sort((a, b) => a.date.localeCompare(b.date));
-        if (upcoming.length > 0) nextEarnings = upcoming[0].date;
+        if (upcoming.length > 0) {
+          const soonest = upcoming[0];
+          nextEarnings = soonest.date;
+          // Finnhub sets dateConfirmed=1 when the company has officially announced the date
+          earningsEstimated = soonest.dateConfirmed !== 1;
+        }
       }
     } else {
       console.error(`[get-news] earnings fetch failed for ${sym}`);
@@ -83,6 +88,6 @@ export default async function handler(req, res) {
     console.error(`[get-news] earnings parse error for ${sym}:`, e.message);
   }
 
-  console.error(`[get-news] ${sym}: ${articles.length} news articles, nextEarnings=${nextEarnings}`);
-  return res.status(200).json({ articles, nextEarnings, rawNews, rawEarnings });
+  console.error(`[get-news] ${sym}: ${articles.length} news articles, nextEarnings=${nextEarnings}, estimated=${earningsEstimated}`);
+  return res.status(200).json({ articles, nextEarnings, earningsEstimated, rawNews, rawEarnings });
 }

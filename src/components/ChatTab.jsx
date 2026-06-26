@@ -130,7 +130,7 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
       let newsText = '';
       let earningsLine = '';
       try {
-        const { articles, nextEarnings } = await getNews(tkr);
+        const { articles, nextEarnings, earningsEstimated } = await getNews(tkr);
         if (articles && articles.length > 0) {
           newsText = articles
             .map(a => `- [${a.date}] ${a.headline} (${a.source})`)
@@ -138,11 +138,12 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
         }
         if (nextEarnings) {
           const daysAway = Math.round((new Date(nextEarnings) - new Date(new Date().toISOString().slice(0, 10))) / 864e5);
-          earningsLine = `Next earnings: ${nextEarnings} (in ${daysAway} day${daysAway !== 1 ? 's' : ''})`;
+          const estFlag = earningsEstimated ? ', est.' : '';
+          earningsLine = `Next earnings: ${nextEarnings}${estFlag} (in ${daysAway} day${daysAway !== 1 ? 's' : ''}${earningsEstimated ? ' — date estimated, not yet confirmed by company' : ''})`;
         } else {
           earningsLine = 'Next earnings: none scheduled within 90 days';
         }
-        console.error(`[recon][ChatTab] Finnhub articles: ${articles?.length ?? 0}, nextEarnings: ${nextEarnings}`);
+        console.error(`[recon][ChatTab] Finnhub articles: ${articles?.length ?? 0}, nextEarnings: ${nextEarnings}, estimated: ${earningsEstimated}`);
       } catch (newsErr) {
         console.error('[recon] Finnhub news call failed:', newsErr.message);
         earningsLine = 'Next earnings: unavailable';

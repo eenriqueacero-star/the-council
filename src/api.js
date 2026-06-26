@@ -82,7 +82,7 @@ export async function getNews(ticker) {
   if (cached && Date.now() - cached.ts < 120000) return cached.data;
   const headers = await authHeaders();
   const res = await fetch('/api/get-news', { method: 'POST', headers, body: JSON.stringify({ ticker: key }) });
-  if (!res.ok) return { articles: [], nextEarnings: null, rawNews: [], rawEarnings: null };
+  if (!res.ok) return { articles: [], nextEarnings: null, earningsEstimated: false, rawNews: [], rawEarnings: null };
   const data = await res.json();
   newsCache.set(key, { data, ts: Date.now() });
   return data;

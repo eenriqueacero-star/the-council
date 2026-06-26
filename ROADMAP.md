@@ -6,6 +6,12 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (recent)
 
+### VEGA grounding + earnings estimated flag ✓
+- [x] VEGA must frame unconfirmed risks as "general risk, not confirmed in current data" — no more inferred insider selling or peer activity
+- [x] Finnhub `dateConfirmed` field now propagated as `earningsEstimated` flag
+- [x] LIVE DATA earnings line labels estimated dates clearly
+- [x] NOVA notes "date estimated" for unconfirmed dates near the 60-day boundary
+
 ### NOVA earnings-calendar fix ✓
 - [x] `api/get-news.js` fetches earnings calendar in parallel with news; returns `nextEarnings` date + `rawEarnings`
 - [x] LIVE DATA block now includes "Next earnings: YYYY-MM-DD (in X days)" line from Finnhub

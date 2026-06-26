@@ -5,7 +5,7 @@ import { getQuotes } from '../api.js';
 import { AGENTS, STANCE_STYLE } from '../constants/agents.js';
 import { writeAgentLesson, updateAgentAccuracy } from '../utils/agentMemory.js';
 import { theme } from '../utils/theme.js';
-import { Loader2, BarChart2, Trash2 } from 'lucide-react';
+import { Loader2, BarChart2, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
@@ -26,6 +26,20 @@ function moveStr(from, to) {
 function parsePrice(v) {
   if (!v) return NaN;
   return parseFloat(String(v).replace(/[^0-9.]/g, ''));
+}
+
+function pctStr(v, decimals = 1) {
+  if (v == null || isNaN(v)) return null;
+  return `${v >= 0 ? '+' : ''}${v.toFixed(decimals)}%`;
+}
+
+// Compute my_return / spy_return / alpha from a ruling object
+function computeReturns(r, exitPrice, spyExitPrice) {
+  const entryPrice = parsePrice(r.enteredPrice) || r.priceAtCall;
+  const myReturn = entryPrice && exitPrice ? (exitPrice - entryPrice) / entryPrice * 100 : null;
+  const spyReturn = spyExitPrice && r.spyEntryPrice ? (spyExitPrice - r.spyEntryPrice) / r.spyEntryPrice * 100 : null;
+  const alpha = myReturn != null && spyReturn != null ? myReturn - spyReturn : null;
+  return { myReturn, spyReturn, alpha, spyExitPrice: spyExitPrice || null };
 }
 
 function StatusBadge({ status }) {
@@ -57,6 +71,34 @@ function OutcomeBadge({ outcome, T }) {
   );
   return (
     <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: T.bgHover, color: T.text2, padding: '2px 7px', borderRadius: 4 }}>EXPIRED</span>
+  );
+}
+
+// Alpha cell: shows My Return / SPY / Alpha for graded entered trades
+function AlphaCell({ r, T }) {
+  if (r.status !== 'entered' || !r.outcome) {
+    return <span style={{ ...MFONT, color: T.text3, fontSize: 11 }}>—</span>;
+  }
+  // Trade has been closed/graded but no spyEntryPrice was captured
+  if (r.spyEntryPrice == null) {
+    return (
+      <span style={{ ...MFONT, fontSize: 9, color: T.text3, display: 'block', lineHeight: 1.6 }}>
+        SPY N/A
+      </span>
+    );
+  }
+  if (r.alpha == null) {
+    return <span style={{ ...MFONT, color: T.text3, fontSize: 11 }}>—</span>;
+  }
+  const myColor  = r.myReturn  >= 0 ? '#00C805' : '#FF3B30';
+  const spyColor = r.spyReturn >= 0 ? '#00C805' : '#FF3B30';
+  const aColor   = r.alpha     >= 0 ? '#00C805' : '#FF3B30';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <span style={{ ...MFONT, fontSize: 9, color: myColor,  fontWeight: 600 }}>Me {pctStr(r.myReturn)}</span>
+      <span style={{ ...MFONT, fontSize: 9, color: spyColor }}                >SPY {pctStr(r.spyReturn)}</span>
+      <span style={{ ...MFONT, fontSize: 9, color: aColor,   fontWeight: 700 }}>α {pctStr(r.alpha)}</span>
+    </div>
   );
 }
 
@@ -92,7 +134,6 @@ export default function AlphaTrackerTab({ account, dark }) {
       }
 
       const cutoff = Date.now() - 30 * 86400 * 1000;
-      // Only auto-grade trades the user explicitly entered — not "watching" or legacy auto-saved rulings
       const needs = forAcct.filter(r =>
         r.status === 'entered' &&
         !r.outcomeCheckedAt && r.ts?.toDate && r.ts.toDate().getTime() < cutoff
@@ -101,7 +142,14 @@ export default function AlphaTrackerTab({ account, dark }) {
       if (needs.length) {
         setGrading(true);
         const gradeTickers = [...new Set(needs.map(r => r.ticker).filter(Boolean))];
-        const gq = await getQuotes(gradeTickers).catch(() => ({}));
+
+        // Fetch ticker prices + SPY price in parallel
+        const [gq, spyRes] = await Promise.all([
+          getQuotes(gradeTickers).catch(() => ({})),
+          getQuotes(['SPY']).catch(() => ({})),
+        ]);
+        const spyQ = spyRes['SPY'];
+        const spyExitPrice = spyQ?.price > 0 ? spyQ.price : spyQ?.prevClose || null;
 
         if (Object.keys(gq).length === 0) {
           setGrading(false);
@@ -117,10 +165,17 @@ export default function AlphaTrackerTab({ account, dark }) {
           let outcome = 'expired';
           if (!isNaN(tp) && price >= tp) outcome = 'target';
           else if (!isNaN(sl) && price <= sl) outcome = 'stop';
+
+          const { myReturn, spyReturn, alpha } = computeReturns(r, price, spyExitPrice);
+
           await updateDoc(doc(db, 'users', uid, 'rulings', r.id), {
             outcomeCheckedAt: new Date().toISOString(),
             priceAt30d: price,
             outcome,
+            ...(spyExitPrice != null ? { spyExitPrice } : {}),
+            ...(myReturn  != null ? { myReturn }  : {}),
+            ...(spyReturn != null ? { spyReturn } : {}),
+            ...(alpha     != null ? { alpha }     : {}),
           });
 
           if (r.agentStances) {
@@ -173,14 +228,29 @@ export default function AlphaTrackerTab({ account, dark }) {
   async function closeRuling(id, outcome) {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
+    const ruling = rulings.find(r => r.id === id);
     try {
-      await updateDoc(doc(db, 'users', uid, 'rulings', id), {
+      // Fetch current ticker + SPY prices to compute returns at close time
+      const tickersToFetch = [ruling?.ticker, 'SPY'].filter(Boolean);
+      const prices = await getQuotes(tickersToFetch).catch(() => ({}));
+      const lq = ruling?.ticker ? prices[ruling.ticker] : null;
+      const exitPrice = lq?.price > 0 ? lq.price : lq?.prevClose || null;
+      const spyLq = prices['SPY'];
+      const spyExitPrice = spyLq?.price > 0 ? spyLq.price : spyLq?.prevClose || null;
+
+      const { myReturn, spyReturn, alpha } = ruling ? computeReturns(ruling, exitPrice, spyExitPrice) : {};
+
+      const updates = {
         outcome,
         outcomeCheckedAt: new Date().toISOString(),
-      });
-      setRulings(prev => prev.map(r =>
-        r.id === id ? { ...r, outcome, outcomeCheckedAt: new Date().toISOString() } : r
-      ));
+        ...(exitPrice     != null ? { priceAt30d: exitPrice } : {}),
+        ...(spyExitPrice  != null ? { spyExitPrice } : {}),
+        ...(myReturn      != null ? { myReturn }     : {}),
+        ...(spyReturn     != null ? { spyReturn }    : {}),
+        ...(alpha         != null ? { alpha }         : {}),
+      };
+      await updateDoc(doc(db, 'users', uid, 'rulings', id), updates);
+      setRulings(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
     } catch (e) {
       console.error('Close ruling failed:', e);
     }
@@ -200,7 +270,6 @@ export default function AlphaTrackerTab({ account, dark }) {
   const stats = useMemo(() => {
     const entered  = rulings.filter(r => r.status === 'entered');
     const watching = rulings.filter(r => r.status === 'watching');
-    // Graded = entered trades that have a final outcome (auto-graded or manually closed)
     const graded     = entered.filter(r => r.outcome);
     const targetHit  = graded.filter(r => r.outcome === 'target' || r.outcome === 'win').length;
     const stopped    = graded.filter(r => r.outcome === 'stop'   || r.outcome === 'loss').length;
@@ -208,6 +277,13 @@ export default function AlphaTrackerTab({ account, dark }) {
     const avgReturn  = withReturn.length
       ? withReturn.reduce((s, r) => s + (r.priceAt30d - r.priceAtCall) / r.priceAtCall * 100, 0) / withReturn.length
       : null;
+
+    // SPY benchmarking — only graded entered trades with full alpha data
+    const withAlpha  = graded.filter(r => r.alpha != null);
+    const totalAlpha = withAlpha.length ? withAlpha.reduce((s, r) => s + r.alpha, 0) : null;
+    const avgAlpha   = withAlpha.length ? totalAlpha / withAlpha.length : null;
+    const beatSpy    = withAlpha.filter(r => r.myReturn > r.spyReturn).length;
+    const winVsSpy   = withAlpha.length ? Math.round(beatSpy / withAlpha.length * 100) : null;
 
     const agentAcc = {};
     AGENTS.forEach(a => {
@@ -236,6 +312,12 @@ export default function AlphaTrackerTab({ account, dark }) {
       stopped,
       avgReturn,
       agentAcc,
+      // SPY benchmark
+      withAlphaCount: withAlpha.length,
+      totalAlpha,
+      avgAlpha,
+      beatSpy,
+      winVsSpy,
     };
   }, [rulings]);
 
@@ -247,6 +329,15 @@ export default function AlphaTrackerTab({ account, dark }) {
   );
 
   const btnBase = { ...MFONT, fontSize: 9, fontWeight: 700, borderRadius: 4, border: 'none', cursor: 'pointer', padding: '2px 7px' };
+
+  // Alpha summary panel colors
+  const alphaPositive = stats.totalAlpha != null && stats.totalAlpha >= 0;
+  const alphaBorderColor = stats.withAlphaCount === 0 ? 'transparent'
+    : alphaPositive ? 'rgba(0,200,5,0.25)' : 'rgba(255,59,48,0.25)';
+  const alphaBgColor = stats.withAlphaCount === 0 ? T.bgCard
+    : alphaPositive ? 'rgba(0,200,5,0.05)' : 'rgba(255,59,48,0.05)';
+  const alphaTextColor = stats.withAlphaCount === 0 ? T.text
+    : alphaPositive ? '#00C805' : '#FF3B30';
 
   return (
     <div style={{ ...FONT, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -286,6 +377,56 @@ export default function AlphaTrackerTab({ account, dark }) {
             ))}
           </div>
 
+          {/* SPY Benchmarking Panel */}
+          <div style={{ borderRadius: 12, padding: 16, background: alphaBgColor, border: `1px solid ${alphaBorderColor || T.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              {stats.withAlphaCount === 0
+                ? <Minus size={13} style={{ color: T.text3 }} />
+                : alphaPositive
+                  ? <TrendingUp size={13} style={{ color: '#00C805' }} />
+                  : <TrendingDown size={13} style={{ color: '#FF3B30' }} />}
+              <span style={{ ...MFONT, fontSize: 10, letterSpacing: '0.10em', color: T.text2, fontWeight: 600 }}>ALPHA vs SPY BENCHMARK</span>
+              {stats.withAlphaCount > 0 && (
+                <span style={{ ...MFONT, fontSize: 9, color: T.text3, marginLeft: 'auto' }}>{stats.withAlphaCount} trade{stats.withAlphaCount !== 1 ? 's' : ''} benchmarked</span>
+              )}
+            </div>
+            {stats.withAlphaCount === 0 ? (
+              <p style={{ ...MFONT, fontSize: 11, color: T.text3, margin: 0 }}>
+                No benchmarked trades yet. Close or auto-grade an Entered trade to see alpha vs SPY.
+                New entered trades automatically capture SPY price at entry.
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+                {[
+                  {
+                    label: 'TOTAL ALPHA',
+                    value: pctStr(stats.totalAlpha, 1) || '—',
+                    sub: 'sum across all trades',
+                    color: alphaTextColor,
+                  },
+                  {
+                    label: 'AVG ALPHA / TRADE',
+                    value: pctStr(stats.avgAlpha, 1) || '—',
+                    sub: 'vs SPY over same period',
+                    color: stats.avgAlpha != null ? (stats.avgAlpha >= 0 ? '#00C805' : '#FF3B30') : T.text,
+                  },
+                  {
+                    label: 'BEAT SPY RATE',
+                    value: stats.winVsSpy != null ? `${stats.winVsSpy}%` : '—',
+                    sub: `${stats.beatSpy} of ${stats.withAlphaCount} trades`,
+                    color: stats.winVsSpy != null ? (stats.winVsSpy >= 50 ? '#00C805' : '#FF3B30') : T.text,
+                  },
+                ].map((c, i) => (
+                  <div key={i}>
+                    <div style={{ ...MFONT, fontSize: 9, letterSpacing: '0.10em', color: T.text2, marginBottom: 4 }}>{c.label}</div>
+                    <div style={{ ...MFONT, color: c.color, fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{c.value}</div>
+                    <div style={{ ...MFONT, color: T.text3, fontSize: 9, marginTop: 4 }}>{c.sub}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {stats.graded >= 5 && (
             <div style={{ borderRadius: 12, padding: 16, background: T.bgCard, border: `1px solid ${T.border}` }}>
               <div style={{ ...MFONT, fontSize: 10, letterSpacing: '0.10em', color: T.text2, marginBottom: 12 }}>AGENT ACCURACY · ENTERED TRADES ONLY</div>
@@ -323,10 +464,10 @@ export default function AlphaTrackerTab({ account, dark }) {
 
           <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${T.border}` }}>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
                 <thead>
                   <tr style={{ background: T.bgCard, borderBottom: `1px solid ${T.border}` }}>
-                    {['DATE', 'TICKER', 'VERDICT', 'STATUS', 'CONV', 'PRICE@CALL', '30D / NOW', 'MOVE', 'OUTCOME', ''].map(h => (
+                    {['DATE', 'TICKER', 'VERDICT', 'STATUS', 'CONV', 'PRICE@CALL', '30D / NOW', 'MOVE', 'vs SPY', 'OUTCOME', ''].map(h => (
                       <th key={h} style={{ ...MFONT, fontSize: 9, letterSpacing: '0.08em', color: T.text2, padding: '10px 12px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -364,10 +505,12 @@ export default function AlphaTrackerTab({ account, dark }) {
                             ? <span style={{ ...MFONT, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#00C805' : '#FF3B30' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
                             : <span style={{ ...MFONT, color: T.text3, fontSize: 11 }}>—</span>}
                         </td>
+                        <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                          <AlphaCell r={r} T={T} />
+                        </td>
                         <td style={{ padding: '10px 12px' }}><OutcomeBadge outcome={r.outcome} T={T} /></td>
                         <td style={{ padding: '10px 12px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
-                            {/* Win/Loss close buttons — entered trades only, while open */}
                             {isEntered && isOpen && !isPending && (
                               <>
                                 <button
@@ -382,7 +525,6 @@ export default function AlphaTrackerTab({ account, dark }) {
                                 >LOSS</button>
                               </>
                             )}
-                            {/* Reclassify watching → entered */}
                             {isWatching && !isPending && (
                               <button
                                 onClick={() => markEntered(r.id)}
@@ -390,7 +532,6 @@ export default function AlphaTrackerTab({ account, dark }) {
                                 style={{ ...btnBase, background: 'rgba(56,224,212,0.1)', color: '#38e0d4' }}
                               >→ ENT</button>
                             )}
-                            {/* Delete */}
                             {!isPending ? (
                               <button
                                 onClick={() => setDeletePending(prev => new Set([...prev, r.id]))}

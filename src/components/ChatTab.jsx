@@ -46,6 +46,16 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
     if (!uid || !rulingData) return;
     setChatTrackSaving(true);
     try {
+      // Capture SPY entry price for benchmarking on entered trades
+      let spyEntryPrice = null;
+      if (status === 'entered') {
+        try {
+          const sq = await getQuotes(['SPY']);
+          const spyQ = sq['SPY'];
+          spyEntryPrice = spyQ?.price > 0 ? spyQ.price : spyQ?.prevClose || null;
+        } catch {}
+      }
+
       await addDoc(collection(db, 'users', uid, 'rulings'), {
         ticker: rulingData.ticker, account: rulingData.account,
         verdict: rulingData.verdict, conviction: rulingData.conviction,
@@ -58,9 +68,14 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
         status,
         enteredPrice: status === 'entered' && price ? parseFloat(price) : null,
         enteredShares: status === 'entered' && shares ? parseFloat(shares) : null,
+        spyEntryPrice,
         outcome: null,
         outcomeCheckedAt: null,
         priceAt30d: null,
+        spyExitPrice: null,
+        myReturn: null,
+        spyReturn: null,
+        alpha: null,
       });
       setChatTrackedMap(prev => ({ ...prev, [runId]: status }));
       setChatTrackRunId(null);

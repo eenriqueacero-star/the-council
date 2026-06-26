@@ -61,6 +61,16 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     setTrackSaving(true);
     const rd = synthesis.rulingData;
     try {
+      // Capture SPY entry price for benchmarking on entered trades
+      let spyEntryPrice = null;
+      if (trackStatus === 'entered') {
+        try {
+          const sq = await getQuotes(['SPY']);
+          const spyQ = sq['SPY'];
+          spyEntryPrice = spyQ?.price > 0 ? spyQ.price : spyQ?.prevClose || null;
+        } catch {}
+      }
+
       await addDoc(collection(db, 'users', uid, 'rulings'), {
         ticker: rd.ticker, account: rd.account,
         verdict: rd.verdict, conviction: rd.conviction,
@@ -73,9 +83,14 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
         status: trackStatus,
         enteredPrice: trackStatus === 'entered' && trackPrice ? parseFloat(trackPrice) : null,
         enteredShares: trackStatus === 'entered' && trackShares ? parseFloat(trackShares) : null,
+        spyEntryPrice,
         outcome: null,
         outcomeCheckedAt: null,
         priceAt30d: null,
+        spyExitPrice: null,
+        myReturn: null,
+        spyReturn: null,
+        alpha: null,
       });
       setTrackSaved(true);
     } catch (e) {

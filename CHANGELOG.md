@@ -4,6 +4,28 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-26 (session 10)
+
+### Alpha Tracker vs SPY benchmarking
+
+**`src/components/CouncilTab.jsx` + `src/components/ChatTab.jsx`:** When saving a trade as "Entered", the app now calls `getQuotes(['SPY'])` (hits the 45s client cache if SPY was recently fetched) and stores `spyEntryPrice` on the Firestore ruling doc. Watching trades skip this.
+
+**`src/components/AlphaTrackerTab.jsx` — grading changes:**
+- Auto-grade (30-day): fetches SPY price alongside ticker prices in parallel. Computes `myReturn`, `spyReturn`, and `alpha` for any ruling that has `spyEntryPrice`; stores all three on the doc. If SPY fetch fails, return fields stay null and the trade is excluded from alpha calcs (not errored).
+- Manual WIN/LOSS close: now also fetches current ticker + SPY price, stores `priceAt30d` (previously not stored on manual close), and computes the same trio.
+
+**`src/components/AlphaTrackerTab.jsx` — UI additions:**
+- New "ALPHA vs SPY BENCHMARK" panel: Total Alpha, Avg Alpha/Trade, Beat-SPY Rate (% of trades where my_return > spy_return). Green-bordered when positive, red when negative, grey when no data.
+- "vs SPY" column added to the trade table: `Me +X% / SPY +Y% / α +Z%` per graded Entered trade. Trades without `spyEntryPrice` show "SPY N/A". Open/Watching show "—".
+
+**`src/constants/agents.js`:** In-app Roadmap: "Alpha vs SPY" moved to BUILT tier with "⚡ IN PROGRESS" label; removed from HIGH VALUE NEXT.
+
+**SPY data source:** Finnhub `/api/v1/quote?symbol=SPY` via existing `get-quotes.js`. Entry price = live quote at save time. Exit = live quote at grade/close. No historical lookup — pre-existing trades will show "SPY N/A" until graded/closed.
+
+- Files: `src/components/CouncilTab.jsx`, `src/components/ChatTab.jsx`, `src/components/AlphaTrackerTab.jsx`, `src/constants/agents.js`
+
+---
+
 ## 2026-06-26
 
 ### Finnhub quote hardening — retry, 429 detection, duplicate call fix

@@ -4,6 +4,18 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## IN PROGRESS
+
+### Alpha Tracker vs SPY ⚡
+- [x] `spyEntryPrice` captured at save time (Finnhub quote) for all new Entered trades
+- [x] Auto-grade (30d) computes `myReturn`, `spyReturn`, `alpha` when `spyEntryPrice` exists; stores on Firestore doc
+- [x] Manual WIN/LOSS close now also stores `priceAt30d` + computes return trio
+- [x] UI: "ALPHA vs SPY BENCHMARK" summary panel — Total Alpha, Avg Alpha/Trade, Beat-SPY Rate; green/red/grey by sign
+- [x] UI: "vs SPY" column in trade table — `Me +X% / SPY +Y% / α +Z%` per graded Entered trade; "SPY N/A" for pre-existing trades without entry price
+- [ ] Pre-existing trades: historical SPY price lookup for trades logged before this build (backfill via Finnhub candles on entry date)
+
+---
+
 ## DONE (recent)
 
 ### Finnhub quote hardening ✓
@@ -77,8 +89,8 @@ Point the same 6-agent council at existing positions, not just new buys. Verdict
 ### Scout Mode
 Council auto-runs on the watchlist and surfaces only tickers that score 7+ and pass all 4 gates.
 
-### Alpha Tracker vs SPY
-Benchmark entered trades against SPY — is the council outperforming the index?
+### Alpha Tracker vs SPY — historical backfill
+Pre-existing Entered trades (logged before this build) show "SPY N/A". To backfill: use Finnhub candle data for SPY on the entry date and write `spyEntryPrice` retroactively. Then the next grade/close will compute alpha correctly.
 
 ---
 

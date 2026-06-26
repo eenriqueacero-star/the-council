@@ -8,9 +8,9 @@ export const ROADMAP = [
     { name: 'Smart DCA Allocator', desc: 'Routes weekly/monthly DCA into the best dip, not spread thin' },
     { name: 'Sell-Protocol Watchdog', desc: 'Scans all holdings; flags only confirmed weekly downtrends' },
     { name: 'Alpha Tracker', desc: 'Track This Trade button on every ruling — Entered / Watching states, Win/Loss close, delete, auto-grade at 30 days. Stats count entered trades only.' },
+    { name: 'Agent Tuning', desc: 'Exact Sell Protocol + 4-Gate rules encoded in every agent prompt. No flip-flopping — same facts, same stance. Live data only — no memory-based prices or dates.' },
   ]},
   { tier: 'HIGH VALUE — NEXT', color: '#f5c451', items: [
-    { name: 'Agent Tuning', desc: 'Encode exact Sell Protocol + 4-Gate rules into agent prompts; stop verdict flip-flopping; force live-data use over memory.' },
     { name: 'Council on Holdings (HOLD/TRIM)', desc: 'Same 6 agents pointed at what you already own, not just new buys' },
     { name: 'Scout Mode', desc: 'Council auto-runs on your watchlist; surfaces only 7+ that pass the gates' },
     { name: 'Alpha Tracker vs SPY', desc: 'Benchmark entered trades against SPY — is the council outperforming the index?' },

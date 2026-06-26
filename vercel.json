@@ -6,8 +6,12 @@
     "api/get-quotes.js":  { "maxDuration": 30 },
     "api/get-candles.js": { "maxDuration": 30 },
     "api/get-news.js":    { "maxDuration": 15 },
-    "api/send-push.js":   { "maxDuration": 10 }
+    "api/send-push.js":   { "maxDuration": 10 },
+    "api/scout-cron.js":  { "maxDuration": 300 }
   },
+  "crons": [
+    { "path": "/api/scout-cron", "schedule": "0 13 * * 1-5" }
+  ],
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

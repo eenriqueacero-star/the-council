@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, MessageSquare, Shield, MoreHorizontal } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, Telescope, MoreHorizontal } from 'lucide-react';
 
 const FONT = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 
@@ -7,11 +7,11 @@ const TABS = [
   { id: 'portfolio', label: 'Portfolio', Icon: LayoutDashboard },
   { id: 'council',   label: 'Council',   Icon: Users },
   { id: 'chat',      label: 'Chat',      Icon: MessageSquare },
-  { id: 'watchdog',  label: 'Watchdog',  Icon: Shield },
+  { id: 'scout',     label: 'Scout',     Icon: Telescope },
   { id: 'more',      label: 'More',      Icon: MoreHorizontal },
 ];
 
-const MORE_IDS = new Set(['dca','alpha','roadmap','changelog']);
+const MORE_IDS = new Set(['dca','alpha','roadmap','changelog','watchdog']);
 
 export default function BottomNav({ tab, setTab, dark }) {
   return (

@@ -24,7 +24,14 @@ const PS = {
   PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // backward-compat
 };
 
-export default function ChatTab({ account, acct, positionsLine, flagApiDown, dark }) {
+const PORTFOLIO_KEYWORDS = ['portfolio','holdings','p&l','pnl','how did','performance','today','positions','my stocks','how are we doing','green','red','down','up','gains','losses','unrealized','total value'];
+
+function isPortfolioQuery(text) {
+  const lower = text.toLowerCase();
+  return PORTFOLIO_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+export default function ChatTab({ account, acct, posMap, positionsLine, flagApiDown, dark }) {
   const [chat,        setChat]       = useState([{ role:'pm', text:"The council is assembled. Ask me anything — market conditions, macro outlook, portfolio strategy, or name a ticker for a full investment ruling." }]);
   const [chatInput,   setChatInput]  = useState('');
   const [chatBusy,    setChatBusy]   = useState(false);
@@ -295,6 +302,41 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
     const acctLine = `Account: ${acct.label} (${acct.sub}). Holdings: ${positionsLine}. DCA: ${acct.dcaNote}.`;
     const historyBlock = buildHistoryBlock(convHistory);
 
+    // Portfolio data injection — fetch live prices if user asks about portfolio performance
+    let portfolioDataBlock = '';
+    if (isPortfolioQuery(text)) {
+      const tickers = Object.keys(posMap || {}).filter(t => t && t.trim());
+      if (tickers.length > 0) {
+        try {
+          const quotes = await getQuotes(tickers);
+          let totalValue = 0, totalDayGain = 0, totalUnrealizedPL = 0;
+          const rows = [];
+          for (const ticker of tickers) {
+            const q = quotes[ticker];
+            const pos = posMap[ticker] || {};
+            const shares = parseFloat(pos.shares) || 0;
+            const cost = parseFloat(String(pos.cost || '').replace(/[^0-9.]/g, '')) || 0;
+            const price = q?.price || q?.prevClose || 0;
+            const changePct = q?.changePct ?? 0;
+            const prevClose = q?.prevClose || price;
+            const mktVal = shares * price;
+            const dayGain = shares * (price - prevClose);
+            const unrealizedPL = cost > 0 ? (price - cost) * shares : null;
+            totalValue += mktVal;
+            totalDayGain += dayGain;
+            if (unrealizedPL != null) totalUnrealizedPL += unrealizedPL;
+            rows.push(`${ticker}: $${price.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% today) | ${shares}sh | cost $${cost.toFixed(2)} | mkt val $${mktVal.toFixed(2)} | day gain $${dayGain.toFixed(2)}${unrealizedPL != null ? ` | unrealized P&L $${unrealizedPL.toFixed(2)}` : ''}`);
+          }
+          portfolioDataBlock = `\n\nPORTFOLIO DATA (live as of ${new Date().toLocaleTimeString()}):\n${rows.join('\n')}\nTOTAL: market value $${totalValue.toFixed(2)} | day change $${totalDayGain.toFixed(2)} (${totalValue > 0 ? ((totalDayGain / (totalValue - totalDayGain)) * 100).toFixed(2) : '0.00'}%) | total unrealized P&L $${totalUnrealizedPL.toFixed(2)}\n`;
+          if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1') {
+            console.log('[chat portfolio injection]', portfolioDataBlock);
+          }
+        } catch (err) {
+          console.error('[chat portfolio injection] quote fetch failed:', err?.message);
+        }
+      }
+    }
+
     // AXIOM reads the message and decides: answer directly, route to specialist(s), or convene full council
     const axiomSys = `You are AXIOM, chair of THE COUNCIL — an elite private investment analysis team. You are direct, sharp, decisive, and genuinely knowledgeable about markets. ${PROTOCOLS}
 
@@ -325,7 +367,8 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
 
     let router;
     try {
-      const { text: txt } = await callAgent(axiomSys, `Investor: "${text}". ${acctLine} Return ONLY the JSON.`, false);
+      const portfolioContext = portfolioDataBlock ? portfolioDataBlock : '';
+      const { text: txt } = await callAgent(axiomSys, `Investor: "${text}". ${acctLine}${portfolioContext} Return ONLY the JSON.`, false);
       const parsed = extractJSON(txt);
       if (!parsed) console.error('[AXIOM router] JSON parse failed. Raw txt:', JSON.stringify(txt));
       router = parsed || { speak: "I didn't quite catch that.", fullCouncil: false, ticker: null, route: [] };

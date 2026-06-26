@@ -156,7 +156,38 @@ function AgentRoundCard({ ag, round, data }) {
   );
 }
 
-export default function DebugTab({ debugLog, dark }) {
+function ScoutDebugSection({ scoutDebugLog }) {
+  if (!scoutDebugLog || !scoutDebugLog.tickers) return null;
+  const entries = Object.entries(scoutDebugLog.tickers);
+  if (!entries.length) return null;
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div style={{ ...MONO, fontSize: 10, color: '#38e0d4', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 12, padding: '0 16px' }}>Scout Debug</div>
+      <div style={{ padding: '0 16px' }}>
+        {entries.map(([ticker, data]) => (
+          <Card key={ticker} title={`SCOUT · ${ticker}`} accent="#38e0d4" copyText={JSON.stringify(data, null, 2)}>
+            <div style={{ ...MONO, fontSize: 9, color: '#666', marginBottom: 4 }}>LIVE DATA BLOCK</div>
+            <Pre text={data.liveDataBlock || '(none)'} maxLines={10} />
+            {data.agents && Object.entries(data.agents).map(([id, ag]) => (
+              <div key={id} style={{ marginTop: 8 }}>
+                <div style={{ ...MONO, fontSize: 9, color: '#888', marginBottom: 3 }}>{id.toUpperCase()} · {ag.ms}ms · key[{ag.keyIndex}]</div>
+                <Pre text={`Raw: ${ag.rawResponse || ag.error || '(none)'}\nParsed: ${JSON.stringify(ag.parsed)}`} maxLines={5} />
+              </div>
+            ))}
+            {data.synthesis && (
+              <>
+                <div style={{ ...MONO, fontSize: 9, color: '#666', marginTop: 10, marginBottom: 4 }}>AXIOM SYNTHESIS</div>
+                <Pre text={`Raw: ${data.synthesis.rawResponse || data.synthesis.error || '(none)'}\nParsed: ${JSON.stringify(data.synthesis.parsed)}`} maxLines={8} />
+              </>
+            )}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function DebugTab({ debugLog, scoutDebugLog, dark }) {
   const T = theme(dark);
 
   if (!debugLog) {
@@ -291,6 +322,8 @@ export default function DebugTab({ debugLog, dark }) {
           </Card>
         )}
       </div>
+
+      <ScoutDebugSection scoutDebugLog={scoutDebugLog} />
     </div>
   );
 }

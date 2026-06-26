@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, addDoc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { ACCOUNTS } from './constants/agents.js';
 import { getMarketState, getTimeToNextOpen } from './utils/marketState.js';
@@ -16,7 +16,10 @@ import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 import ChangelogTab from './components/ChangelogTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
+import ScoutTab from './components/ScoutTab.jsx';
 import DebugTab from './components/DebugTab.jsx';
+import { getQuotes } from './api.js';
+import { sendNotification, getPermissionState } from './utils/notify.js';
 import { ChevronRight, LogOut } from 'lucide-react';
 
 const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
@@ -28,6 +31,7 @@ const SIDEBAR_TABS = [
   { id:'portfolio', label:'Portfolio'  },
   { id:'council',   label:'Council'    },
   { id:'chat',      label:'Chat'       },
+  { id:'scout',     label:'Scout'      },
   { id:'watchdog',  label:'Watchdog'   },
   { id:'dca',       label:'DCA'        },
   { id:'alpha',     label:'Alpha'      },
@@ -38,7 +42,7 @@ const SIDEBAR_TABS = [
 ];
 
 const MORE_ROWS = [
-  ['dca','DCA Allocator'],['alpha','Alpha Tracker'],
+  ['watchdog','Watchdog'],['dca','DCA Allocator'],['alpha','Alpha Tracker'],
   ['roadmap','Roadmap'],['changelog','Changelog'],
   ['settings','Settings'],
   ...(isDebugMode ? [['debug','Debug 🔍']] : []),
@@ -55,6 +59,10 @@ export default function App() {
   useEffect(() => { localStorage.setItem('council_dark', String(dark)); }, [dark]);
   useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
 
+  const [scoutDebugLog, setScoutDebugLog] = useState(null);
+  const [alertSettings, setAlertSettings] = useState({ globalThreshold: 5, perStock: {} });
+  const alertFiredToday = useRef({}); // ticker → true; reset daily
+  const lastAlertDate   = useRef(new Date().toDateString());
   const [debugLog,   setDebugLog]   = useState(null);
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
@@ -163,6 +171,63 @@ export default function App() {
     return next;
   });
 
+  // Portfolio alert checker — runs on mount and every 5 minutes while in foreground
+  const checkAlerts = useCallback(async () => {
+    const today = new Date().toDateString();
+    if (lastAlertDate.current !== today) {
+      alertFiredToday.current = {};
+      lastAlertDate.current = today;
+    }
+    if (getPermissionState() !== 'granted') return;
+    const uid = auth.currentUser?.uid;
+    const positionsNow = positionsRef.current;
+    const tickers = Object.keys(positionsNow[account] || {}).filter(t => t && t.trim());
+    if (!tickers.length) return;
+
+    let quotes;
+    try { quotes = await getQuotes(tickers); } catch { return; }
+
+    for (const ticker of tickers) {
+      const q = quotes[ticker];
+      if (!q || q.changePct == null) continue;
+      const threshold = alertSettings.perStock[ticker] ?? alertSettings.globalThreshold;
+      const absChg = Math.abs(q.changePct);
+      if (absChg < threshold) continue;
+      const firedKey = `${ticker}_${today}`;
+      if (alertFiredToday.current[firedKey]) continue;
+      alertFiredToday.current[firedKey] = true;
+
+      const dir = q.changePct >= 0 ? '📈' : '📉';
+      const sign = q.changePct >= 0 ? '+' : '';
+      const priceStr = q.price ? ` ($${q.price.toFixed(2)})` : '';
+      sendNotification(
+        `${dir} ${ticker} is ${q.changePct >= 0 ? 'up' : 'down'} ${sign}${q.changePct.toFixed(1)}% today${priceStr}`,
+        `Threshold: ${threshold}%`,
+      );
+
+      // Log to Firestore alert history
+      if (uid) {
+        try {
+          await addDoc(collection(db, 'users', uid, 'alertHistory'), {
+            ticker, changePct: q.changePct, price: q.price || null,
+            direction: q.changePct >= 0 ? 'up' : 'down',
+            threshold, firedAt: new Date().toISOString(),
+          });
+        } catch {}
+      }
+    }
+
+    if (isDebugMode) {
+      console.log('[alerts] checked:', tickers, 'quotes:', JSON.stringify(quotes));
+    }
+  }, [account, alertSettings]);
+
+  useEffect(() => {
+    checkAlerts();
+    const id = setInterval(checkAlerts, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [checkAlerts]);
+
   const acct          = ACCOUNTS[account];
   const posMap        = positions[account] || {};
   const acctHoldings  = Object.keys(posMap).length ? Object.keys(posMap) : (acct?.holdings || []);
@@ -269,14 +334,15 @@ export default function App() {
               />
             </div>
           )}
-          {tab === 'chat'      && <div style={padded}><ChatTab {...shared} /></div>}
+          {tab === 'chat'      && <div style={padded}><ChatTab {...shared} posMap={posMap} /></div>}
+          {tab === 'scout'     && <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} onDebugLog={isDebugMode ? log => setScoutDebugLog(log) : undefined} />}
           {tab === 'watchdog'  && <div style={padded}><WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} /></div>}
           {tab === 'dca'       && <div style={padded}><DCATab {...shared} /></div>}
           {tab === 'alpha'     && <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>}
           {tab === 'roadmap'   && <div style={padded}><RoadmapTab dark={dark} /></div>}
           {tab === 'changelog' && <div style={padded}><ChangelogTab dark={dark} /></div>}
-          {tab === 'settings'  && <div style={padded}><SettingsTab dark={dark} setDark={setDark} /></div>}
-          {tab === 'debug'     && isDebugMode && <DebugTab debugLog={debugLog} dark={dark} />}
+          {tab === 'settings'  && <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} /></div>}
+          {tab === 'debug'     && isDebugMode && <DebugTab debugLog={debugLog} scoutDebugLog={scoutDebugLog} dark={dark} />}
           {tab === 'more' && (
             <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>
               {MORE_ROWS.map(([t, label]) => (

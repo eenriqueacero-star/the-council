@@ -6,6 +6,21 @@ const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const ENTRIES = [
   {
+    version: '0.3.0', date: '2026-06-26', label: 'MAJOR',
+    changes: [
+      { type: 'FEAT', text: 'Scout Mode — watchlist + auto-discovery pool (30 tickers) scanned in a single-round lightweight council. Results sorted by conviction. BUY 7+ highlighted green. Tap rows to expand agent stance summary. Vercel Cron auto-runs daily at 9 AM ET (configure CRON_USER_IDS in Vercel env).' },
+      { type: 'FEAT', text: 'Portfolio Alerts — price check on all holdings on app open and every 5 minutes. Configurable thresholds (3/5/7/10%). Fires Web Notifications (works on iOS PWA). Alert history stored in Firestore. Enable via Settings → Notifications.' },
+      { type: 'FEAT', text: 'AXIOM live portfolio data in chat — ask "how did my portfolio do today" and AXIOM gets live prices for all holdings, calculates day P&L and unrealized gain/loss, and answers with real numbers.' },
+      { type: 'FEAT', text: 'AXIOM conversational tone — casual, direct, market slang. No corporate speak. "MU got hammered today" not "the equity exhibited significant downward pressure."' },
+      { type: 'FIX',  text: 'Alpha vs SPY marked complete — removed "IN PROGRESS" label from roadmap.' },
+      { type: 'FEAT', text: 'Scout tab replaces Watchdog in bottom nav (Watchdog moves to More menu). Telescope icon.' },
+      { type: 'FEAT', text: 'shared src/utils/notify.js for Web Notification API — used by Scout Mode and Portfolio Alerts.' },
+      { type: 'FEAT', text: 'src/utils/councilRunner.js — extracted single-round scout logic to avoid duplicating CouncilTab prompt-building code.' },
+      { type: 'FEAT', text: 'Debug panel (?debug=1) extended: Scout Mode debug cards show per-ticker liveDataBlock, per-agent raw response + parse status + latency + key index, AXIOM synthesis raw response.' },
+      { type: 'FEAT', text: 'AXIOM_SYSTEM updated to use casual direct tone in convene=false speak responses.' },
+    ],
+  },
+  {
     version: '0.2.0', date: '2026-06-13', label: 'MAJOR',
     changes: [
       { type: 'FEAT', text: 'Named agents: REX ⚡ (Technical), NOVA 🚀 (Catalyst), SAGE 🛡️ (Risk), ATLAS 🌐 (Macro), VEGA 🐻 (Devil\'s Advocate), ZEN ⚖️ (Sizer) — each with distinct personality, color, and domain expertise' },

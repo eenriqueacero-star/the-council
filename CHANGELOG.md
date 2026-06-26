@@ -4,6 +4,48 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-26 (session 12)
+
+### Six-feature build: Scout Mode, Portfolio Alerts, AXIOM live data, AXIOM tone, Alpha vs SPY complete, debug/roadmap/changelog updates
+
+**Task 1 — Alpha vs SPY complete (`src/constants/agents.js`):** Removed "⚡ IN PROGRESS" from the roadmap item. Now called "Alpha vs SPY Benchmark". Moved to BUILT tier (was already there but mislabeled). Updated desc to reflect completion.
+
+**Task 2 — Scout Mode (`src/components/ScoutTab.jsx`, `src/utils/councilRunner.js`, `api/scout-cron.js`, `vercel.json`, `src/components/BottomNav.jsx`, `src/App.jsx`, `src/constants/agents.js`):**
+- New Scout tab (Telescope icon) in bottom nav and sidebar. Replaces Watchdog in bottom nav (Watchdog moves to More menu).
+- Two sources: user watchlist (Firestore `users/{uid}/watchlist`, pre-loaded with OKLO/LPTH/UNH/KKR/ACMR/NU/SERV/RXRX) and auto-discovery pool (30 tickers in `DISCOVERY_POOL`, 5-8 random per run).
+- Single-round lightweight council per ticker via `src/utils/councilRunner.js` (reused agent prompts, key rotation, liveDataBlock — no code duplication from CouncilTab).
+- 3-second delay between tickers. Progress bar shows "Scouting OKLO… 3/12".
+- Results sorted by conviction desc. BUY 7+ = green highlight. Tap row to expand agent stances + rationale.
+- Results stored in Firestore: `users/{uid}/watchlist/{ticker}` (watchlist) and `users/{uid}/scoutDiscovery/{ticker}` (discovery).
+- Push notification via Web Notification API when BUY conviction 7+ is found.
+- Vercel Cron (`api/scout-cron.js`): runs weekdays 9 AM ET (13:00 UTC). Reads watchlists via Firestore REST API. Requires `CRON_USER_IDS` env var (comma-separated UIDs). Also needs `FIREBASE_PROJECT_ID`.
+- Auto-discovery toggle in Scout UI.
+
+**Task 3 — Portfolio Alerts (`src/App.jsx`, `src/components/SettingsTab.jsx`, `src/utils/notify.js`):**
+- `src/utils/notify.js`: shared utility for Web Notification API (`requestPermission`, `sendNotification`, `getPermissionState`).
+- Alert checker runs on app mount and every 5 minutes (in App.jsx). Compares current changePct to threshold. Fires notification once per stock per day. Logs to `users/{uid}/alertHistory`.
+- SettingsTab: new Portfolio Alerts section with notification enable button, global threshold selector (3/5/7/10%), and iOS PWA tip.
+- Default threshold: 5%. Per-stock customization via `alertSettings.perStock` in App state (Firestore persistence not wired — intentional for now, local state only).
+
+**Task 4 — AXIOM live portfolio data in chat (`src/components/ChatTab.jsx`):**
+- `isPortfolioQuery(text)` detects portfolio keywords ("portfolio", "holdings", "P&L", "how did", "performance", "today", "positions", "my stocks", "green", "red", "gains", "losses", "unrealized", "total value", etc).
+- When detected: fetches live quotes for all holdings, builds a PORTFOLIO DATA block (per-ticker: price, changePct, shares, cost, day gain/loss, unrealized P&L), calculates totals (total value, total day change %, total unrealized P&L), injects into AXIOM routing prompt.
+- ChatTab now receives `posMap` prop from App.jsx.
+- Debug mode (?debug=1) logs the full injected portfolio block to console.
+
+**Task 5 — AXIOM conversational tone (`src/constants/agents.js`):**
+- `AXIOM_CONVERSATIONAL` updated: casual, direct, market slang, no hedging, strong opinions. "MU got hammered today, whole chip sector sold off" instead of corporate analyst speak.
+- `AXIOM_SYSTEM` updated to instruct the speak field to also use the same casual direct tone.
+
+**Task 6 — Changelog, debug, roadmap:**
+- ROADMAP: Alpha vs SPY Benchmark, Scout Mode, Portfolio Alerts, AXIOM Live Portfolio Data, AXIOM Natural Voice all in BUILT. "Council on Holdings (HOLD/TRIM)" kept in HIGH VALUE NEXT.
+- Debug panel: `ScoutDebugSection` added to DebugTab — expandable cards per scouted ticker showing liveDataBlock, per-agent raw response + parse status + latency + key index, AXIOM synthesis raw response.
+- ChangelogTab: v0.3.0 entry added.
+
+- Files: `src/constants/agents.js`, `src/utils/councilRunner.js`, `src/utils/notify.js`, `src/components/ScoutTab.jsx`, `src/components/BottomNav.jsx`, `src/App.jsx`, `src/components/ChatTab.jsx`, `src/components/SettingsTab.jsx`, `src/components/DebugTab.jsx`, `src/components/ChangelogTab.jsx`, `api/scout-cron.js`, `vercel.json`, `CHANGELOG.md`
+
+---
+
 ## 2026-06-26 (session 11)
 
 ### Three bug fixes: AXIOM verdict collision, double dollar sign, ZEN sizing scale

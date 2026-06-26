@@ -9,11 +9,14 @@ export const ROADMAP = [
     { name: 'Sell-Protocol Watchdog', desc: 'Scans all holdings; flags only confirmed weekly downtrends' },
     { name: 'Alpha Tracker', desc: 'Track This Trade button on every ruling — Entered / Watching states, Win/Loss close, delete, auto-grade at 30 days. Stats count entered trades only.' },
     { name: 'Agent Tuning', desc: 'Exact Sell Protocol + 4-Gate rules encoded in every agent prompt. No flip-flopping — same facts, same stance. Live data only — no memory-based prices or dates.' },
-    { name: 'Alpha vs SPY ⚡ IN PROGRESS', desc: 'SPY price captured at entry for every Entered trade. At close or 30-day auto-grade: my return vs SPY over same holding period → alpha. Summary panel shows total alpha, avg alpha/trade, beat-SPY rate. Per-trade breakdown (Me / SPY / α) visible in the tracker table.' },
+    { name: 'Alpha vs SPY Benchmark', desc: 'SPY price captured at entry for every Entered trade. At close or 30-day auto-grade: my return vs SPY over same holding period → alpha. Summary panel shows total alpha, avg alpha/trade, beat-SPY rate. Per-trade breakdown (Me / SPY / α) visible in the tracker table.' },
+    { name: 'Scout Mode', desc: 'Watchlist + auto-discovery pool scanned daily (Vercel Cron, 9 AM ET). Single-round council per ticker → AXIOM verdict. Results sorted by conviction. Push notifications when high-conviction buys surface.' },
+    { name: 'Portfolio Alerts', desc: 'Robinhood-style notifications on holdings — configurable thresholds (3/5/7/10%), per-stock custom alerts, daily alert history.' },
+    { name: 'AXIOM Live Portfolio Data', desc: 'Ask AXIOM how your portfolio is doing and get real-time answers with live prices and P&L.' },
+    { name: 'AXIOM Natural Voice', desc: 'AXIOM speaks like a sharp friend, not a corporate robot — casual, direct, market slang.' },
   ]},
   { tier: 'HIGH VALUE — NEXT', color: '#f5c451', items: [
     { name: 'Council on Holdings (HOLD/TRIM)', desc: 'Same 6 agents pointed at what you already own, not just new buys' },
-    { name: 'Scout Mode', desc: 'Council auto-runs on your watchlist; surfaces only 7+ that pass the gates' },
   ]},
   { tier: 'STRONG EDGE', color: '#38e0d4', items: [
     { name: 'Earnings Radar', desc: 'Countdown to every holding\'s earnings + auto pre-earnings council review 3 days out' },
@@ -91,13 +94,19 @@ ACCOUNT SCALE: The investor is a young retail investor with a small account. Typ
 Output ONLY the raw JSON object — no markdown, no code fences, no reasoning text, no prose before or after: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10 where 10=fits cleanly>,"headline":"<8 words max>","points":["<starter $ + approx shares>","<% of available capital>","<scale-up plan>"]}` },
 ];
 
-export const AXIOM_SYSTEM = `You are AXIOM, chair of THE COUNCIL — an elite private investment analysis team. You are direct, sharp, decisive, and genuinely knowledgeable about markets. ${PROTOCOLS}
+export const AXIOM_SYSTEM = `You are AXIOM, chair of THE COUNCIL — an elite private investment analysis team. You talk like a sharp, knowledgeable friend — direct, casual, no corporate speak. Market slang welcome (got crushed, ripping, dip-buy, etc). ${PROTOCOLS}
 CRITICAL: Only convene the full council (convene=true) when the investor specifically asks for a BUY/SELL/HOLD/ANALYSIS decision on a named ticker.
-For ALL other questions — market conditions, portfolio strategy, macro discussion, greetings, or general questions — answer directly and intelligently yourself (convene=false).
+For ALL other questions — market conditions, portfolio strategy, macro discussion, greetings, or general questions — answer directly and intelligently yourself (convene=false). Your speak text should sound like a sharp friend, not a corporate analyst — plain language, strong opinions, no hedging.
 You are NOT a router. You are a seasoned portfolio manager who happens to have a full research team available.
 Output ONLY the raw JSON object — no markdown, no code fences, no reasoning text, no prose before or after: {"speak":"<your response>","convene":<true|false>,"ticker":"<TICKER or null>"}`;
 
-export const AXIOM_CONVERSATIONAL = `You are AXIOM, chair of THE COUNCIL — an elite investment analysis team. You are direct, sharp, and decisive. You answer portfolio questions directly. For specific stock BUY/SELL/HOLD decisions, you convene the full council. Speak with authority, not servility.`;
+export const AXIOM_CONVERSATIONAL = `You are AXIOM, the portfolio manager running THE COUNCIL. You talk like a sharp, knowledgeable friend — direct, casual, no corporate speak. Use plain language. Instead of 'the equity exhibited significant downward pressure amid sector rotation', say 'MU got hammered today, whole chip sector sold off.' Keep it concise. No bullet points unless the user asks for a breakdown. No hedging with 'it's important to note' or 'one might consider' — just say what you think. You can use market slang naturally (got crushed, ripping, dip-buy, bag-holding, etc). You have strong opinions backed by data. For specific stock BUY/SELL/HOLD decisions, you convene the full council. You are not a chatbot — you are the PM.`;
+
+export const DISCOVERY_POOL = [
+  'TSLA','AAPL','MSFT','GOOGL','AMZN','META','SMCI','ARM','MRVL','AVGO',
+  'TSM','ASML','LRCX','KLAC','SNOW','NET','DDOG','PANW','COIN','MSTR',
+  'RKLB','IONQ','RGTI','QBTS','LLY','ISRG','DXCM','ENPH','FSLR','CEG',
+];
 
 export const STANCE_STYLE = {
   PASS:       { bg: 'rgba(47,203,138,0.12)',  fg: '#2fcb8a', label: 'PASS' },   // individual agent gate = green

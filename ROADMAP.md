@@ -6,6 +6,14 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (recent)
 
+### Real news via Finnhub ✓
+- [x] Replaced groq/compound news recon with Finnhub company-news API (real, dated, sourced headlines)
+- [x] `api/get-news.js` — new serverless endpoint using existing FINNHUB_KEY
+- [x] `getNews(ticker)` in `src/api.js` with 2-min cache
+- [x] Both CouncilTab and ChatTab use Finnhub; compound news call fully removed
+- [x] Debug panel RECON card now shows raw Finnhub JSON for verification
+- [x] Honest-empty ("no recent news available") instead of fabricated fallback
+
 ### NOVA + Recon fixes ✓
 - [x] NOVA catalyst gate relaxed — passes when a clearly referenced upcoming event exists, even without exact date
 - [x] Recon news query now requests dated, last-3-5-day headlines only; staleness filter rejects undated generic responses

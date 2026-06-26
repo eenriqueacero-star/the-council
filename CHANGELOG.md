@@ -4,6 +4,23 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-25 (session 5)
+
+### CRITICAL — Replace compound/generated news with real Finnhub headlines
+
+**Problem:** groq/compound was fabricating dated headlines that passed the freshness filter (fake GPU launches, nonsensical price targets, false revenue figures). These fed every agent as ground truth, causing agents to reason on hallucinated facts.
+
+**Solution — Finnhub company-news endpoint (real data):**
+- New `api/get-news.js` serverless function: calls `https://finnhub.io/api/v1/company-news?symbol=<TICKER>&from=<5-days-ago>&to=<today>` using the existing `FINNHUB_KEY`. Returns top 5 articles sorted by datetime desc, each with `headline`, `source`, `date`, `summary`.
+- New `getNews(ticker)` in `src/api.js`: auth-gated POST to `/api/get-news` with a 2-minute in-memory cache (same pattern as `getQuotes`).
+- `CouncilTab.jsx` + `ChatTab.jsx`: compound news call removed entirely and replaced with `getNews()`. Headlines formatted as `- [YYYY-MM-DD] Headline (Source)`. If Finnhub returns zero articles, LIVE DATA shows "no recent news available (Finnhub)" — no fallback to generated text.
+- `vercel.json`: added `api/get-news.js` with 15s maxDuration.
+- The groq/compound recon call is fully removed from both tabs (code deleted, not commented out). The `callAgent` import and compound model remain available in `run-agent.js` for other uses.
+
+**Debug panel:** "RECON · RAW NEWS RESPONSE" card now shows the raw Finnhub JSON array — real articles with unix timestamps, sources, and headlines. Headlines are verifiably real and dated.
+
+---
+
 ## 2026-06-25 (session 4)
 
 ### FIX — NOVA catalyst gate too rigid; recon news staleness

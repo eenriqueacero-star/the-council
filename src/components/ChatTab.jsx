@@ -3,7 +3,7 @@ import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send, Crown, Ale
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
-import { callAgent, getQuotes, sleep } from '../api.js';
+import { callAgent, getQuotes, getNews, sleep } from '../api.js';
 import { auth, db } from '../firebase.js';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { loadTickerHistory } from '../utils/rulingContext.js';
@@ -129,18 +129,18 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
       let newsText = '';
       try {
-        const reconSys = 'You are a financial news researcher. Return only recent, dated headlines — no background, no history, no generic summaries. If you cannot find news from the last 3-5 days, say "No confirmed recent news in the last 3-5 days."';
-        const reconQuery = `Search for ${tkr} news from the last 3-5 days only. Return 3-4 dated, specific headlines about catalysts, earnings, analyst upgrades/downgrades, product launches, or major moves. Include the date for each item. Do NOT return generic background info, old earnings history, or stale summaries. If no recent news exists, say so explicitly.`;
-        const { text: newsRaw } = await callAgent(reconSys, reconQuery, true, 400);
-        const looksGeneric = !newsRaw?.trim() ||
-          newsRaw.trim().length < 60 ||
-          /no (recent|confirmed|news)/i.test(newsRaw);
-        newsText = looksGeneric ? '' : newsRaw.trim();
+        const { articles } = await getNews(tkr);
+        if (articles && articles.length > 0) {
+          newsText = articles
+            .map(a => `- [${a.date}] ${a.headline} (${a.source})`)
+            .join('\n');
+        }
+        console.error(`[recon][ChatTab] Finnhub articles: ${articles?.length ?? 0}`);
       } catch (newsErr) {
-        console.error('[recon] news call failed:', newsErr.message);
+        console.error('[recon] Finnhub news call failed:', newsErr.message);
       }
 
-      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news (last 3-5 days):\n' + newsText : ' Recent news: no confirmed recent news (last 3-5 days).'}\n`;
+      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news (last 5 days, via Finnhub):\n' + newsText : ' Recent news: no recent news available (Finnhub).'}\n`;
       reconGrounded = !!(livePrice && newsText);
       console.error('[recon][ChatTab] rawQuote:', JSON.stringify(rawQuote));
       console.error('[recon][ChatTab] liveDataBlock:', liveDataBlock);

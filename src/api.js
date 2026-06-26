@@ -73,5 +73,20 @@ export async function getCandles(tickers, range) {
   return res.json();
 }
 
+// 2-min in-memory news cache per ticker
+const newsCache = new Map(); // key: ticker → { data, ts }
+
+export async function getNews(ticker) {
+  const key = ticker.toUpperCase();
+  const cached = newsCache.get(key);
+  if (cached && Date.now() - cached.ts < 120000) return cached.data;
+  const headers = await authHeaders();
+  const res = await fetch('/api/get-news', { method: 'POST', headers, body: JSON.stringify({ ticker: key }) });
+  if (!res.ok) return { articles: [], raw: [] };
+  const data = await res.json();
+  newsCache.set(key, { data, ts: Date.now() });
+  return data;
+}
+
 // Stagger helper
 export const sleep = ms => new Promise(r => setTimeout(r, ms));

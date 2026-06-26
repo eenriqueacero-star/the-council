@@ -7,11 +7,12 @@ export const ROADMAP = [
     { name: 'Capital Input', desc: 'State available cash; Position Sizer returns dollars + shares' },
     { name: 'Smart DCA Allocator', desc: 'Routes weekly/monthly DCA into the best dip, not spread thin' },
     { name: 'Sell-Protocol Watchdog', desc: 'Scans all holdings; flags only confirmed weekly downtrends' },
+    { name: 'Alpha Tracker', desc: 'Track This Trade button on every ruling — Entered / Watching states, Win/Loss close, delete, auto-grade at 30 days. Stats count entered trades only.' },
   ]},
   { tier: 'HIGH VALUE — NEXT', color: '#f5c451', items: [
     { name: 'Council on Holdings (HOLD/TRIM)', desc: 'Same 6 agents pointed at what you already own, not just new buys' },
     { name: 'Scout Mode', desc: 'Council auto-runs on your watchlist; surfaces only 7+ that pass the gates' },
-    { name: 'Alpha Tracker vs SPY', desc: 'Logs every ruling, grades it later vs SPY — is the council making money?' },
+    { name: 'Alpha Tracker vs SPY', desc: 'Benchmark entered trades against SPY — is the council outperforming the index?' },
   ]},
   { tier: 'STRONG EDGE', color: '#38e0d4', items: [
     { name: 'Earnings Radar', desc: 'Countdown to every holding\'s earnings + auto pre-earnings council review 3 days out' },

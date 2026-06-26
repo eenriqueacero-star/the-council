@@ -6,6 +6,12 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (recent)
 
+### Debug Panel ✓
+- [x] `?debug=1` URL param gates the Debug tab — zero clutter in normal use
+- [x] Captures LIVE DATA block, all 6 agents × 3 rounds (prompt, raw response, parse OK, stance, timing, key index), and AXIOM synthesis
+- [x] Copyable cards for each section; truncated pre-blocks with expand links
+- [x] State persists after run completes; survives tab switches
+
 ### Agent Tuning ✓
 - [x] **PROTOCOLS expanded** — downtrend definition explicit (lower highs + lower lows over multiple weeks; single red day never counts), 4-Gate rule spelled out, Stability Rule (anti-flip-flop), Live Data Rule added
 - [x] **REX** — DOWNTREND STANDARD block: must see lower highs AND lower lows across multiple weeks; ambiguity defaults to CAUTION not FAIL

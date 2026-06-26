@@ -16,7 +16,10 @@ import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import RoadmapTab from './components/RoadmapTab.jsx';
 import ChangelogTab from './components/ChangelogTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
+import DebugTab from './components/DebugTab.jsx';
 import { ChevronRight, LogOut } from 'lucide-react';
+
+const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
@@ -31,12 +34,14 @@ const SIDEBAR_TABS = [
   { id:'roadmap',   label:'Roadmap'    },
   { id:'changelog', label:'Changelog'  },
   { id:'settings',  label:'Settings'   },
+  ...(isDebugMode ? [{ id:'debug', label:'Debug 🔍' }] : []),
 ];
 
 const MORE_ROWS = [
   ['dca','DCA Allocator'],['alpha','Alpha Tracker'],
   ['roadmap','Roadmap'],['changelog','Changelog'],
   ['settings','Settings'],
+  ...(isDebugMode ? [['debug','Debug 🔍']] : []),
 ];
 
 export default function App() {
@@ -50,6 +55,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('council_dark', String(dark)); }, [dark]);
   useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
 
+  const [debugLog,   setDebugLog]   = useState(null);
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
   const [ticker,     setTicker]     = useState('');
@@ -258,6 +264,7 @@ export default function App() {
                 active={active} setActive={setActive}
                 agentState={agentState} setAgentState={setAgentState}
                 synthesis={synthesis} setSynthesis={setSynthesis}
+                setDebugLog={isDebugMode ? setDebugLog : undefined}
               />
             </div>
           )}
@@ -268,6 +275,7 @@ export default function App() {
           {tab === 'roadmap'   && <div style={padded}><RoadmapTab dark={dark} /></div>}
           {tab === 'changelog' && <div style={padded}><ChangelogTab dark={dark} /></div>}
           {tab === 'settings'  && <div style={padded}><SettingsTab dark={dark} setDark={setDark} /></div>}
+          {tab === 'debug'     && isDebugMode && <DebugTab debugLog={debugLog} dark={dark} />}
           {tab === 'more' && (
             <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>
               {MORE_ROWS.map(([t, label]) => (

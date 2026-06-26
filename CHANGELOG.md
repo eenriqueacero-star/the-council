@@ -4,6 +4,31 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-25 (session 3)
+
+### Debug panel — full run diagnostics without DevTools
+
+Added a diagnostic `Debug` tab (visible only when `?debug=1` is in the URL) that captures and displays all data flowing through a council run without changing any logic.
+
+**What's captured:**
+- `LIVE DATA` block exactly as assembled (price, %change, range, news)
+- For each of the 6 agents across all 3 rounds: full prompt sent, raw response text, parse success (✅/❌), parsed stance/score, response time in ms, Groq key index used, and grounded/ungrounded status
+- Synthesis (AXIOM): system prompt, user prompt (final council summary), raw response, parse success, timing, and any warning
+- `anyUngrounded` flag shown in the panel header
+
+**UI:**
+- Each card has a "Copy" button that copies the full debug block for easy pasting
+- Long prompts/responses are truncated at 8–12 lines with an expand link — readable without scrolling forever
+- Panel is dark (`#0a0d10`) regardless of app theme — debug always shows on black
+- Shows "No debug data yet" when no run has happened; data persists in state between tab switches
+
+**Implementation:**
+- `debugRef` accumulates data during the run; `setDebugLog` (passed from App.jsx) is called once synthesis completes
+- `isDebugMode` flag (`?debug=1`) gates all tab registration, rendering, and prop passing — zero overhead in normal use
+- Files: `src/App.jsx`, `src/components/CouncilTab.jsx`, `src/components/DebugTab.jsx` (new)
+
+---
+
 ## 2026-06-26
 
 ### Agent Tuning — tighter rules, no flip-flopping, live data only

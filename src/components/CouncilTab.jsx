@@ -35,7 +35,7 @@ function StanceBadge({ stance, small }) {
   );
 }
 
-export default function CouncilTab({ account, acct, positionsLine, flagApiDown, running, setRunning, ticker, setTicker, capital, setCapital, active, setActive, agentState, setAgentState, synthesis, setSynthesis, dark }) {
+export default function CouncilTab({ account, acct, positionsLine, flagApiDown, running, setRunning, ticker, setTicker, capital, setCapital, active, setActive, agentState, setAgentState, synthesis, setSynthesis, dark, setDebugLog }) {
   const synthRef = useRef(null);
   const T = theme(dark);
   const [progressLabel, setProgressLabel] = useState('');
@@ -44,6 +44,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const [trackShares, setTrackShares] = useState('');
   const [trackSaving, setTrackSaving] = useState(false);
   const [trackSaved, setTrackSaved] = useState(false);
+  const debugRef = useRef(null); // accumulates debug data during a run
 
   const upperTicker = ticker.trim().toUpperCase();
   const verdictKey = synthesis.result ? (synthesis.result.verdict === 'PASS' ? 'PASS_FINAL' : synthesis.result.verdict) : null;
@@ -95,6 +96,9 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     setTrackPrice('');
     setTrackShares('');
     setTrackSaved(false);
+
+    // Initialize debug data for this run
+    debugRef.current = { ticker: ticker.trim().toUpperCase(), ts: Date.now(), liveDataBlock: '', agents: {}, synthesis: null, anyUngrounded: false };
 
     const uid = auth.currentUser?.uid;
 
@@ -154,6 +158,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
       liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${upperTicker} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news:\n' + newsText : ' Recent news: unavailable.'}\n`;
       reconGrounded = !!(livePrice && newsText);
+      if (debugRef.current) debugRef.current.liveDataBlock = liveDataBlock;
       console.error('[recon][CouncilTab] rawQuote:', JSON.stringify(rawQuote));
       console.error('[recon][CouncilTab] liveDataBlock:', liveDataBlock);
     } catch (reconErr) {
@@ -229,15 +234,24 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
           console.error(`[recon][CouncilTab] agent[0] userMsg first 600 chars:`, userMsg.slice(0, 600));
         }
 
+        const _t0 = Date.now();
         try {
           const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
+          const _ms = Date.now() - _t0;
           let result = extractJSON(txt);
+          const parseOk = !!result;
           if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] }; }
           roundResults[ag.id] = result;
+          const _warn = reconGrounded ? null : 'Ungrounded — live data unavailable';
           setAgentState(prev => ({
             ...prev,
-            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: reconGrounded, warning: reconGrounded ? null : 'Ungrounded — live data unavailable' } },
+            [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: reconGrounded, warning: _warn } },
           }));
+          if (debugRef.current) {
+            if (!debugRef.current.agents[ag.id]) debugRef.current.agents[ag.id] = {};
+            debugRef.current.agents[ag.id][`r${round + 1}`] = { prompt: userMsg, rawResponse: txt, parseOk, parsed: result, ms: _ms, keyIndex: i % 5, grounded: reconGrounded, warning: _warn };
+            if (!reconGrounded) debugRef.current.anyUngrounded = true;
+          }
         } catch (err) {
           const isRateLimit = err?.message?.includes('429') || err?.message?.includes('ERR-429');
           if (isRateLimit) {
@@ -245,14 +259,22 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             await sleep(35000);
             setSynthesis({ status: 'idle', result: null });
             try {
+              const _t1 = Date.now();
               const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
+              const _ms = Date.now() - _t1;
               let result = extractJSON(txt);
+              const parseOk = !!result;
               if (!result) { console.error(`[parse fail] ${ag.name} R${round + 1} retry raw:`, JSON.stringify(txt)); result = { stance: 'CAUTION', score: 5, headline: 'Rate limit retry', points: [] }; }
               roundResults[ag.id] = result;
+              const _warn = reconGrounded ? null : 'Ungrounded — live data unavailable';
               setAgentState(prev => ({
                 ...prev,
-                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: reconGrounded, warning: reconGrounded ? null : 'Ungrounded — live data unavailable' } },
+                [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'done', result, grounded: reconGrounded, warning: _warn } },
               }));
+              if (debugRef.current) {
+                if (!debugRef.current.agents[ag.id]) debugRef.current.agents[ag.id] = {};
+                debugRef.current.agents[ag.id][`r${round + 1}`] = { prompt: userMsg, rawResponse: txt, parseOk, parsed: result, ms: _ms, keyIndex: i % 5, grounded: reconGrounded, warning: _warn };
+              }
             } catch {
               roundResults[ag.id] = { stance: 'TIMEOUT', score: 5, headline: 'Agent unavailable', points: [] };
               setAgentState(prev => ({
@@ -297,13 +319,17 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 The council ran 3 deliberation rounds. Synthesize their evolving positions into a decisive verdict.
 Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}`;
 
+    const synthUserMsg = `Council final positions:\n${finalCouncilSummary}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`;
+    const _st0 = Date.now();
     try {
       const { text: txt, warning: synthWarn } = await callAgent(
         synthSys,
-        `Council final positions:\n${finalCouncilSummary}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`,
+        synthUserMsg,
         false, 2000, null, 'openai/gpt-oss-120b'
       );
+      const _sms = Date.now() - _st0;
       let result = extractJSON(txt);
+      const synthParseOk = !!result;
       if (!result) {
         console.error('[synthesis parse fail] CouncilTab raw txt:', JSON.stringify(txt), 'warn:', synthWarn);
         result = {
@@ -311,6 +337,10 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
           headline: synthWarn ? 'Synthesis error — see details' : 'Council deliberation complete',
           rationale: synthWarn || (txt ? txt.slice(0, 600) : 'Could not parse synthesis response.'),
         };
+      }
+      if (debugRef.current) {
+        debugRef.current.synthesis = { systemPrompt: synthSys, userPrompt: synthUserMsg, rawResponse: txt, parseOk: synthParseOk, parsed: result, ms: _sms, warning: synthWarn || null, verdict: result.verdict, conviction: result.conviction };
+        setDebugLog?.({ ...debugRef.current });
       }
 
       // Build agentStances for when user clicks Track This Trade
@@ -327,6 +357,10 @@ Output ONLY the final raw JSON ruling object — no markdown, no code fences, no
       }});
     } catch (err) {
       console.error('[synthesis] callAgent threw:', err?.message);
+      if (debugRef.current) {
+        debugRef.current.synthesis = { systemPrompt: synthSys, userPrompt: synthUserMsg, rawResponse: null, parseOk: false, parsed: null, ms: Date.now() - _st0, warning: err?.message || 'callAgent threw' };
+        setDebugLog?.({ ...debugRef.current });
+      }
       flagApiDown();
       setSynthesis({ status: 'error', result: null });
     }

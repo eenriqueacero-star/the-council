@@ -4,6 +4,15 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (recent)
+
+### Three bug fixes ✓
+- [x] AXIOM verdict collision: `"PASS"` was ambiguous (green for agents, meant red/skip for AXIOM). Fixed: AXIOM now outputs `SKIP` instead of `PASS`. Old Firestore rulings with `PASS` still render correctly via `PASS_FINAL` alias.
+- [x] Double dollar sign in positionsLine: `@ $${p.cost}` doubled when user stored cost with `$` prefix. Fixed: strip non-numeric chars via `parseFloat` before formatting.
+- [x] ZEN unrealistic sizing: was suggesting $5k starters for a Youth DCA account. Added ACCOUNT SCALE rule anchoring starters to $50–200 for small accounts.
+
+---
+
 ## IN PROGRESS
 
 ### Alpha Tracker vs SPY ⚡

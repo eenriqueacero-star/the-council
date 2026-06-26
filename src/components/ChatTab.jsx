@@ -20,7 +20,8 @@ const PS = {
   BEARISH:    { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'BEAR'    },
   BUY:        { bg:'rgba(0,200,5,0.15)',   fg:'#00C805', label:'BUY'     },
   WATCH:      { bg:'rgba(245,158,11,0.15)',fg:'#B45309', label:'WATCH'   },
-  PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'PASS'    },
+  SKIP:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // AXIOM rejection
+  PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // backward-compat
 };
 
 export default function ChatTab({ account, acct, positionsLine, flagApiDown, dark }) {
@@ -243,7 +244,8 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
     const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final ruling on ${tkr} for ${acct.label}. ${PROTOCOLS}
 The council ran 3 deliberation rounds. Synthesize into a decisive verdict. Speak the ruling conversationally (2-4 sentences).
-Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>"}`;
+Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"SKIP","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>"}
+BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this trade — do not enter.`;
 
     let synth;
     try {
@@ -491,7 +493,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
             );
 
             if (m.role === 'pm') {
-              const vs = m.verdict ? (PS[m.verdict === 'PASS' ? 'PASS_FINAL' : m.verdict] || null) : null;
+              const vs = m.verdict ? (PS[m.verdict === 'SKIP' ? 'SKIP' : m.verdict === 'PASS' ? 'PASS_FINAL' : m.verdict] || null) : null;
               return (
                 <div key={i} style={{ display:'flex', justifyContent:'flex-start', gap:10, animation:'slideInLeft .22s ease both' }}>
                   <div style={{ flexShrink:0, marginTop:2 }}><ArcReactor size={26} /></div>
@@ -593,7 +595,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
                     {m.synth && (
                       <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${T.border}` }}>
                         {(() => {
-                          const vs = m.synth.verdict ? (PS[m.synth.verdict === 'PASS' ? 'PASS_FINAL' : m.synth.verdict] || null) : null;
+                          const vs = m.synth.verdict ? (PS[m.synth.verdict === 'SKIP' ? 'SKIP' : m.synth.verdict === 'PASS' ? 'PASS_FINAL' : m.synth.verdict] || null) : null;
                           return vs ? (
                             <span style={{ ...MONO, background:vs.bg, color:vs.fg, fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:6 }}>
                               {vs.label} · {m.synth.conviction}/10

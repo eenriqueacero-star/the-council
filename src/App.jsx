@@ -168,7 +168,8 @@ export default function App() {
   const acctHoldings  = Object.keys(posMap).length ? Object.keys(posMap) : (acct?.holdings || []);
   const positionsLine = acctHoldings.map(t => {
     const p = posMap[t] || {};
-    return p.shares ? `${t} ${p.shares}sh${p.cost ? ` @ $${p.cost} avg` : ''}` : t;
+    const costNum = parseFloat(String(p.cost || '').replace(/[^0-9.]/g, ''));
+    return p.shares ? `${t} ${p.shares}sh${costNum > 0 ? ` @ $${costNum.toFixed(2)} avg` : ''}` : t;
   }).join(', ');
 
   const shared  = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus, authReady };

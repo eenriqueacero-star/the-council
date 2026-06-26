@@ -474,7 +474,7 @@ export default function AlphaTrackerTab({ account, dark }) {
                 </thead>
                 <tbody>
                   {rulings.map((r, i) => {
-                    const vs         = r.verdict ? STANCE_STYLE[r.verdict === 'PASS' ? 'PASS_FINAL' : r.verdict] : null;
+                    const vs         = r.verdict ? STANCE_STYLE[r.verdict === 'SKIP' ? 'SKIP' : r.verdict === 'PASS' ? 'PASS_FINAL' : r.verdict] : null;
                     const lq         = liveQuotes[r.ticker];
                     const livePrice  = lq?.price > 0 ? lq.price : lq?.prevClose;
                     const displayPrice = r.outcome ? r.priceAt30d : livePrice;

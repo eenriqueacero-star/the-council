@@ -87,6 +87,7 @@ Output ONLY the raw JSON object — no markdown, no code fences, no reasoning te
     system: `You are ZEN, the POSITION SIZER on an investment council. ${PROTOCOLS}
 Your ONLY job: translate the decision into concrete numbers for the stated available capital and account. Search for the ticker's CURRENT share price. Compute a small starter dollar amount, approximate shares at current price, and % of available capital. If no capital stated, give % guidance. Keep starters genuinely small.
 SIZING STANDARD: Use ONLY the price from the LIVE DATA block for your calculations — do not use a price from memory. If the LIVE DATA has no price, note it and give % guidance only. Your stance should reflect whether the position size is feasible and prudent, not whether the stock is a good buy (that is the council's job). Do not FAIL solely because the stock is expensive per share — size the dollar amount small.
+ACCOUNT SCALE: The investor is a young retail investor with a small account. Typical starter positions are $50–200, not thousands. Scale ALL sizing to the actual capital stated in the account context. If no capital is stated, assume a small retail account (~$2,000–5,000 total). Never suggest a $5,000+ starter unless the provided capital clearly supports it (e.g. capital > $25,000).
 Output ONLY the raw JSON object — no markdown, no code fences, no reasoning text, no prose before or after: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10 where 10=fits cleanly>,"headline":"<8 words max>","points":["<starter $ + approx shares>","<% of available capital>","<scale-up plan>"]}` },
 ];
 
@@ -99,13 +100,14 @@ Output ONLY the raw JSON object — no markdown, no code fences, no reasoning te
 export const AXIOM_CONVERSATIONAL = `You are AXIOM, chair of THE COUNCIL — an elite investment analysis team. You are direct, sharp, and decisive. You answer portfolio questions directly. For specific stock BUY/SELL/HOLD decisions, you convene the full council. Speak with authority, not servility.`;
 
 export const STANCE_STYLE = {
-  PASS:       { bg: 'rgba(47,203,138,0.12)',  fg: '#2fcb8a', label: 'PASS' },
+  PASS:       { bg: 'rgba(47,203,138,0.12)',  fg: '#2fcb8a', label: 'PASS' },   // individual agent gate = green
   FAIL:       { bg: 'rgba(232,92,92,0.12)',   fg: '#e85c5c', label: 'FAIL' },
   CAUTION:    { bg: 'rgba(200,146,42,0.12)',  fg: '#c8922a', label: 'CAUTION' },
   BEARISH:    { bg: 'rgba(232,92,92,0.12)',   fg: '#e85c5c', label: 'BEAR CASE' },
   BUY:        { bg: 'rgba(47,203,138,0.14)',  fg: '#2fcb8a', label: 'BUY' },
   WATCH:      { bg: 'rgba(200,146,42,0.14)',  fg: '#c8922a', label: 'WATCH' },
-  PASS_FINAL: { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'PASS' },
+  SKIP:       { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'SKIP' },   // AXIOM rejection = red
+  PASS_FINAL: { bg: 'rgba(232,92,92,0.14)',   fg: '#e85c5c', label: 'SKIP' },   // backward-compat alias for old Firestore rulings
 };
 
 export const WD_STYLE = {

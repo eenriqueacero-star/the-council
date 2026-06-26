@@ -4,6 +4,23 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-26 (session 11)
+
+### Three bug fixes: AXIOM verdict collision, double dollar sign, ZEN sizing scale
+
+**Bug 1 — AXIOM verdict collision (`src/constants/agents.js`, `CouncilTab.jsx`, `ChatTab.jsx`, `AlphaTrackerTab.jsx`):**
+AXIOM's verdict `"PASS"` was ambiguous — it meant both "gate passes (good)" for individual agents AND "skip this trade (bad)" for AXIOM's ruling. Fixed by changing AXIOM's rejection verdict from `"PASS"` to `"SKIP"`. AXIOM now returns `BUY` (approved), `WATCH` (wait), or `SKIP` (council rejects — do not enter). Updated all three synthesis prompts, all PS/STANCE_STYLE lookups, and the verdict-to-style mapping in CouncilTab, ChatTab, and AlphaTrackerTab. `PASS_FINAL` kept as a backward-compat alias (old Firestore rulings with `verdict:"PASS"` still render red with label "SKIP").
+
+**Bug 2 — Double dollar sign (`src/App.jsx`):**
+`positionsLine` was built as `` `@ $${p.cost} avg` ``. If the user typed a cost with a leading `$` (e.g. `$283.70`), the output became `@ $$283.70 avg`. Fixed by parsing cost through `parseFloat` with symbol stripping before formatting: `costNum.toFixed(2)` always produces a clean number, and the single `$` in the template is the only one.
+
+**Bug 3 — ZEN unrealistic sizing (`src/constants/agents.js`):**
+ZEN's prompt lacked account scale context and was suggesting $5,000 starters for small accounts. Added ACCOUNT SCALE rule: typical starters are $50–200; scale to stated capital; if no capital, assume ~$2,000–5,000 total; never suggest $5,000+ starter unless capital clearly supports it.
+
+- Files: `src/constants/agents.js`, `src/components/CouncilTab.jsx`, `src/components/ChatTab.jsx`, `src/components/AlphaTrackerTab.jsx`, `src/App.jsx`
+
+---
+
 ## 2026-06-26 (session 10)
 
 ### Alpha Tracker vs SPY benchmarking

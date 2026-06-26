@@ -12,13 +12,14 @@ import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from 
 import { theme } from '../utils/theme.js';
 
 const PS = {
-  PASS:       { bg:'rgba(0,200,5,0.1)',    fg:'#00C805', label:'PASS'    },
+  PASS:       { bg:'rgba(0,200,5,0.1)',    fg:'#00C805', label:'PASS'    },  // individual agent gate
   FAIL:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'FAIL'    },
   CAUTION:    { bg:'rgba(245,158,11,0.1)', fg:'#B45309', label:'CAUTION' },
   BEARISH:    { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'BEAR'    },
   BUY:        { bg:'rgba(0,200,5,0.15)',   fg:'#00C805', label:'BUY'     },
   WATCH:      { bg:'rgba(245,158,11,0.15)',fg:'#B45309', label:'WATCH'   },
-  PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'PASS'    },
+  SKIP:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // AXIOM rejection
+  PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // backward-compat for old rulings
   TIMEOUT:    { bg:'rgba(120,120,120,0.1)',fg:'#888',    label:'N/A'     },
 };
 
@@ -47,7 +48,11 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const debugRef = useRef(null); // accumulates debug data during a run
 
   const upperTicker = ticker.trim().toUpperCase();
-  const verdictKey = synthesis.result ? (synthesis.result.verdict === 'PASS' ? 'PASS_FINAL' : synthesis.result.verdict) : null;
+  const verdictKey = synthesis.result ? (
+    synthesis.result.verdict === 'SKIP' ? 'SKIP' :
+    synthesis.result.verdict === 'PASS' ? 'PASS_FINAL' : // backward-compat with old Firestore rulings
+    synthesis.result.verdict
+  ) : null;
   const vStyle     = verdictKey ? (PS[verdictKey] || PS.WATCH) : null;
   const anyUngrounded = Object.values(agentState).some(st =>
     st.r1?.grounded === false || st.r2?.grounded === false || st.r3?.grounded === false
@@ -350,7 +355,8 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
     const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final investment ruling on ${upperTicker} for ${acct.label}. ${PROTOCOLS}
 The council ran 3 deliberation rounds. Synthesize their evolving positions into a decisive verdict.
-Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"verdict":"BUY"|"WATCH"|"PASS","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}`;
+Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"verdict":"BUY"|"WATCH"|"SKIP","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}
+BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this trade — do not enter.`;
 
     const synthUserMsg = `Council final positions:\n${finalCouncilSummary}\nLive price: ${livePrice ? '$' + livePrice.toFixed(2) : 'unknown'}. Capital: $${capital.trim() || acct.capital || 'unspecified'}. Deliver the ruling.`;
     const _st0 = Date.now();

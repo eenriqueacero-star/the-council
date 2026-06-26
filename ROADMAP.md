@@ -6,6 +6,15 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (recent)
 
+### Agent Tuning ✓
+- [x] **PROTOCOLS expanded** — downtrend definition explicit (lower highs + lower lows over multiple weeks; single red day never counts), 4-Gate rule spelled out, Stability Rule (anti-flip-flop), Live Data Rule added
+- [x] **REX** — DOWNTREND STANDARD block: must see lower highs AND lower lows across multiple weeks; ambiguity defaults to CAUTION not FAIL
+- [x] **NOVA** — CATALYST STANDARD: earnings dates must come from live search or LIVE DATA; never from memory; unconfirmed date does not clear Gate 1
+- [x] **SAGE** — RISK STANDARD: all risk flags grounded in LIVE DATA and account context; small starter mitigates sizing risk
+- [x] **ATLAS** — GATE 4 STANDARD: only fail on real macro stress visible in LIVE DATA; background uncertainty is not a headwind
+- [x] **VEGA** — BEAR CASE STANDARD: confirmed facts only; no fabricated risks; trend call stays with REX
+- [x] **ZEN** — SIZING STANDARD: price from LIVE DATA only; never from memory; stance reflects position feasibility, not stock quality
+
 ### Alpha Tracker rework ✓
 - [x] **"Track This Trade" button** — council no longer auto-saves; user explicitly clicks Entered or Watching on the AXIOM card
 - [x] **Entered / Watching states** — stored as `status` field on rulings doc; badge shown in tracker table
@@ -17,13 +26,14 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## NEXT
 
-### Agent Tuning
-Stop verdicts flip-flopping and agents hallucinating data they should fetch live.
+### Council on Holdings (HOLD/TRIM)
+Point the same 6-agent council at existing positions, not just new buys. Verdict options: HOLD, TRIM, ADD, EXIT.
 
-- [ ] **Encode Sell Protocol in agent prompts** — downtrend = confirmed lower highs AND lower lows over multiple weeks; never fail on one red day; hold through normal volatility
-- [ ] **4-Gate rule** — all 4 gates (technical, catalyst, macro, risk) must be clear before BUY; one hard PASS gate overrides the rest
-- [ ] **Reduce PASS↔WATCH flip-flop** — agents should anchor on prior stance unless new data materially changes the picture; add "rebuttal" requirement when changing stance
-- [ ] **Force agents to use live recon data** — prompt changes to make agents cite the live sector/macro context they received, not rely on training-data memory for current prices/news
+### Scout Mode
+Council auto-runs on the watchlist and surfaces only tickers that score 7+ and pass all 4 gates.
+
+### Alpha Tracker vs SPY
+Benchmark entered trades against SPY — is the council outperforming the index?
 
 ---
 

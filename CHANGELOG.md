@@ -4,6 +4,30 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-26
+
+### Agent Tuning — tighter rules, no flip-flopping, live data only
+
+**PROTOCOLS block expanded** (`src/constants/agents.js`). All 6 agents and AXIOM synthesis receive the full shared rules block. New additions:
+- *Sell Protocol* now explicitly lists what does NOT count as a downtrend: single red day, -1% to -3% move, one down week, high RSI, valuation. Default when ambiguous: trend is INTACT.
+- *4-Gate rule* rewritten with gate numbers and explicit criteria.
+- *Stability Rule* (new): same facts must produce the same stance; do not swing on intraday noise or fractional moves.
+- *Live Data Rule* (new): never state a price, earnings date, or news event from memory; if not in LIVE DATA, say it is unconfirmed.
+
+**Per-agent additions** (all preserve existing role, persona, and JSON output schema):
+- **REX** — DOWNTREND STANDARD: lower highs AND lower lows across multiple weeks required; ambiguity defaults to CAUTION, not FAIL.
+- **NOVA** — CATALYST STANDARD: earnings dates must come from live search or LIVE DATA; unconfirmed date does not clear Gate 1.
+- **SAGE** — RISK STANDARD: all flags grounded in LIVE DATA and account context; small starter mitigates sizing risk, so not a FAIL trigger.
+- **ATLAS** — GATE 4 STANDARD: only FAIL on real macro stress visible in today's LIVE DATA; background uncertainty is the normal state, not a headwind.
+- **VEGA** — BEAR CASE STANDARD: confirmed facts from live search only; no fabricated risks; trend call deferred to REX.
+- **ZEN** — SIZING STANDARD: price from LIVE DATA only; stance reflects position feasibility, not overall stock quality.
+
+**In-app Roadmap** — Agent Tuning added as #1 item in HIGH VALUE — NEXT.
+
+- File: `src/constants/agents.js`
+
+---
+
 ## 2026-06-25 (session 2)
 
 ### Alpha Tracker rework — intent-driven tracking only

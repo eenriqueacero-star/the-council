@@ -6,6 +6,12 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (recent)
 
+### NOVA + Recon fixes ✓
+- [x] NOVA catalyst gate relaxed — passes when a clearly referenced upcoming event exists, even without exact date
+- [x] Recon news query now requests dated, last-3-5-day headlines only; staleness filter rejects undated generic responses
+- [x] Debug panel shows raw recon response (before filtering) so news freshness is verifiable
+- [x] shadcn CSS build error fixed (border/ring Tailwind color extensions)
+
 ### Debug Panel ✓
 - [x] `?debug=1` URL param gates the Debug tab — zero clutter in normal use
 - [x] Captures LIVE DATA block, all 6 agents × 3 rounds (prompt, raw response, parse OK, stance, timing, key index), and AXIOM synthesis

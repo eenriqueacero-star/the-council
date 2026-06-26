@@ -129,15 +129,18 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
 
       let newsText = '';
       try {
-        const reconSys = 'Financial news summarizer. Return 3-4 bullet headlines only, no JSON.';
-        const reconQuery = `Latest news, catalysts, and analyst moves for ${tkr} past 7 days.`;
-        const { text: newsRaw } = await callAgent(reconSys, reconQuery, true, 350);
-        if (newsRaw?.trim()) newsText = newsRaw.trim();
+        const reconSys = 'You are a financial news researcher. Return only recent, dated headlines — no background, no history, no generic summaries. If you cannot find news from the last 3-5 days, say "No confirmed recent news in the last 3-5 days."';
+        const reconQuery = `Search for ${tkr} news from the last 3-5 days only. Return 3-4 dated, specific headlines about catalysts, earnings, analyst upgrades/downgrades, product launches, or major moves. Include the date for each item. Do NOT return generic background info, old earnings history, or stale summaries. If no recent news exists, say so explicitly.`;
+        const { text: newsRaw } = await callAgent(reconSys, reconQuery, true, 400);
+        const looksGeneric = !newsRaw?.trim() ||
+          newsRaw.trim().length < 60 ||
+          /no (recent|confirmed|news)/i.test(newsRaw);
+        newsText = looksGeneric ? '' : newsRaw.trim();
       } catch (newsErr) {
         console.error('[recon] news call failed:', newsErr.message);
       }
 
-      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news:\n' + newsText : ' Recent news: unavailable.'}\n`;
+      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news (last 3-5 days):\n' + newsText : ' Recent news: no confirmed recent news (last 3-5 days).'}\n`;
       reconGrounded = !!(livePrice && newsText);
       console.error('[recon][ChatTab] rawQuote:', JSON.stringify(rawQuote));
       console.error('[recon][ChatTab] liveDataBlock:', liveDataBlock);

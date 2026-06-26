@@ -146,19 +146,28 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       let rangeStr = rawQuote?.low && rawQuote?.high ? ` range $${rawQuote.low.toFixed(2)}-$${rawQuote.high.toFixed(2)}` : '';
 
       let newsText = '';
+      let reconRawResponse = '';
       try {
-        const reconSys = 'Financial news summarizer. Return 3-4 bullet headlines only, no JSON.';
-        const reconQuery = `Latest news, catalysts, and analyst moves for ${upperTicker} past 7 days.`;
-        const { text: newsRaw } = await callAgent(reconSys, reconQuery, true, 350);
-        if (newsRaw?.trim()) newsText = newsRaw.trim();
+        const reconSys = 'You are a financial news researcher. Return only recent, dated headlines — no background, no history, no generic summaries. If you cannot find news from the last 3-5 days, say "No confirmed recent news in the last 3-5 days."';
+        const reconQuery = `Search for ${upperTicker} news from the last 3-5 days only. Return 3-4 dated, specific headlines about catalysts, earnings, analyst upgrades/downgrades, product launches, or major moves. Include the date for each item. Do NOT return generic background info, old earnings history, or stale summaries. If no recent news exists, say so explicitly.`;
+        const { text: newsRaw } = await callAgent(reconSys, reconQuery, true, 400);
+        reconRawResponse = newsRaw || '';
+        // Treat generic/undated responses as no confirmed news
+        const looksGeneric = !newsRaw?.trim() ||
+          newsRaw.trim().length < 60 ||
+          /no (recent|confirmed|news)/i.test(newsRaw);
+        newsText = looksGeneric ? '' : newsRaw.trim();
       } catch (newsErr) {
         console.error('[recon] news call failed:', newsErr.message);
         newsText = '';
       }
 
-      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${upperTicker} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news:\n' + newsText : ' Recent news: unavailable.'}\n`;
+      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${upperTicker} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news (last 3-5 days):\n' + newsText : ' Recent news: no confirmed recent news (last 3-5 days).'}\n`;
       reconGrounded = !!(livePrice && newsText);
-      if (debugRef.current) debugRef.current.liveDataBlock = liveDataBlock;
+      if (debugRef.current) {
+        debugRef.current.liveDataBlock = liveDataBlock;
+        debugRef.current.reconRawResponse = reconRawResponse;
+      }
       console.error('[recon][CouncilTab] rawQuote:', JSON.stringify(rawQuote));
       console.error('[recon][CouncilTab] liveDataBlock:', liveDataBlock);
     } catch (reconErr) {

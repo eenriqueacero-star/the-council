@@ -4,6 +4,33 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-25 (session 4)
+
+### FIX — NOVA catalyst gate too rigid; recon news staleness
+
+**FIX 1 — NOVA prompt relaxed (agents.js)**
+- Previous rule: FAIL if exact date not confirmed → NOVA blocked every run where GTC/conference had no pinned date
+- New rule: A catalyst COUNTS if a clearly referenced upcoming event exists within ~60 days, even without an exact date. A recent earnings beat or referenced conference DOES satisfy Gate 1. Only FAIL if there is genuinely NO identifiable near-term catalyst. When timing is approximate, note "timing approximate" rather than FAILing.
+- NEVER fabricate a date, but if a specific date isn't in LIVE DATA, say "date unconfirmed" while still PASSing if the event itself is clearly referenced.
+
+**FIX 2 — Recon news query tightened (CouncilTab.jsx, ChatTab.jsx)**
+- Old query: "Latest news… past 7 days" with a generic summarizer system prompt → compound returned stale/historical summaries (old earnings beats, Hopper architecture background) without dates
+- New system prompt: explicitly forbids generic background and requests dated headlines only; if no recent news exists, say so
+- New query: "Search for ${ticker} news from the last 3-5 days only. Return dated, specific headlines… Do NOT return generic background info or old news. If no recent news exists, say so."
+- Staleness filter: if response is <60 chars or matches `/no (recent|confirmed|news)/i`, treat as empty → LIVE DATA shows "no confirmed recent news (last 3-5 days)" rather than a stale summary
+- Raw recon response now stored in `debugRef.current.reconRawResponse` for inspection
+
+**Debug panel — recon card added (DebugTab.jsx)**
+- New "RECON · RAW NEWS RESPONSE" card (purple accent) appears before the LIVE DATA BLOCK card
+- Shows the raw compound output before filtering, so you can see exactly what was returned and verify freshness/dates
+- "LIVE DATA BLOCK (assembled)" card now has a subtitle clarifying it's the filtered block injected into agent prompts
+
+**shadcn CSS fix (tailwind.config.js)**
+- shadcn init added `@apply border-border` to index.css but the Tailwind config had no `border`/`ring` color extensions
+- Added CSS var mappings to tailwind.config.js so the build no longer errors
+
+---
+
 ## 2026-06-25 (session 3)
 
 ### Debug panel — full run diagnostics without DevTools

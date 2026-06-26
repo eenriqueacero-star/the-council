@@ -167,7 +167,7 @@ export default function DebugTab({ debugLog, dark }) {
     );
   }
 
-  const { ticker, ts, liveDataBlock, agents, synthesis, anyUngrounded } = debugLog;
+  const { ticker, ts, liveDataBlock, reconRawResponse, agents, synthesis, anyUngrounded } = debugLog;
 
   const synthCopyText = [
     '=== AXIOM SYNTHESIS ===',
@@ -203,12 +203,27 @@ export default function DebugTab({ debugLog, dark }) {
       </div>
 
       <div style={{ padding: '0 16px' }}>
+        {/* Recon raw response — news freshness check */}
+        <Card
+          title="RECON · RAW NEWS RESPONSE"
+          accent="#6366f1"
+          copyText={reconRawResponse || '(none)'}
+        >
+          <div style={{ ...MONO, fontSize: 9, color: '#555', marginBottom: 6 }}>
+            Raw compound output before filtering — check for dates and freshness
+          </div>
+          <Pre text={reconRawResponse || '(no recon response captured — run was before this fix)'} maxLines={15} />
+        </Card>
+
         {/* Live Data Block */}
         <Card
-          title="LIVE DATA BLOCK"
+          title="LIVE DATA BLOCK (assembled)"
           accent="#38e0d4"
           copyText={liveDataBlock || '(empty)'}
         >
+          <div style={{ ...MONO, fontSize: 9, color: '#555', marginBottom: 6 }}>
+            Final block injected into all agent prompts
+          </div>
           <Pre text={liveDataBlock || '(empty — recon failed)'} maxLines={20} />
         </Card>
 

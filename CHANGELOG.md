@@ -4,6 +4,22 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-25 (session 8)
+
+### FIX — VEGA hard ban on fabricated events
+
+Previous soft rule ("label it as general risk") was being ignored by rounds 2-3, where VEGA reverted to asserting "sector facing heavy insider selling" with no hedge and no data support.
+
+Replaced with an ABSOLUTE RULE in VEGA's system prompt: specific market events (insider selling, downgrades, lawsuits, earnings misses, layoffs, specific competitor moves) are **forbidden** unless that exact event appears in the LIVE DATA news headlines. Not even as a hedge or possibility. The rule includes FORBIDDEN/ALLOWED examples inline so the model has no ambiguity about what "specific event" means.
+
+Allowed bear case sources remain: (a) actual LIVE DATA price action, (b) actual LIVE DATA headlines, (c) real portfolio position/concentration, (d) broad structural arguments (valuation, sector concentration, competition as a general dynamic) without specific event claims.
+
+VEGA's adversarial role is unchanged — it should still argue the strongest honest bear case, just without inventing events.
+
+- File: `src/constants/agents.js`
+
+---
+
 ## 2026-06-25 (session 7)
 
 ### FIX — VEGA data-grounding + earnings estimated flag

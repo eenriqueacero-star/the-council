@@ -6,6 +6,11 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (recent)
 
+### VEGA hard ban on fabricated events ✓
+- [x] Replaced soft "label it" rule with ABSOLUTE RULE: specific events forbidden unless in LIVE DATA headlines
+- [x] Inline FORBIDDEN/ALLOWED examples so model has no ambiguity
+- [x] Adversarial role preserved — strongest honest bear case, no invented events
+
 ### VEGA grounding + earnings estimated flag ✓
 - [x] VEGA must frame unconfirmed risks as "general risk, not confirmed in current data" — no more inferred insider selling or peer activity
 - [x] Finnhub `dateConfirmed` field now propagated as `earningsEstimated` flag

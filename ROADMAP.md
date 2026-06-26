@@ -8,9 +8,11 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ### Finnhub quote hardening ✓
 - [x] Retry loop (3 attempts, 1 s apart) when both c and pc come back zero/null — transient miss no longer marks everything ungrounded
+- [x] `[quote] Finnhub returned null price after retry` logged when all retries exhausted
 - [x] 429 detection: `[quote] Finnhub 429 rate-limited` logged; `rateLimited: true` flag in response; no retry on 429
 - [x] Debug RECON card now shows `rawQuote` alongside news+earnings so 429 vs outage is immediately distinguishable
 - [x] ChatTab duplicate quote call eliminated — AXIOM routing step now uses same cache key as `runCouncilInChat`; second call is a cache hit
+- [x] Quote + news + earnings fetched ONCE per run; shared via `liveDataBlock`/`baseContent` to all 6 agents × 3 rounds — never re-fetched per agent or per round
 
 ### VEGA hard ban on fabricated events ✓
 - [x] Replaced soft "label it" rule with ABSOLUTE RULE: specific events forbidden unless in LIVE DATA headlines

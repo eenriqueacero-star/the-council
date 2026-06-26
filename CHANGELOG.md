@@ -14,7 +14,9 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 **`src/components/CouncilTab.jsx`:** Debug RECON card now includes `rawQuote` (full quote result, including `rateLimited: true` when applicable) alongside `rawNews`/`rawEarnings`, so 429 vs outage is immediately visible in the debug panel.
 
-**Quote call count:** CouncilTab — 2 `get-quotes` calls per convene (ticker + 7 sector ETFs), never per-agent. ChatTab — was 3 (ticker called twice), now 2 (cache hit on second ticker call).
+**Quote call count:** CouncilTab — 2 `get-quotes` calls per convene (ticker + 7 sector ETFs), never per-agent. ChatTab — was 3 (ticker called twice), now 2 (cache hit on second ticker call). News/earnings: 1 `get-news` call per run, data shared via `liveDataBlock`/`baseContent` to all 6 agents × 3 rounds — never per-agent, never per-round.
+
+Added `[quote] Finnhub returned null price after retry for <TICKER>` log when all 3 retry attempts are exhausted and both `c` and `pc` remain zero/null.
 
 - Files: `api/get-quotes.js`, `src/components/ChatTab.jsx`, `src/components/CouncilTab.jsx`
 

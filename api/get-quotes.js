@@ -65,7 +65,8 @@ export default async function handler(req, res) {
       if (quoteData) {
         results[ticker] = { price: quoteData.c, changePct: quoteData.dp, high: quoteData.h, low: quoteData.l, open: quoteData.o, prevClose: quoteData.pc };
       } else {
-        results[ticker] = { error: 'no_price_after_retries' };
+        console.error(`[quote] Finnhub returned null price after retry for ${ticker}`);
+      results[ticker] = { error: 'no_price_after_retries' };
       }
     }
 

@@ -205,12 +205,12 @@ export default function DebugTab({ debugLog, dark }) {
       <div style={{ padding: '0 16px' }}>
         {/* Recon raw response — news freshness check */}
         <Card
-          title="RECON · RAW NEWS RESPONSE"
+          title="RECON · RAW FINNHUB RESPONSE (news + earnings)"
           accent="#6366f1"
           copyText={reconRawResponse || '(none)'}
         >
           <div style={{ ...MONO, fontSize: 9, color: '#555', marginBottom: 6 }}>
-            Raw compound output before filtering — check for dates and freshness
+            rawNews: Finnhub company-news (last 5 days) · rawEarnings: Finnhub earnings calendar (next 90 days)
           </div>
           <Pre text={reconRawResponse || '(no recon response captured — run was before this fix)'} maxLines={15} />
         </Card>

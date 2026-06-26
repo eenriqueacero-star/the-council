@@ -24,38 +24,65 @@ export default async function handler(req, res) {
   }
 
   const sym = ticker.toUpperCase();
-  const to   = new Date();
-  const from = new Date(Date.now() - 5 * 864e5); // 5 days ago
-  const toStr   = to.toISOString().slice(0, 10);
-  const fromStr = from.toISOString().slice(0, 10);
+  const today     = new Date();
+  const newsFrom  = new Date(Date.now() - 5 * 864e5);  // 5 days ago
+  const earningsTo = new Date(Date.now() + 90 * 864e5); // 90 days ahead
 
+  const todayStr      = today.toISOString().slice(0, 10);
+  const newsFromStr   = newsFrom.toISOString().slice(0, 10);
+  const earningsToStr = earningsTo.toISOString().slice(0, 10);
+
+  // Fetch news and earnings calendar in parallel
+  const [newsResult, earningsResult] = await Promise.allSettled([
+    fetch(`https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${newsFromStr}&to=${todayStr}&token=${process.env.FINNHUB_KEY}`),
+    fetch(`https://finnhub.io/api/v1/calendar/earnings?symbol=${encodeURIComponent(sym)}&from=${todayStr}&to=${earningsToStr}&token=${process.env.FINNHUB_KEY}`),
+  ]);
+
+  // --- News articles ---
+  let articles = [];
+  let rawNews  = [];
   try {
-    const url = `https://finnhub.io/api/v1/company-news?symbol=${encodeURIComponent(sym)}&from=${fromStr}&to=${toStr}&token=${process.env.FINNHUB_KEY}`;
-    const r = await fetch(url);
-    if (!r.ok) {
-      console.error(`[get-news] Finnhub error ${r.status} for ${sym}`);
-      return res.status(200).json({ articles: [], raw: [] });
+    if (newsResult.status === 'fulfilled' && newsResult.value.ok) {
+      const data = await newsResult.value.json();
+      if (Array.isArray(data)) {
+        const sorted = [...data].sort((a, b) => b.datetime - a.datetime).slice(0, 5);
+        rawNews  = sorted;
+        articles = sorted.map(item => ({
+          headline: item.headline || '',
+          source:   item.source   || '',
+          date:     item.datetime ? new Date(item.datetime * 1000).toISOString().slice(0, 10) : '',
+          summary:  item.summary  || '',
+        }));
+      }
+    } else {
+      console.error(`[get-news] news fetch failed for ${sym}`);
     }
-    const data = await r.json();
-    if (!Array.isArray(data)) {
-      console.error(`[get-news] Unexpected Finnhub response for ${sym}:`, JSON.stringify(data).slice(0, 200));
-      return res.status(200).json({ articles: [], raw: [] });
-    }
-
-    // Sort by datetime desc, take top 5
-    const sorted = [...data].sort((a, b) => b.datetime - a.datetime).slice(0, 5);
-
-    const articles = sorted.map(item => ({
-      headline: item.headline || '',
-      source:   item.source   || '',
-      date:     item.datetime ? new Date(item.datetime * 1000).toISOString().slice(0, 10) : '',
-      summary:  item.summary  || '',
-    }));
-
-    console.error(`[get-news] ${sym}: ${articles.length} articles from Finnhub (${fromStr} to ${toStr})`);
-    return res.status(200).json({ articles, raw: sorted });
-  } catch (err) {
-    console.error(`[get-news] fetch threw for ${sym}:`, err.message);
-    return res.status(200).json({ articles: [], raw: [] });
+  } catch (e) {
+    console.error(`[get-news] news parse error for ${sym}:`, e.message);
   }
+
+  // --- Earnings calendar ---
+  let nextEarnings    = null; // 'YYYY-MM-DD' or null
+  let rawEarnings     = null;
+  try {
+    if (earningsResult.status === 'fulfilled' && earningsResult.value.ok) {
+      const eData = await earningsResult.value.json();
+      rawEarnings = eData;
+      const cal = eData?.earningsCalendar;
+      if (Array.isArray(cal) && cal.length > 0) {
+        // Take the soonest date on or after today
+        const upcoming = cal
+          .filter(e => e.date >= todayStr)
+          .sort((a, b) => a.date.localeCompare(b.date));
+        if (upcoming.length > 0) nextEarnings = upcoming[0].date;
+      }
+    } else {
+      console.error(`[get-news] earnings fetch failed for ${sym}`);
+    }
+  } catch (e) {
+    console.error(`[get-news] earnings parse error for ${sym}:`, e.message);
+  }
+
+  console.error(`[get-news] ${sym}: ${articles.length} news articles, nextEarnings=${nextEarnings}`);
+  return res.status(200).json({ articles, nextEarnings, rawNews, rawEarnings });
 }

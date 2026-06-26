@@ -146,21 +146,31 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       let rangeStr = rawQuote?.low && rawQuote?.high ? ` range $${rawQuote.low.toFixed(2)}-$${rawQuote.high.toFixed(2)}` : '';
 
       let newsText = '';
+      let earningsLine = '';
       let reconRawResponse = '';
       try {
-        const { articles, raw } = await getNews(upperTicker);
-        reconRawResponse = JSON.stringify(raw || [], null, 2);
+        const { articles, nextEarnings, rawNews, rawEarnings } = await getNews(upperTicker);
+        reconRawResponse = JSON.stringify({ rawNews: rawNews || [], rawEarnings: rawEarnings || null }, null, 2);
+
         if (articles && articles.length > 0) {
           newsText = articles
             .map(a => `- [${a.date}] ${a.headline} (${a.source})`)
             .join('\n');
         }
-        console.error(`[recon][CouncilTab] Finnhub articles: ${articles?.length ?? 0}`);
+
+        if (nextEarnings) {
+          const daysAway = Math.round((new Date(nextEarnings) - new Date(new Date().toISOString().slice(0, 10))) / 864e5);
+          earningsLine = `Next earnings: ${nextEarnings} (in ${daysAway} day${daysAway !== 1 ? 's' : ''})`;
+        } else {
+          earningsLine = 'Next earnings: none scheduled within 90 days';
+        }
+        console.error(`[recon][CouncilTab] Finnhub articles: ${articles?.length ?? 0}, nextEarnings: ${nextEarnings}`);
       } catch (newsErr) {
         console.error('[recon] Finnhub news call failed:', newsErr.message);
+        earningsLine = 'Next earnings: unavailable';
       }
 
-      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${upperTicker} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news (last 5 days, via Finnhub):\n' + newsText : ' Recent news: no recent news available (Finnhub).'}\n`;
+      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${upperTicker} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}. ${earningsLine}.${newsText ? ' Recent news (last 5 days, via Finnhub):\n' + newsText : ' Recent news: no recent news available (Finnhub).'}\n`;
       reconGrounded = !!(livePrice && newsText);
       if (debugRef.current) {
         debugRef.current.liveDataBlock = liveDataBlock;

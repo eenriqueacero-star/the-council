@@ -4,6 +4,25 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-25 (session 6)
+
+### FIX — NOVA catalyst gate now sees real upcoming earnings dates
+
+**Root cause:** NOVA was searching news for upcoming catalysts, but news reports *past* events. The next earnings date was never in the data NOVA could see, so it FAILed the catalyst gate even when a real earnings date existed in Finnhub.
+
+**Solution — earnings calendar in LIVE DATA:**
+- `api/get-news.js`: now fetches news and earnings calendar **in parallel** (`Promise.allSettled`). Earnings call: `GET /calendar/earnings?symbol=<SYM>&from=<today>&to=<today+90days>`. Returns `nextEarnings` (nearest upcoming date as `YYYY-MM-DD` or `null`) and `rawEarnings` (full Finnhub response) alongside the existing `articles`/`rawNews`.
+- `src/api.js`: `getNews()` fallback now includes `nextEarnings: null, rawEarnings: null`.
+- `CouncilTab.jsx` + `ChatTab.jsx`: compute days-away from `nextEarnings`, build `earningsLine` ("Next earnings: 2026-08-21 (in 57 days)" or "none scheduled within 90 days"), inject into LIVE DATA block directly before the news bullets.
+- LIVE DATA block now reads: `NVDA $195.74, -1.64% today range ... Next earnings: 2026-08-21 (in 57 days). Recent news ...`
+
+**NOVA prompt tightened:**
+- Now explicitly told to check the "Next earnings:" line in LIVE DATA first (sourced from Finnhub). If that line shows a confirmed date within ~60 days → PASS Gate 1, report the exact date. Falls back to news headlines for other catalysts (conferences, launches) only if no earnings date within the window. FAIL only when genuinely nothing upcoming exists. NEVER invent a date.
+
+**Debug panel:** RECON card relabeled "RECON · RAW FINNHUB RESPONSE (news + earnings)" — now shows `{ rawNews: [...], rawEarnings: {...} }` so both data sources are verifiable.
+
+---
+
 ## 2026-06-25 (session 5)
 
 ### CRITICAL — Replace compound/generated news with real Finnhub headlines

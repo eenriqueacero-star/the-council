@@ -6,6 +6,12 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (recent)
 
+### NOVA earnings-calendar fix ✓
+- [x] `api/get-news.js` fetches earnings calendar in parallel with news; returns `nextEarnings` date + `rawEarnings`
+- [x] LIVE DATA block now includes "Next earnings: YYYY-MM-DD (in X days)" line from Finnhub
+- [x] NOVA prompt updated to check the earnings line first — PASS if confirmed date within ~60 days
+- [x] Debug RECON card shows both rawNews and rawEarnings for verification
+
 ### Real news via Finnhub ✓
 - [x] Replaced groq/compound news recon with Finnhub company-news API (real, dated, sourced headlines)
 - [x] `api/get-news.js` — new serverless endpoint using existing FINNHUB_KEY

@@ -128,19 +128,27 @@ export default function ChatTab({ account, acct, positionsLine, flagApiDown, dar
       let rangeStr = rawQuote?.low && rawQuote?.high ? ` range $${rawQuote.low.toFixed(2)}-$${rawQuote.high.toFixed(2)}` : '';
 
       let newsText = '';
+      let earningsLine = '';
       try {
-        const { articles } = await getNews(tkr);
+        const { articles, nextEarnings } = await getNews(tkr);
         if (articles && articles.length > 0) {
           newsText = articles
             .map(a => `- [${a.date}] ${a.headline} (${a.source})`)
             .join('\n');
         }
-        console.error(`[recon][ChatTab] Finnhub articles: ${articles?.length ?? 0}`);
+        if (nextEarnings) {
+          const daysAway = Math.round((new Date(nextEarnings) - new Date(new Date().toISOString().slice(0, 10))) / 864e5);
+          earningsLine = `Next earnings: ${nextEarnings} (in ${daysAway} day${daysAway !== 1 ? 's' : ''})`;
+        } else {
+          earningsLine = 'Next earnings: none scheduled within 90 days';
+        }
+        console.error(`[recon][ChatTab] Finnhub articles: ${articles?.length ?? 0}, nextEarnings: ${nextEarnings}`);
       } catch (newsErr) {
         console.error('[recon] Finnhub news call failed:', newsErr.message);
+        earningsLine = 'Next earnings: unavailable';
       }
 
-      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}.${newsText ? ' Recent news (last 5 days, via Finnhub):\n' + newsText : ' Recent news: no recent news available (Finnhub).'}\n`;
+      liveDataBlock = `\nLIVE DATA (as of ${timeStr}): ${tkr} ${priceStr}${changeStr ? ', ' + changeStr : ''}${rangeStr}. ${earningsLine}.${newsText ? ' Recent news (last 5 days, via Finnhub):\n' + newsText : ' Recent news: no recent news available (Finnhub).'}\n`;
       reconGrounded = !!(livePrice && newsText);
       console.error('[recon][ChatTab] rawQuote:', JSON.stringify(rawQuote));
       console.error('[recon][ChatTab] liveDataBlock:', liveDataBlock);

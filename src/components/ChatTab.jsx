@@ -348,13 +348,10 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       if (router.ticker) {
         try {
           const tkr = router.ticker.toUpperCase();
-          const q = await getQuotes([tkr], true);
+          const q = await getQuotes([tkr]);
           const quote = q[tkr];
           if (quote?.price) {
             liveContext = `\nVERIFIED LIVE DATA for ${tkr}: price $${quote.price.toFixed(2)} (prev close $${(quote.prevClose || 0).toFixed(2)}, chg ${(quote.changePct || 0).toFixed(2)}%)`;
-            if (quote.nextEarnings) {
-              liveContext += `, next earnings: ${quote.nextEarnings} (verified from Finnhub — do NOT cite a different date)`;
-            }
           }
         } catch {}
       }

@@ -4,6 +4,22 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-26
+
+### Finnhub quote hardening — retry, 429 detection, duplicate call fix
+
+**`api/get-quotes.js`:** Quote fetch now retries up to 3 times (1 s wait between) when Finnhub returns both `c` and `pc` as zero/null (transient miss). On HTTP 429, logs `[quote] Finnhub 429 rate-limited for <TICKER>` and sets `{ error: 'rate_limited', rateLimited: true }` — no retry on 429. Graceful fallback when all retries exhausted: `{ error: 'no_price_after_retries' }`, agents proceed flagged ungrounded as before.
+
+**`src/components/ChatTab.jsx`:** Removed duplicate Finnhub quote call. The AXIOM routing step was calling `getQuotes([tkr], true)` (cache key `"NVDA+earnings"`) while `runCouncilInChat` called `getQuotes([tkr])` (key `"NVDA"`). Two different cache keys → two server round-trips per chat-convene. Changed the routing step to `getQuotes([tkr])` — second call now hits the 45 s client cache. The `nextEarnings` data in the routing step was redundant (NOVA already gets it from `getNews` during the council).
+
+**`src/components/CouncilTab.jsx`:** Debug RECON card now includes `rawQuote` (full quote result, including `rateLimited: true` when applicable) alongside `rawNews`/`rawEarnings`, so 429 vs outage is immediately visible in the debug panel.
+
+**Quote call count:** CouncilTab — 2 `get-quotes` calls per convene (ticker + 7 sector ETFs), never per-agent. ChatTab — was 3 (ticker called twice), now 2 (cache hit on second ticker call).
+
+- Files: `api/get-quotes.js`, `src/components/ChatTab.jsx`, `src/components/CouncilTab.jsx`
+
+---
+
 ## 2026-06-25 (session 8)
 
 ### FIX — VEGA hard ban on fabricated events

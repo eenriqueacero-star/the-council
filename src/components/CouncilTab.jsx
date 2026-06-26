@@ -150,7 +150,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       let reconRawResponse = '';
       try {
         const { articles, nextEarnings, earningsEstimated, rawNews, rawEarnings } = await getNews(upperTicker);
-        reconRawResponse = JSON.stringify({ rawNews: rawNews || [], rawEarnings: rawEarnings || null }, null, 2);
+        reconRawResponse = JSON.stringify({ rawQuote: rawQuote || null, rawNews: rawNews || [], rawEarnings: rawEarnings || null }, null, 2);
 
         if (articles && articles.length > 0) {
           newsText = articles

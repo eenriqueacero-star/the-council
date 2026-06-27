@@ -334,6 +334,25 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
             rows.push(`${ticker}: $${price.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% today) | ${shares}sh | cost $${cost.toFixed(2)} | mkt val $${mktVal.toFixed(2)} | day gain $${dayGain.toFixed(2)}${unrealizedPL != null ? ` | unrealized P&L $${unrealizedPL.toFixed(2)}` : ''}`);
           }
           portfolioDataBlock = `\n\nPORTFOLIO DATA (live as of ${new Date().toLocaleTimeString()}):\n${rows.join('\n')}\nTOTAL: market value $${totalValue.toFixed(2)} | day change $${totalDayGain.toFixed(2)} (${totalValue > 0 ? ((totalDayGain / (totalValue - totalDayGain)) * 100).toFixed(2) : '0.00'}%) | total unrealized P&L $${totalUnrealizedPL.toFixed(2)}\n`;
+
+          // Fetch headlines for top 3 movers (by absolute $ day change) — gives AXIOM real news to cite
+          const tickerDayGains = tickers.map(t => {
+            const q = quotes[t]; const pos = posMap[t] || {};
+            const shares = parseFloat(pos.shares) || 0;
+            const price = q?.price || q?.prevClose || 0;
+            const prevClose = q?.prevClose || price;
+            return { ticker: t, absDayGain: Math.abs(shares * (price - prevClose)) };
+          }).sort((a, b) => b.absDayGain - a.absDayGain).slice(0, 3);
+
+          const newsResults = await Promise.allSettled(tickerDayGains.map(({ ticker: t }) => getNews(t)));
+          const newsLines = [];
+          newsResults.forEach((r, i) => {
+            if (r.status !== 'fulfilled') return;
+            const headlines = (r.value?.articles || []).slice(0, 3).map(a => `  - ${a.headline}`);
+            if (headlines.length) newsLines.push(`${tickerDayGains[i].ticker} recent news:\n${headlines.join('\n')}`);
+          });
+          if (newsLines.length) portfolioDataBlock += `\nRECENT NEWS (biggest movers):\n${newsLines.join('\n')}\n`;
+
           lastPortfolioDataRef.current = portfolioDataBlock;
           portfolioFollowUpRef.current = 3; // carry for next 3 follow-up messages
           writeDebug('CHAT', `Portfolio data injected for "${text.slice(0, 40)}"`, portfolioDataBlock);
@@ -376,6 +395,8 @@ ROUTING RULES:
 - route=["bear"] for bear case or "what could go wrong".
 - route=["sizer"] for position sizing or how much to buy.
 - route=[] — answer DIRECTLY as AXIOM for: greetings, portfolio questions, strategy, watchlist, anything that doesn't need a specialist.
+
+MACRO GROUNDING RULE: When explaining why stocks moved, ONLY cite reasons that appear in the LIVE DATA, PORTFOLIO DATA, or RECENT NEWS blocks provided. Do NOT invent macro explanations (CPI surprises, Fed moves, geopolitical events, earnings reports) unless they are explicitly mentioned in the data you were given. If you don't know the specific reason for a move, say so honestly — "not sure what triggered it specifically, but the whole chip sector sold off" is better than inventing a CPI surprise that didn't happen. Honesty about uncertainty is always better than a confident fabrication.
 
 When routing: set "speak" to a brief 1-sentence intro ("Let me get REX on that chart.").
 When answering directly: set "speak" to your full casual answer.

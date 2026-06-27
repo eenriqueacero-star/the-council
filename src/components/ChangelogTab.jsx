@@ -6,6 +6,13 @@ const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const ENTRIES = [
   {
+    version: '0.3.3', date: '2026-06-26', label: 'FIX',
+    changes: [
+      { type: 'FIX', text: 'AXIOM hallucinating macro explanations — added MACRO GROUNDING RULE to axiomSys, AXIOM_SYSTEM, and AXIOM_CONVERSATIONAL: AXIOM may only cite reasons that appear in the LIVE DATA, PORTFOLIO DATA, or RECENT NEWS blocks. If the cause is unknown, it must say so honestly instead of inventing a CPI surprise or Fed move.' },
+      { type: 'FEAT', text: 'Portfolio data block now includes recent headlines for the top 3 biggest movers (by absolute $ day change). Fetched in parallel via getNews on portfolio query, giving AXIOM real news to cite when explaining moves.' },
+    ],
+  },
+  {
     version: '0.3.2', date: '2026-06-26', label: 'FIX',
     changes: [
       { type: 'FIX', text: 'Portfolio data lost on follow-ups — after fetching live quotes for a portfolio question, the data now carries over automatically for the next 3 follow-up messages (e.g. "why did it do that?" still has the data). Clears when a new ticker council is convened.' },

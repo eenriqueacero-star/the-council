@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase.js';
-import { MONO, DISP, CY } from '../constants/styles.js';
 import ArcReactor from './ArcReactor.jsx';
 
 export default function AuthGate({ children, user }) {
@@ -23,39 +23,45 @@ export default function AuthGate({ children, user }) {
     setLoading(false);
   }
 
-  return (
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", background: '#080910', color: '#e2ddd5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% -8%, rgba(200,146,42,0.07), transparent 52%)' }} />
+  const inputStyle = {
+    fontFamily: 'var(--font-mono)', width: '100%', display: 'block',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+    color: '#FAFAFA', borderRadius: 12, padding: '13px 16px', fontSize: 14, outline: 'none',
+    transition: 'border-color .15s ease',
+  };
 
-      <div className="relative w-full max-w-sm px-5">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-5"><ArcReactor size={52} /></div>
-          <div style={{ ...DISP, color: CY, letterSpacing: '0.24em', fontWeight: 700 }} className="text-xl neon">THE COUNCIL</div>
-          <div style={{ ...MONO, color: 'rgba(226,221,213,0.35)', letterSpacing: '0.18em' }} className="text-[10px] mt-2">AUTHENTICATION REQUIRED</div>
+  return (
+    <div style={{ fontFamily: 'var(--font-display)', background: '#09090B', color: '#FAFAFA', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+      {/* Ambient */}
+      <div style={{ position: 'absolute', top: '-15%', left: '50%', transform: 'translateX(-50%)', width: 500, height: 400, background: 'radial-gradient(ellipse, rgba(59,130,246,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+        style={{ width: '100%', maxWidth: 360, padding: '0 24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><ArcReactor size={48} /></div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.12em', color: '#FAFAFA' }}>THE COUNCIL</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.18em', marginTop: 6 }}>PRIVATE ACCESS</div>
         </div>
-        <form onSubmit={login} className="space-y-3">
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="email" required autoComplete="email"
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-            className="w-full border rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-            onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="password" required autoComplete="current-password"
-            style={{ ...MONO, background: 'rgba(226,221,213,0.03)', borderColor: 'rgba(226,221,213,0.10)', color: '#e2ddd5' }}
-            className="w-full border rounded-xl px-4 py-3 text-sm outline-none transition-colors"
-            onFocus={e => e.target.style.borderColor = `${CY}55`}
-            onBlur={e => e.target.style.borderColor = 'rgba(226,221,213,0.10)'} />
-          {error && <p style={{ ...MONO, color: '#e85c5c' }} className="text-[12px]">{error}</p>}
-          <button type="submit" disabled={loading}
-            style={{ ...MONO, background: loading ? 'rgba(200,146,42,0.22)' : CY, color: '#0a0808', letterSpacing: '0.10em', fontWeight: 600 }}
-            className="glow-btn w-full py-3 rounded-xl transition-all disabled:cursor-not-allowed text-[13px]">
-            {loading ? 'AUTHENTICATING…' : 'ACCESS COUNCIL'}
-          </button>
+
+        <form onSubmit={login} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" required autoComplete="email"
+            style={inputStyle}
+            onFocus={e => { e.target.style.borderColor = 'rgba(59,130,246,0.5)'; }}
+            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required autoComplete="current-password"
+            style={inputStyle}
+            onFocus={e => { e.target.style.borderColor = 'rgba(59,130,246,0.5)'; }}
+            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; }} />
+          {error && (
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</motion.p>
+          )}
+          <motion.button type="submit" disabled={loading} whileTap={{ scale: 0.97 }}
+            style={{ fontFamily: 'var(--font-display)', background: loading ? 'rgba(59,130,246,0.3)' : '#3B82F6', color: '#fff', borderRadius: 12, border: 'none', padding: '14px', fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '0.04em', transition: 'background .15s ease' }}>
+            {loading ? 'Signing in…' : 'Sign In'}
+          </motion.button>
         </form>
-        <p style={{ ...MONO, color: 'rgba(226,221,213,0.22)' }} className="mt-4 text-[10px] text-center">Add your account in Firebase Console → Authentication → Users</p>
-      </div>
+        <p style={{ fontFamily: 'var(--font-mono)', marginTop: 20, fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>Add your account in Firebase → Authentication → Users</p>
+      </motion.div>
     </div>
   );
 }

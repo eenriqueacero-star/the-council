@@ -4,6 +4,39 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-27 (session 13)
+
+### Full UI Redesign — Apple-clean cinematic design system
+
+**Phase 1 — Foundation:**
+- Installed `framer-motion@^11` and `@headlessui/react`
+- Added Inter font from Google Fonts to `index.html`
+- Rewrote `src/utils/theme.js` with new design tokens: zinc-based near-blacks (`#09090B`, `#18181B`, `#27272A`), `#3B82F6` blue accent, `#22C55E`/`#EF4444` green/red, ultra-subtle borders (`rgba(255,255,255,0.06)`). Legacy aliases preserved for backward compat.
+- Rewrote `src/index.css`: stripped all CSS keyframe animations except SVG-only (ArcReactor), market overlay effects, live dot, skeleton, ambient glow. Replaced with Framer Motion equivalents. Added `.glass` utility (backdrop-filter blur+saturate). Added CSS custom properties for radius/spacing/font-family tokens.
+- Created `src/components/ui/AnimatedNumber.jsx` — count-up component using Framer Motion `animate()`.
+- Created `src/components/ui/Card.jsx` — glass card with optional motion hover.
+
+**Phase 2 — Layout Shell:**
+- Redesigned `App.jsx`: 72px icon-only side rail (desktop), animated tooltips on hover, shared-layout `layoutId="rail-pill"` active indicator, glass top bar offset, `AnimatePresence mode="wait"` tab transitions (opacity + y + blur), dark mode toggle in rail footer. Mobile header kept compact with accent-colored account pills.
+- New `src/components/TopBar.jsx`: fixed glass top bar (desktop only), account switcher pills, dark/light toggle, sign-out.
+- Redesigned `src/components/BottomNav.jsx`: glass backdrop, Framer Motion `layoutId="nav-pill"` shared layout active indicator, `whileTap` spring press, no more CSS keyframe `tab-pop`.
+
+**Phase 3 — PortfolioTab:**
+- `AnimatedNumber` hero total value (count-up on load/change, duration 1s).
+- Top movers as horizontal-scroll cards with green/red border tint and `whileHover={{ y: -2 }}`.
+- Holdings list: Framer Motion stagger-in (each item 50ms delay), `AnimatePresence` for expanded card (height auto-animation).
+- Expanded card chevron rotates 180° on open. "Run Council" button navigates to Council tab directly.
+- Range selector replaced with blue pill buttons. Summary moved to 3-column grid cards.
+
+**Phase 4 — CouncilTab + ChatTab:**
+- CouncilTab: Framer Motion stagger on agent cards, colored left border per agent, glass card background, `AnimatePresence` on synthesis card entrance (scale + opacity), blue accent on inputs and convene button, animated progress banner.
+- ChatTab: Clean chat bubbles (user = blue accent pill, agent = `bgCard` pill), 3-dot typing indicator with bounce animation, glass input bar with pill input, `AnimatePresence` wrapping all messages for slide-in.
+
+**Phase 5 — AuthGate:**
+- Cinematic login screen: ambient radial glow, ArcReactor logo, clean blue sign-in button, entrance animation.
+
+---
+
 ## 2026-06-27
 
 ### AXIOM chat mode: web search enabled for direct answers

@@ -1,7 +1,6 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { LayoutDashboard, Users, MessageSquare, Telescope, MoreHorizontal } from 'lucide-react';
-
-const FONT = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 
 const TABS = [
   { id: 'portfolio', label: 'Portfolio', Icon: LayoutDashboard },
@@ -10,45 +9,55 @@ const TABS = [
   { id: 'scout',     label: 'Scout',     Icon: Telescope },
   { id: 'more',      label: 'More',      Icon: MoreHorizontal },
 ];
-
-const MORE_IDS = new Set(['dca','alpha','roadmap','changelog','watchdog']);
+const MORE_IDS = new Set(['dca','alpha','roadmap','changelog','watchdog','settings']);
 
 export default function BottomNav({ tab, setTab, dark }) {
   return (
-    <div className="flex lg:hidden" style={{
+    <nav className="flex lg:hidden glass" style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-      background: dark ? '#1C1C1E' : '#FFFFFF',
-      borderTop: `1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`,
-      boxShadow: '0 -4px 20px rgba(0,0,0,0.06)',
-      height: 83,
+      height: 80,
       alignItems: 'flex-start',
       paddingTop: 10,
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      background: dark ? 'rgba(9,9,11,0.92)' : 'rgba(250,250,250,0.92)',
+      borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
     }}>
       {TABS.map(({ id, label, Icon }) => {
         const active = tab === id || (id === 'more' && MORE_IDS.has(tab));
         return (
-          <button key={id} onClick={() => setTab(id)} style={{
-            ...FONT,
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 4,
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            padding: '0 4px',
-            color: active ? (dark ? '#F2F2F7' : '#000000') : '#AAAAAA',
-          }}>
-            {/* key change triggers remount → spring pop animation */}
-            <span key={active ? 'on' : 'off'} className={active ? 'tab-pop' : ''} style={{ display:'flex' }}>
-              <Icon size={24} strokeWidth={active ? 2.2 : 1.8} />
+          <motion.button
+            key={id}
+            onClick={() => setTab(id)}
+            whileTap={{ scale: 0.9 }}
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 3, border: 'none', background: 'none', cursor: 'pointer', padding: '0 4px',
+              position: 'relative',
+              color: active ? '#3B82F6' : (dark ? '#52525B' : '#A1A1AA'),
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            {active && (
+              <motion.div
+                layoutId="nav-pill"
+                style={{
+                  position: 'absolute', top: -2, left: '50%', transform: 'translateX(-50%)',
+                  width: 32, height: 32, borderRadius: 10,
+                  background: 'rgba(59,130,246,0.12)',
+                  zIndex: 0,
+                }}
+                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              />
+            )}
+            <span style={{ display: 'flex', position: 'relative', zIndex: 1 }}>
+              <Icon size={22} strokeWidth={active ? 2.2 : 1.7} />
             </span>
-            <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>{label}</span>
-          </button>
+            <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, position: 'relative', zIndex: 1 }}>
+              {label}
+            </span>
+          </motion.button>
         );
       })}
-    </div>
+    </nav>
   );
 }

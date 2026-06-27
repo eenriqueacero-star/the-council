@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, addDoc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { ACCOUNTS } from './constants/agents.js';
 import { getMarketState, getTimeToNextOpen } from './utils/marketState.js';
+import { theme } from './utils/theme.js';
 import ArcReactor from './components/ArcReactor.jsx';
+import TopBar from './components/TopBar.jsx';
 import MarketBanner from './components/MarketBanner.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import PortfolioTab from './components/PortfolioTab.jsx';
@@ -21,33 +24,39 @@ import DebugTab from './components/DebugTab.jsx';
 import { getQuotes } from './api.js';
 import { sendNotification, getPermissionState } from './utils/notify.js';
 import { writeDebug } from './utils/debugStore.js';
-import { ChevronRight, LogOut } from 'lucide-react';
+import {
+  LayoutDashboard, Users, MessageSquare, Telescope, Eye, PieChart,
+  TrendingUp, Map, FileText, Settings, Bug, ChevronRight, LogOut, Sun, Moon,
+  MoreHorizontal,
+} from 'lucide-react';
 
 const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
-const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
-const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
-
 const SIDEBAR_TABS = [
-  { id:'portfolio', label:'Portfolio'  },
-  { id:'council',   label:'Council'    },
-  { id:'chat',      label:'Chat'       },
-  { id:'scout',     label:'Scout'      },
-  { id:'watchdog',  label:'Watchdog'   },
-  { id:'dca',       label:'DCA'        },
-  { id:'alpha',     label:'Alpha'      },
-  { id:'roadmap',   label:'Roadmap'    },
-  { id:'changelog', label:'Changelog'  },
-  { id:'settings',  label:'Settings'   },
-  ...(isDebugMode ? [{ id:'debug', label:'Debug 🔍' }] : []),
+  { id: 'portfolio', Icon: LayoutDashboard, label: 'Portfolio'  },
+  { id: 'council',   Icon: Users,           label: 'Council'    },
+  { id: 'chat',      Icon: MessageSquare,   label: 'Chat'       },
+  { id: 'scout',     Icon: Telescope,       label: 'Scout'      },
+  { id: 'watchdog',  Icon: Eye,             label: 'Watchdog'   },
+  { id: 'dca',       Icon: PieChart,        label: 'DCA'        },
+  { id: 'alpha',     Icon: TrendingUp,      label: 'Alpha'      },
+  { id: 'roadmap',   Icon: Map,             label: 'Roadmap'    },
+  { id: 'changelog', Icon: FileText,        label: 'Changelog'  },
+  { id: 'settings',  Icon: Settings,        label: 'Settings'   },
+  ...(isDebugMode ? [{ id:'debug', Icon: Bug, label:'Debug' }] : []),
 ];
 
 const MORE_ROWS = [
   ['watchdog','Watchdog'],['dca','DCA Allocator'],['alpha','Alpha Tracker'],
-  ['roadmap','Roadmap'],['changelog','Changelog'],
-  ['settings','Settings'],
-  ...(isDebugMode ? [['debug','Debug 🔍']] : []),
+  ['roadmap','Roadmap'],['changelog','Changelog'],['settings','Settings'],
+  ...(isDebugMode ? [['debug','Debug']] : []),
 ];
+
+const PAGE_VARIANTS = {
+  initial: { opacity: 0, y: 16, filter: 'blur(4px)' },
+  animate: { opacity: 1, y: 0,  filter: 'blur(0px)', transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } },
+  exit:    { opacity: 0, y: -8, filter: 'blur(4px)', transition: { duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] } },
+};
 
 export default function App() {
   const [account,  setAccount]  = useState(() => localStorage.getItem('council_account') || 'edwin');
@@ -55,13 +64,16 @@ export default function App() {
   const [apiDown,  setApiDown]  = useState(false);
   const [mktState, setMktState] = useState(() => getMarketState(new Date()));
   const [msToOpen, setMsToOpen] = useState(() => getTimeToNextOpen(new Date()));
-  const [dayChange,setDayChange]= useState(0);
-  const [dark, setDark] = useState(() => localStorage.getItem('council_dark') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('council_dark') !== 'false');
+  const [tooltipId, setTooltipId] = useState(null);
+
   useEffect(() => { localStorage.setItem('council_dark', String(dark)); }, [dark]);
   useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
 
+  const T = theme(dark);
+
   const [alertSettings, setAlertSettings] = useState({ globalThreshold: 5, perStock: {} });
-  const alertFiredToday = useRef({}); // ticker → true; reset daily
+  const alertFiredToday = useRef({});
   const lastAlertDate   = useRef(new Date().toDateString());
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
@@ -120,10 +132,7 @@ export default function App() {
           positionsRef.current = merged;
           return merged;
         });
-      }, err => {
-        console.error('positions snapshot error:', err);
-        fsLoaded.current = true;
-      });
+      }, err => { console.error('positions snapshot error:', err); fsLoaded.current = true; });
     });
     return () => { authUnsub(); snapUnsub(); };
   }, []);
@@ -133,7 +142,7 @@ export default function App() {
     setSaveStatus('saving');
     saveTimer.current = setTimeout(async () => {
       const user = auth.currentUser;
-      const doSave = async (u) => {
+      const doSave = async u => {
         await setDoc(doc(db, 'users', u.uid, 'data', 'positions'), { positions: positionsRef.current }, { merge: true });
       };
       if (!user) {
@@ -170,22 +179,16 @@ export default function App() {
     return next;
   });
 
-  // Portfolio alert checker — runs on mount and every 5 minutes while in foreground
   const checkAlerts = useCallback(async () => {
     const today = new Date().toDateString();
-    if (lastAlertDate.current !== today) {
-      alertFiredToday.current = {};
-      lastAlertDate.current = today;
-    }
+    if (lastAlertDate.current !== today) { alertFiredToday.current = {}; lastAlertDate.current = today; }
     if (getPermissionState() !== 'granted') return;
     const uid = auth.currentUser?.uid;
     const positionsNow = positionsRef.current;
     const tickers = Object.keys(positionsNow[account] || {}).filter(t => t && t.trim());
     if (!tickers.length) return;
-
     let quotes;
     try { quotes = await getQuotes(tickers); } catch { return; }
-
     for (const ticker of tickers) {
       const q = quotes[ticker];
       if (!q || q.changePct == null) continue;
@@ -195,7 +198,6 @@ export default function App() {
       const firedKey = `${ticker}_${today}`;
       if (alertFiredToday.current[firedKey]) continue;
       alertFiredToday.current[firedKey] = true;
-
       const dir = q.changePct >= 0 ? '📈' : '📉';
       const sign = q.changePct >= 0 ? '+' : '';
       const priceStr = q.price ? ` ($${q.price.toFixed(2)})` : '';
@@ -203,22 +205,11 @@ export default function App() {
         `${dir} ${ticker} is ${q.changePct >= 0 ? 'up' : 'down'} ${sign}${q.changePct.toFixed(1)}% today${priceStr}`,
         `Threshold: ${threshold}%`,
       );
-
-      // Log to Firestore alert history
       if (uid) {
-        try {
-          await addDoc(collection(db, 'users', uid, 'alertHistory'), {
-            ticker, changePct: q.changePct, price: q.price || null,
-            direction: q.changePct >= 0 ? 'up' : 'down',
-            threshold, firedAt: new Date().toISOString(),
-          });
-        } catch {}
+        try { await addDoc(collection(db, 'users', uid, 'alertHistory'), { ticker, changePct: q.changePct, price: q.price || null, direction: q.changePct >= 0 ? 'up' : 'down', threshold, firedAt: new Date().toISOString() }); } catch {}
       }
     }
-
-    if (isDebugMode) {
-      writeDebug('ALERTS', `Alert check · ${tickers.join(', ')}`, { tickers, quotes, threshold: alertSettings.globalThreshold, fired: { ...alertFiredToday.current } });
-    }
+    if (isDebugMode) writeDebug('ALERTS', `Alert check · ${tickers.join(', ')}`, { tickers, quotes, threshold: alertSettings.globalThreshold, fired: { ...alertFiredToday.current } });
   }, [account, alertSettings]);
 
   useEffect(() => {
@@ -236,125 +227,177 @@ export default function App() {
     return p.shares ? `${t} ${p.shares}sh${costNum > 0 ? ` @ $${costNum.toFixed(2)} avg` : ''}` : t;
   }).join(', ');
 
-  const shared  = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus, authReady };
-  const rootBg  = dark ? '#111111' : '#FFFFFF';
-  const accounts = Object.entries(ACCOUNTS).map(([id, v]) => ({ id, label: v.label }));
-  const padded   = { maxWidth:760, margin:'0 auto', padding:'16px' };
+  const shared = { account, acct, posMap, acctHoldings, positionsLine, flagApiDown, apiDown, dark, saveStatus, authReady };
+  const padded = { maxWidth: 760, margin: '0 auto', padding: 'var(--space-page)' };
+
+  function renderTab() {
+    if (tab === 'portfolio') return (
+      <PortfolioTab {...shared}
+        positions={positions} setPos={setPos} addTicker={addTicker} removeTicker={removeTicker}
+        marketState={mktState} onTabChange={setTab}
+      />
+    );
+    if (tab === 'council') return (
+      <div style={padded}>
+        <CouncilTab {...shared}
+          running={running} setRunning={setRunning}
+          ticker={ticker} setTicker={setTicker}
+          capital={capital} setCapital={setCapital}
+          active={active} setActive={setActive}
+          agentState={agentState} setAgentState={setAgentState}
+          synthesis={synthesis} setSynthesis={setSynthesis}
+        />
+      </div>
+    );
+    if (tab === 'chat')      return <div style={padded}><ChatTab {...shared} posMap={posMap} /></div>;
+    if (tab === 'scout')     return <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} />;
+    if (tab === 'watchdog')  return <div style={padded}><WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} /></div>;
+    if (tab === 'dca')       return <div style={padded}><DCATab {...shared} /></div>;
+    if (tab === 'alpha')     return <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>;
+    if (tab === 'roadmap')   return <div style={padded}><RoadmapTab dark={dark} /></div>;
+    if (tab === 'changelog') return <div style={padded}><ChangelogTab dark={dark} /></div>;
+    if (tab === 'settings')  return <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} /></div>;
+    if (tab === 'debug' && isDebugMode) return <DebugTab dark={dark} />;
+    if (tab === 'more') return (
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: 'var(--space-page)' }}>
+        {MORE_ROWS.map(([t, label]) => (
+          <motion.button key={t} onClick={() => setTab(t)} whileTap={{ scale: 0.98 }} style={{
+            fontFamily: 'var(--font-display)', width: '100%', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', padding: '16px 0', background: 'none', border: 'none',
+            borderBottom: `1px solid ${T.border}`, cursor: 'pointer', fontSize: 15, fontWeight: 500,
+            color: T.text,
+          }}>
+            {label} <ChevronRight size={16} style={{ color: T.text3 }} />
+          </motion.button>
+        ))}
+      </div>
+    );
+    return null;
+  }
 
   return (
-    <div style={{ ...FONT, background: rootBg, minHeight:'100vh', color: dark ? '#F2F2F7' : '#000', transition:'background 0.3s ease' }}>
+    <div style={{ fontFamily: 'var(--font-display)', background: T.bg, minHeight: '100vh', color: T.text, transition: 'background 0.4s ease, color 0.4s ease' }}>
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:flex" style={{ flexDirection:'column', width:240, position:'fixed', left:0, top:0, bottom:0, background: dark ? '#1C1C1E' : '#FFFFFF', borderRight:`1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`, zIndex:10, padding:'24px 0' }}>
-        <div style={{ padding:'0 20px 24px', display:'flex', alignItems:'center', gap:10 }}>
-          <ArcReactor size={28} />
-          <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.06em' }}>THE COUNCIL</span>
-        </div>
-        <nav style={{ flex:1, padding:'0 12px', overflowY:'auto' }}>
-          {SIDEBAR_TABS.map(({ id, label }) => (
-            <button key={id} onClick={() => setTab(id)} style={{
-              ...FONT, width:'100%', textAlign:'left', padding:'9px 12px', borderRadius:8,
-              border:'none', cursor:'pointer', fontSize:14, fontWeight: tab===id ? 600 : 400,
-              color: tab===id ? (dark ? '#F2F2F7' : '#000') : '#757575',
-              background: tab===id ? (dark ? '#2C2C2E' : '#F0F0F0') : 'transparent',
-              marginBottom:2, display:'block', transition:'background .15s ease, color .15s ease',
-            }}>{label}</button>
-          ))}
+      {/* Desktop side rail — icon only, 72px */}
+      <aside className="hidden lg:flex" style={{
+        flexDirection: 'column', width: 72, position: 'fixed', left: 0, top: 0, bottom: 0,
+        background: dark ? '#09090B' : '#FAFAFA',
+        borderRight: `1px solid ${T.border}`,
+        zIndex: 50, alignItems: 'center', paddingTop: 16, paddingBottom: 16,
+      }}>
+        <div style={{ marginBottom: 24 }}><ArcReactor size={26} /></div>
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, width: '100%' }}>
+          {SIDEBAR_TABS.map(({ id, Icon, label }) => {
+            const active = tab === id;
+            return (
+              <div key={id} style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}
+                onMouseEnter={() => setTooltipId(id)} onMouseLeave={() => setTooltipId(null)}>
+                <motion.button
+                  onClick={() => setTab(id)}
+                  whileTap={{ scale: 0.9 }}
+                  style={{
+                    position: 'relative', width: 44, height: 44, borderRadius: 12, border: 'none',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: active ? 'rgba(59,130,246,0.15)' : 'transparent',
+                    color: active ? '#3B82F6' : T.text3,
+                    transition: 'background 0.2s, color 0.2s',
+                  }}
+                >
+                  {active && (
+                    <motion.div layoutId="rail-pill" style={{
+                      position: 'absolute', inset: 0, borderRadius: 12,
+                      background: 'rgba(59,130,246,0.15)',
+                    }} transition={{ type: 'spring', stiffness: 500, damping: 35 }} />
+                  )}
+                  <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ position: 'relative', zIndex: 1 }} />
+                </motion.button>
+                {tooltipId === id && (
+                  <div style={{
+                    position: 'absolute', left: 56, top: '50%', transform: 'translateY(-50%)',
+                    background: dark ? '#27272A' : '#09090B', color: '#FAFAFA',
+                    fontSize: 12, fontWeight: 500, padding: '5px 10px', borderRadius: 8,
+                    whiteSpace: 'nowrap', zIndex: 100, pointerEvents: 'none',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                  }}>{label}</div>
+                )}
+              </div>
+            );
+          })}
         </nav>
-        <div style={{ padding:'16px 12px', borderTop:`1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}` }}>
-          <div style={{ ...MFONT, fontSize:11, color:'#AAAAAA', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>Account</div>
-          {accounts.map(({ id, label }) => (
-            <button key={id} onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
-              ...FONT, display:'block', width:'100%', textAlign:'left', padding:'7px 10px', borderRadius:6,
-              border:'none', cursor:'pointer', fontSize:13, fontWeight: account===id ? 600 : 400,
-              background: account===id ? (dark ? '#F2F2F7' : '#000') : 'transparent',
-              color:      account===id ? (dark ? '#000' : '#fff') : '#757575',
-              marginBottom:2, transition:'background .15s ease, color .15s ease',
-            }}>{label}</button>
-          ))}
-          <button onClick={() => signOut(auth)} style={{ ...FONT, marginTop:8, display:'flex', alignItems:'center', gap:6, color:'#AAAAAA', border:'none', background:'none', cursor:'pointer', fontSize:13, padding:'4px 2px' }}>
-            <LogOut size={14} /> Sign out
-          </button>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => setDark(d => !d)} style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.border}`, background: 'transparent', cursor: 'pointer', color: T.text3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {dark ? <Sun size={15} /> : <Moon size={15} />}
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => signOut(auth)} style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${T.border}`, background: 'transparent', cursor: 'pointer', color: T.text3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LogOut size={15} />
+          </motion.button>
         </div>
-      </div>
+      </aside>
+
+      {/* Top bar (desktop) */}
+      <TopBar dark={dark} setDark={setDark} account={account} setAccount={setAccount} running={running || wdRunning} />
 
       {/* Main content */}
-      <div className="lg:ml-[240px]" style={{ position:'relative', zIndex:1 }}>
+      <div className="lg:ml-[72px]" style={{ position: 'relative', zIndex: 1 }}>
         {/* Mobile header */}
-        <div className="lg:hidden" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 16px', borderBottom:`1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`, background: dark ? '#1C1C1E' : '#FFFFFF', position:'sticky', top:0, zIndex:40 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <ArcReactor size={22} />
-            <span style={{ fontSize:14, fontWeight:700, letterSpacing:'0.04em' }}>THE COUNCIL</span>
+        <div className="lg:hidden" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px', position: 'sticky', top: 0, zIndex: 40,
+          background: dark ? 'rgba(9,9,11,0.92)' : 'rgba(250,250,250,0.92)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${T.border}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ArcReactor size={20} />
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', color: T.text }}>THE COUNCIL</span>
           </div>
-          <div style={{ display:'flex', gap:6 }}>
-            {accounts.map(({ id, label }) => (
-              <button key={id} onClick={() => setAccount(id)} disabled={running || wdRunning} style={{
-                ...FONT, fontSize:12, fontWeight: account===id ? 600 : 400,
-                padding:'4px 10px', borderRadius:20,
-                border:`1px solid ${account===id ? (dark ? '#F2F2F7' : '#000') : (dark ? '#2C2C2E' : '#EEEEEE')}`,
-                background: account===id ? (dark ? '#F2F2F7' : '#000') : (dark ? '#1C1C1E' : '#fff'),
-                color:      account===id ? (dark ? '#000' : '#fff') : '#757575',
-                cursor:'pointer', transition:'all .15s ease',
-              }}>{label}</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {Object.entries(ACCOUNTS).map(([id, v]) => (
+              <motion.button key={id} onClick={() => !(running || wdRunning) && setAccount(id)} whileTap={{ scale: 0.95 }} style={{
+                fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: account === id ? 600 : 400,
+                padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
+                border: `1px solid ${account === id ? T.borderActive : T.border}`,
+                background: account === id ? T.accent : 'transparent',
+                color: account === id ? '#fff' : T.text2,
+              }}>{v.label}</motion.button>
             ))}
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setDark(d => !d)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, display: 'flex', alignItems: 'center', padding: 4 }}>
+              {dark ? <Sun size={16} /> : <Moon size={16} />}
+            </motion.button>
           </div>
         </div>
 
+        {/* Desktop top bar offset */}
+        <div className="hidden lg:block" style={{ height: 56 }} />
+
         {mktState !== 'open' && (
-          <div style={{ padding:'0 16px', maxWidth:760, margin:'0 auto' }}>
+          <div style={{ padding: '0 var(--space-page)', maxWidth: 760, margin: '0 auto' }}>
             <MarketBanner state={mktState} msToOpen={msToOpen} />
           </div>
         )}
 
         {apiDown && (
-          <div style={{ background:'rgba(255,59,48,0.06)', border:'1px solid rgba(255,59,48,0.2)', borderRadius:8, padding:'10px 16px', margin:'12px 16px 0', fontSize:13, color:'#FF3B30', maxWidth:760, marginLeft:'auto', marginRight:'auto' }}>
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} style={{
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)',
+            borderRadius: 10, padding: '10px 16px', margin: '12px var(--space-page) 0',
+            fontSize: 13, color: '#EF4444', maxWidth: 760, marginLeft: 'auto', marginRight: 'auto',
+          }}>
             API connection issue. Council responses may be delayed.
-          </div>
+          </motion.div>
         )}
 
-        <div key={tab} className="slide-up lg:pb-8" style={{ paddingBottom:96 }}>
-          {tab === 'portfolio' && (
-            <PortfolioTab {...shared}
-              positions={positions}
-              setPos={setPos} addTicker={addTicker} removeTicker={removeTicker}
-              marketState={mktState} onDayChange={setDayChange}
-            />
-          )}
-          {tab === 'council' && (
-            <div style={padded}>
-              <CouncilTab {...shared}
-                running={running} setRunning={setRunning}
-                ticker={ticker} setTicker={setTicker}
-                capital={capital} setCapital={setCapital}
-                active={active} setActive={setActive}
-                agentState={agentState} setAgentState={setAgentState}
-                synthesis={synthesis} setSynthesis={setSynthesis}
-              />
-            </div>
-          )}
-          {tab === 'chat'      && <div style={padded}><ChatTab {...shared} posMap={posMap} /></div>}
-          {tab === 'scout'     && <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} />}
-          {tab === 'watchdog'  && <div style={padded}><WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} /></div>}
-          {tab === 'dca'       && <div style={padded}><DCATab {...shared} /></div>}
-          {tab === 'alpha'     && <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>}
-          {tab === 'roadmap'   && <div style={padded}><RoadmapTab dark={dark} /></div>}
-          {tab === 'changelog' && <div style={padded}><ChangelogTab dark={dark} /></div>}
-          {tab === 'settings'  && <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} /></div>}
-          {tab === 'debug'     && isDebugMode && <DebugTab dark={dark} />}
-          {tab === 'more' && (
-            <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>
-              {MORE_ROWS.map(([t, label]) => (
-                <button key={t} onClick={() => setTab(t)} style={{
-                  ...FONT, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'16px 0', background:'none', border:'none', borderBottom:`1px solid ${dark ? '#2C2C2E' : '#EEEEEE'}`,
-                  cursor:'pointer', textAlign:'left', fontSize:15, fontWeight:500, color: dark ? '#F2F2F7' : '#000',
-                }}>
-                  {label} <ChevronRight size={16} style={{ color:'#AAAAAA' }} />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            variants={PAGE_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            style={{ paddingBottom: 96 }}
+          >
+            {renderTab()}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <BottomNav tab={tab} setTab={setTab} dark={dark} />

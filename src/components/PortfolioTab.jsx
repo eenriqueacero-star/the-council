@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown } from 'lucide-react';
 import { getQuotes, getCandles } from '../api.js';
 import { theme } from '../utils/theme.js';
-
-const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
-const MFONT = { fontFamily: "ui-monospace, 'SF Mono', 'Fira Code', monospace" };
-const GRN = '#00C805';
-const RED = '#FF3B30';
+import AnimatedNumber from './ui/AnimatedNumber.jsx';
 
 const LOGO_DOMAINS = {
   NVDA:'nvidia.com',  MU:'micron.com',    AMD:'amd.com',       AAPL:'apple.com',
@@ -19,41 +16,43 @@ const LOGO_DOMAINS = {
 
 const RANGES = ['1D','1W','1M','3M','1Y','ALL'];
 
-function TickerLogo({ ticker, dark }) {
+function TickerLogo({ ticker, dark, size = 36 }) {
   const [err, setErr] = useState(false);
   const T = theme(dark);
   const domain = LOGO_DOMAINS[ticker];
-  if (!domain || err) {
-    return (
-      <div style={{ width:36, height:36, borderRadius:'50%', background:'#1A1A1A', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:600, flexShrink:0, ...MFONT }}>
-        {ticker.slice(0,2)}
-      </div>
-    );
-  }
-  return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} onError={() => setErr(true)} style={{ width:36, height:36, borderRadius:'50%', objectFit:'contain', flexShrink:0, background: T.bgCard }} alt={ticker} />;
+  if (!domain || err) return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: '#27272A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#A1A1AA', fontSize: size * 0.33, fontWeight: 600, flexShrink: 0, fontFamily: 'var(--font-mono)' }}>
+      {ticker.slice(0, 2)}
+    </div>
+  );
+  return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} onError={() => setErr(true)} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'contain', flexShrink: 0, background: T.bgCard }} alt={ticker} />;
 }
 
 function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
 
-export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus, authReady }) {
+const STAGGER = { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } };
+const ITEM    = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
+
+export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus, authReady, onTabChange }) {
   const T = theme(dark);
-  const [quotes,      setQuotes]      = useState({});
-  const [candles,     setCandles]     = useState([]);
+  const prefersReduced = useReducedMotion();
+  const [quotes,        setQuotes]        = useState({});
+  const [candles,       setCandles]       = useState([]);
   const [candlesLoaded, setCandlesLoaded] = useState(false);
-  const [range,       setRange]       = useState('1D');
-  const [expanded,   setExpanded]   = useState(null);
-  const [chartKey,   setChartKey]   = useState(0);
-  const [scrubIdx,   setScrubIdx]   = useState(null);
-  const [addMode,    setAddMode]    = useState(false);
-  const [newTicker,  setNewTicker]  = useState('');
-  const [newShares,  setNewShares]  = useState('');
-  const [newCost,    setNewCost]    = useState('');
-  const [editTicker, setEditTicker] = useState(null);
-  const [editShares, setEditShares] = useState('');
-  const [editCost,   setEditCost]   = useState('');
+  const [range,         setRange]         = useState('1D');
+  const [expanded,      setExpanded]      = useState(null);
+  const [chartKey,      setChartKey]      = useState(0);
+  const [scrubIdx,      setScrubIdx]      = useState(null);
+  const [addMode,       setAddMode]       = useState(false);
+  const [newTicker,     setNewTicker]     = useState('');
+  const [newShares,     setNewShares]     = useState('');
+  const [newCost,       setNewCost]       = useState('');
+  const [editTicker,    setEditTicker]    = useState(null);
+  const [editShares,    setEditShares]    = useState('');
+  const [editCost,      setEditCost]      = useState('');
   const timerRef = useRef(null);
 
-  const tickers = acctHoldings.filter(t => posMap[t]);
+  const tickers    = acctHoldings.filter(t => posMap[t]);
   const withShares = tickers.filter(t => parseFloat(posMap[t]?.shares) > 0);
 
   const fetchQuotes = useCallback(async () => {
@@ -72,16 +71,14 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     if (!withShares.length) { setCandlesLoaded(true); return; }
     setCandlesLoaded(false);
     try {
-      const data = await getCandles(withShares, range);
+      const data    = await getCandles(withShares, range);
       const primary = withShares[0];
-      const base = data[primary];
+      const base    = data[primary];
       if (!base?.length) { setCandles([]); setCandlesLoaded(true); return; }
       const minLen = Math.min(...withShares.map(t => data[t]?.length || 0).filter(l => l > 0));
-      const curve = base.slice(0, minLen).map((pt, idx) => {
+      const curve  = base.slice(0, minLen).map((pt, idx) => {
         let val = 0;
-        withShares.forEach(t => {
-          val += (parseFloat(posMap[t]?.shares) || 0) * (data[t]?.[idx]?.c || quotes[t]?.price || 0);
-        });
+        withShares.forEach(t => { val += (parseFloat(posMap[t]?.shares) || 0) * (data[t]?.[idx]?.c || quotes[t]?.price || 0); });
         return { t: pt.t, c: val };
       });
       setCandles(curve);
@@ -91,7 +88,6 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
   useEffect(() => { fetchCandles(); }, [fetchCandles]);
 
-  // Portfolio value
   let totalValue = 0, prevValue = 0;
   withShares.forEach(t => {
     const sh = parseFloat(posMap[t]?.shares) || 0;
@@ -102,7 +98,8 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const dayChange    = totalValue - prevValue;
   const dayChangePct = prevValue > 0 ? (dayChange / prevValue) * 100 : 0;
   const buyingPower  = parseFloat(acct?.capital) || 0;
-  const lineColor    = dayChange > 0 ? GRN : dayChange < 0 ? RED : '#AAAAAA';
+  const isUp         = dayChange >= 0;
+  const lineColor    = dayChange > 0 ? T.green : dayChange < 0 ? T.red : T.text3;
 
   useEffect(() => { onDayChange?.(dayChange); }, [dayChange]);
 
@@ -110,25 +107,20 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const displayValue = (scrubIdx !== null && chartPoints[scrubIdx]) ? chartPoints[scrubIdx] : totalValue;
 
   // SVG chart
-  const W = 400, H = 180;
+  const W = 400, H = 140;
   const renderChart = () => {
-    if (!withShares.length) {
-      return <div style={{ height: 60, margin: '16px 0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <span style={{ ...MFONT, fontSize:11, color:'#CCCCCC' }}>Add positions with share counts to see your equity curve</span>
-      </div>;
-    }
-    if (!chartPoints.length && !candlesLoaded) {
-      return <div className="skeleton" style={{ height: 60, borderRadius: 8, margin: '16px 0' }} />;
-    }
-    // No candle data returned (pre-market 1D, holiday, API limit, etc.)
-    // Synthesize a 2-point line: prevClose → current so the chart is never blank
-    const effectivePoints = chartPoints.length ? chartPoints
-      : (prevValue > 0 ? [prevValue, totalValue || prevValue] : []);
-    if (!effectivePoints.length) {
-      return <div style={{ height: 60, margin: '16px 0', display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <span style={{ ...MFONT, fontSize:11, color: T.text3 }}>No chart data available</span>
-      </div>;
-    }
+    if (!withShares.length) return (
+      <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3 }}>Add positions with share counts to see your equity curve</span>
+      </div>
+    );
+    if (!chartPoints.length && !candlesLoaded) return <div className="skeleton" style={{ height: 80, borderRadius: 8 }} />;
+    const effectivePoints = chartPoints.length ? chartPoints : (prevValue > 0 ? [prevValue, totalValue || prevValue] : []);
+    if (!effectivePoints.length) return (
+      <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3 }}>No chart data</span>
+      </div>
+    );
 
     const isSynthetic = !chartPoints.length;
     const min = Math.min(...effectivePoints), max = Math.max(...effectivePoints);
@@ -138,251 +130,295 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     const linePath = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
     const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
     const gradId   = `cg${chartKey}`;
-    const scrubX   = scrubIdx !== null ? xs[scrubIdx]  : null;
-    const scrubY   = scrubIdx !== null ? ys[scrubIdx]  : null;
+    const scrubX   = scrubIdx !== null ? xs[scrubIdx] : null;
+    const scrubY   = scrubIdx !== null ? ys[scrubIdx] : null;
 
     const handleMove = e => {
       const rect = e.currentTarget.getBoundingClientRect();
-      const cx = e.touches ? e.touches[0].clientX : e.clientX;
-      const idx = Math.round(((cx - rect.left) / rect.width) * (effectivePoints.length - 1));
+      const cx   = e.touches ? e.touches[0].clientX : e.clientX;
+      const idx  = Math.round(((cx - rect.left) / rect.width) * (effectivePoints.length - 1));
       setScrubIdx(Math.max(0, Math.min(effectivePoints.length - 1, idx)));
     };
 
     return (
-      <div key={chartKey} className="fade-in" style={{ position:'relative', height: H, userSelect:'none' }}
+      <div key={chartKey} style={{ position: 'relative', height: H, userSelect: 'none' }}
         onMouseMove={handleMove} onTouchMove={handleMove}
         onMouseLeave={() => setScrubIdx(null)} onTouchEnd={() => setScrubIdx(null)}>
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={lineColor} stopOpacity="0.15" />
+              <stop offset="0%"   stopColor={lineColor} stopOpacity="0.18" />
               <stop offset="100%" stopColor={lineColor} stopOpacity="0"    />
             </linearGradient>
           </defs>
-          <path className="fade-in" d={areaPath} fill={`url(#${gradId})`} style={{ animationDuration:'1.4s' }} />
-          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={areaPath} fill={`url(#${gradId})`} />
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           {scrubX !== null && (
             <>
-              <line x1={scrubX} y1="0" x2={scrubX} y2={H} stroke="#CCCCCC" strokeWidth="1" strokeDasharray="4 3" />
-              <circle cx={scrubX} cy={scrubY} r="4" fill={lineColor} />
+              <line x1={scrubX} y1="0" x2={scrubX} y2={H} stroke={T.text3} strokeWidth="1" strokeDasharray="4 3" />
+              <circle cx={scrubX} cy={scrubY} r="3.5" fill={lineColor} />
             </>
           )}
         </svg>
-        {isSynthetic && (
-          <div style={{ position:'absolute', bottom:4, right:8, ...MFONT, fontSize:9, color: T.text3, letterSpacing:'0.06em' }}>
-            PREV CLOSE REF
-          </div>
-        )}
+        {isSynthetic && <div style={{ position: 'absolute', bottom: 4, right: 8, fontFamily: 'var(--font-mono)', fontSize: 9, color: T.text3 }}>PREV CLOSE REF</div>}
       </div>
     );
   };
 
-  // Today's movers
   const movers = withShares.map(t => {
     const q   = quotes[t] || {};
     const pct = q.prevClose ? ((q.price - q.prevClose) / q.prevClose) * 100 : 0;
     return { t, pct, price: q.price || 0 };
-  }).filter(m => Math.abs(m.pct) > 0.01).sort((a,b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 4);
+  }).filter(m => Math.abs(m.pct) > 0.01).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+
+  const S = { padding: '0 var(--space-page)', maxWidth: 760, margin: '0 auto' };
 
   return (
-    <div style={{ ...FONT, minHeight:'100vh' }}>
-      {/* Hero — opaque so text is always readable */}
-      <div style={{ padding:'20px 16px 0', maxWidth:760, margin:'0 auto', background: T.bg }}>
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+    <div style={{ minHeight: '100vh' }}>
+
+      {/* Hero section */}
+      <div style={{ ...S, paddingTop: 24, paddingBottom: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize:36, fontWeight:700, color: T.text, lineHeight:1.1, letterSpacing:'-0.02em', ...MFONT, fontVariantNumeric:'tabular-nums' }}>
-              ${displayValue.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}
+            {/* Animated total value */}
+            <div style={{ fontSize: 42, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, color: T.text, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-display)' }}>
+              <AnimatedNumber
+                value={displayValue}
+                format={v => `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                duration={prefersReduced ? 0 : 1}
+              />
             </div>
-            <div style={{ marginTop:4, display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:15, fontWeight:500, color: dayChange >= 0 ? GRN : RED }}>
+            <motion.div
+              key={dayChange > 0 ? 'up' : dayChange < 0 ? 'down' : 'flat'}
+              initial={prefersReduced ? false : { opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}
+            >
+              <span style={{ fontSize: 15, fontWeight: 600, color: lineColor, fontFamily: 'var(--font-display)' }}>
                 {dayChange >= 0 ? '+' : ''}{dayChange.toFixed(2)} ({fmtPct(dayChangePct)})
               </span>
-              <span style={{ fontSize:13, color: T.text3 }}>Today</span>
-            </div>
-            {buyingPower > 0 && (
-              <div style={{ fontSize:13, color: T.text2, marginTop:4 }}>
-                ${buyingPower.toLocaleString()} buying power
-              </div>
-            )}
+              <span style={{ fontSize: 13, color: T.text3 }}>Today</span>
+            </motion.div>
+            {buyingPower > 0 && <div style={{ fontSize: 13, color: T.text2, marginTop: 4 }}>${buyingPower.toLocaleString()} cash</div>}
           </div>
-          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, paddingTop:4 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <div style={{ width:8, height:8, borderRadius:'50%', background: marketState==='open' ? GRN : '#CCCCCC', boxShadow: marketState==='open' ? `0 0 6px ${GRN}` : 'none' }} />
-              <span style={{ ...MFONT, fontSize:11, color: T.text3 }}>
-                {marketState === 'open' ? 'LIVE' : marketState === 'premarket' ? 'PRE-MARKET' : marketState === 'afterhours' ? 'AFTER HOURS' : 'MARKET CLOSED'}
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingTop: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className={marketState === 'open' ? 'live-dot' : ''} style={{ width: 7, height: 7, borderRadius: '50%', background: marketState === 'open' ? T.green : T.text3 }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: T.text3, letterSpacing: '0.08em' }}>
+                {marketState === 'open' ? 'LIVE' : marketState === 'premarket' ? 'PRE' : marketState === 'afterhours' ? 'AH' : 'CLOSED'}
               </span>
             </div>
             {saveStatus !== 'idle' && (
-              <span style={{ ...MFONT, fontSize:10, letterSpacing:'0.06em',
-                color: saveStatus === 'error' ? RED : saveStatus === 'saved' ? GRN : T.text3 }}>
-                {saveStatus === 'saving' ? 'SAVING…' : saveStatus === 'saved' ? 'SAVED ✓' : 'SAVE FAILED ✕'}
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: saveStatus === 'error' ? T.red : saveStatus === 'saved' ? T.green : T.text3 }}>
+                {saveStatus === 'saving' ? 'SAVING…' : saveStatus === 'saved' ? 'SAVED ✓' : 'FAILED'}
               </span>
             )}
           </div>
         </div>
 
         {/* Chart */}
-        <div style={{ marginTop:16 }}>{renderChart()}</div>
+        <div style={{ marginTop: 20 }}>{renderChart()}</div>
 
-        {/* Range selector */}
-        <div style={{ display:'flex', alignItems:'center', marginTop:4, marginBottom:16 }}>
+        {/* Range pills */}
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: 8, marginBottom: 20, gap: 2 }}>
           {RANGES.map(r => (
-            <button key={r} onClick={() => setRange(r)} style={{
-              ...FONT, fontSize:13, fontWeight:500, padding:'6px 10px',
-              border:'none', borderBottom: range===r ? `2px solid ${T.text}` : '2px solid transparent',
-              background:'none', cursor:'pointer', color: range===r ? T.text : T.text3,
-            }}>{r}</button>
+            <motion.button key={r} onClick={() => setRange(r)} whileTap={{ scale: 0.92 }} style={{
+              fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: range === r ? 600 : 400,
+              padding: '5px 11px', borderRadius: 20, border: 'none', cursor: 'pointer',
+              background: range === r ? T.accent : 'transparent',
+              color: range === r ? '#fff' : T.text3,
+              transition: 'all 0.18s ease',
+            }}>{r}</motion.button>
           ))}
-          <button onClick={() => { fetchQuotes(); fetchCandles(); }}
-            style={{ marginLeft:'auto', border:'none', background:'none', cursor:'pointer', color: T.text3, padding:6 }}>
-            <RefreshCw size={14} />
-          </button>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => { fetchQuotes(); fetchCandles(); }}
+            style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: T.text3, display: 'flex', padding: 6 }}>
+            <RefreshCw size={13} />
+          </motion.button>
         </div>
 
-        {/* Breakdown */}
-        <div style={{ border: `1px solid ${T.border}`, borderRadius:12, padding:'0 16px', marginBottom:16, background: T.bg }}>
+        {/* Summary row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 24 }}>
           {[
-            ['Equity',       `$${totalValue.toFixed(2)}`],
-            ['Cash',         `$${buyingPower.toLocaleString()}`],
-            ['Total',        `$${(totalValue+buyingPower).toFixed(2)}`],
-          ].map(([label, val], i, arr) => (
-            <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'13px 0', borderBottom: i<arr.length-1 ? `1px solid ${T.border}` : 'none' }}>
-              <span style={{ fontSize:14, color: T.text2 }}>{label}</span>
-              <span style={{ fontSize:16, fontWeight:500, color: T.text }}>{val}</span>
+            ['Equity',   `$${totalValue.toFixed(2)}`],
+            ['Cash',     `$${buyingPower.toLocaleString()}`],
+            ['Total',    `$${(totalValue + buyingPower).toFixed(2)}`],
+          ].map(([label, val]) => (
+            <div key={label} style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, padding: '12px 14px' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{val}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Movers */}
+      {/* Top movers — horizontal scroll */}
       {movers.length > 0 && (
-        <div style={{ padding:'0 16px 16px', maxWidth:760, margin:'0 auto', background: T.bg }}>
-          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>{"TODAY'S MOVERS"}</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
-            {movers.map(({ t, pct, price }, mi) => (
-              <div key={t} style={{ border: `1px solid ${T.border}`, borderRadius:10, padding:'10px 12px', display:'flex', alignItems:'center', gap:10, background: T.bgCard }}>
-                <TickerLogo ticker={t} dark={dark} />
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14, fontWeight:600, color: T.text }}>{t}</div>
-                  <div style={{ fontSize:12, color: pct>=0 ? GRN : RED, display:'flex', alignItems:'center', gap:3 }}>
-                    {pct>=0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                    {fmtPct(pct)}
-                  </div>
-                </div>
-                <div style={{ fontSize:14, fontWeight:500 }}>${price.toFixed(2)}</div>
-              </div>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ ...S, paddingBottom: 8 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top Movers</span>
+          </div>
+          <div className="no-scrollbar" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 'var(--space-page)', paddingRight: 'var(--space-page)', paddingBottom: 4 }}>
+            {movers.map(({ t, pct, price }) => (
+              <motion.div key={t} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{
+                flexShrink: 0, background: T.bgCard, border: `1px solid ${pct >= 0 ? T.green + '25' : T.red + '25'}`,
+                borderRadius: 12, padding: '12px 14px', minWidth: 90, cursor: 'pointer',
+              }}>
+                <TickerLogo ticker={t} dark={dark} size={28} />
+                <div style={{ marginTop: 8, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600, color: T.text }}>{t}</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: pct >= 0 ? T.green : T.red, marginTop: 2 }}>{fmtPct(pct)}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text2, marginTop: 1 }}>${price.toFixed(2)}</div>
+              </motion.div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Positions */}
-      <div style={{ maxWidth:760, margin:'0 auto', paddingBottom:24, background: T.bg }}>
-        <div style={{ padding:'0 16px 8px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ ...MFONT, fontSize:13, fontWeight:600, color: T.text3, textTransform:'uppercase', letterSpacing:'0.08em' }}>POSITIONS</div>
-          <button onClick={() => setAddMode(!addMode)}
-            style={{ ...FONT, fontSize:13, fontWeight:500, color: T.text, border: `1px solid ${T.border}`, borderRadius:8, padding:'5px 10px', background: T.bg, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
-            <Plus size={14} /> Add
-          </button>
+      {/* Holdings */}
+      <div style={{ ...S, paddingBottom: 32 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Holdings</span>
+          <motion.button onClick={() => setAddMode(!addMode)} whileTap={{ scale: 0.96 }} style={{
+            fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 500, color: T.text,
+            border: `1px solid ${T.border}`, borderRadius: 8, padding: '5px 12px',
+            background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            <Plus size={13} /> Add
+          </motion.button>
         </div>
 
-        {addMode && (
-          <div style={{ padding:'12px 16px', borderBottom: `1px solid ${T.border}`, display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', background: T.bgCard, marginBottom:0 }}>
-            <input value={newTicker} onChange={e => setNewTicker(e.target.value.toUpperCase())} placeholder="TICKER"
-              style={{ width:80, padding:'8px 10px', border: `1px solid ${T.border}`, borderRadius:8, fontSize:13, textTransform:'uppercase', background: T.input, color: T.text, outline:'none', ...MFONT }} />
-            <input value={newShares} onChange={e => setNewShares(e.target.value)} placeholder="Shares"
-              style={{ width:90, padding:'8px 10px', border: `1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
-            <input value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="Avg cost"
-              style={{ width:100, padding:'8px 10px', border: `1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
-            <button onClick={() => { if (!newTicker) return; addTicker(newTicker); if (newShares) setPos(newTicker,'shares',newShares); if (newCost) setPos(newTicker,'cost',newCost); setNewTicker(''); setNewShares(''); setNewCost(''); setAddMode(false); }}
-              style={{ padding:'8px 14px', background: T.text, color: T.bg, border:'none', borderRadius:8, cursor:'pointer', fontSize:13 }}>Add</button>
-            <button onClick={() => setAddMode(false)}
-              style={{ padding:'8px 12px', border: `1px solid ${T.border}`, background: T.input, color: T.text, borderRadius:8, cursor:'pointer', fontSize:13 }}>Cancel</button>
-          </div>
-        )}
+        <AnimatePresence>
+          {addMode && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, marginBottom: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', overflow: 'hidden' }}>
+              {[
+                [newTicker, setNewTicker, 'TICKER', 72, true],
+                [newShares, setNewShares, 'Shares',  90, false],
+                [newCost,   setNewCost,   'Avg cost',100, false],
+              ].map(([val, fn, ph, w, upper]) => (
+                <input key={ph} value={val} onChange={e => fn(upper ? e.target.value.toUpperCase() : e.target.value)} placeholder={ph}
+                  style={{ width: w, padding: '8px 10px', border: `1px solid ${T.inputBorder}`, borderRadius: 8, fontSize: 13, background: T.input, color: T.text, outline: 'none', fontFamily: upper ? 'var(--font-mono)' : 'var(--font-display)' }} />
+              ))}
+              <motion.button whileTap={{ scale: 0.96 }} onClick={() => {
+                if (!newTicker) return;
+                addTicker(newTicker);
+                if (newShares) setPos(newTicker, 'shares', newShares);
+                if (newCost)   setPos(newTicker, 'cost', newCost);
+                setNewTicker(''); setNewShares(''); setNewCost(''); setAddMode(false);
+              }} style={{ padding: '8px 16px', background: T.accent, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>Add</motion.button>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={() => setAddMode(false)} style={{ padding: '8px 12px', border: `1px solid ${T.border}`, background: 'transparent', color: T.text2, borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>Cancel</motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <div style={{ border: `1px solid ${T.border}`, borderRadius:12, overflow:'hidden', margin:'0 16px' }}>
+        <div style={{ border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden' }}>
           {tickers.length === 0 ? (
-            <div style={{ padding:32, textAlign:'center', color: T.text3, fontSize:14 }}>No positions yet. Add a ticker above.</div>
-          ) : tickers.map((t, idx) => {
-            const q       = quotes[t] || {};
-            const pos     = posMap[t]  || {};
-            const shares  = parseFloat(pos.shares) || 0;
-            const cost    = parseFloat(pos.cost)   || 0;
-            const price   = q.price    || 0;
-            const prev    = q.prevClose|| price;
-            const val     = shares * price;
-            const dayPct  = prev ? ((price - prev) / prev) * 100 : 0;
-            const totRet  = cost && shares ? ((price - cost) / cost) * 100 : null;
-            const totPnL  = shares && cost ? (price - cost) * shares : null;
-            const isExp   = expanded === t;
-            const isEdit  = editTicker === t;
+            <div style={{ padding: 40, textAlign: 'center', color: T.text3, fontSize: 14 }}>No positions yet. Add a ticker above.</div>
+          ) : (
+            <motion.div variants={prefersReduced ? undefined : STAGGER} initial="hidden" animate="visible">
+              {tickers.map((t, idx) => {
+                const q      = quotes[t] || {};
+                const pos    = posMap[t]  || {};
+                const shares = parseFloat(pos.shares) || 0;
+                const cost   = parseFloat(String(pos.cost || '').replace(/[^0-9.]/g, '')) || 0;
+                const price  = q.price    || 0;
+                const prev   = q.prevClose|| price;
+                const val    = shares * price;
+                const dayPct = prev ? ((price - prev) / prev) * 100 : 0;
+                const totRet = cost && shares ? ((price - cost) / cost) * 100 : null;
+                const totPnL = shares && cost ? (price - cost) * shares : null;
+                const isExp  = expanded === t;
+                const isEdit = editTicker === t;
 
-            return (
-              <div key={t} style={{ animation:`cardIn 0.4s ease both`, animationDelay:`${idx*40}ms` }}>
-                {/* Row */}
-                <div className="holding-row" onClick={() => setExpanded(isExp ? null : t)}
-                  style={{ display:'flex', alignItems:'center', gap:12, minHeight:64, padding:'0 16px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', background: T.bg }}>
-                  <TickerLogo ticker={t} dark={dark} />
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:15, fontWeight:600, color: T.text }}>{t}</div>
-                    {shares > 0 && <div style={{ ...MFONT, fontSize:12, color: T.text2 }}>{shares} sh</div>}
-                  </div>
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    {price > 0 ? (
-                      <>
-                        <div style={{ fontSize:15, fontWeight:500, color: T.text }}>${price.toFixed(2)}</div>
-                        <div style={{ ...MFONT, fontSize:12, color: dayPct>=0 ? GRN : RED }}>{fmtPct(dayPct)}</div>
-                      </>
-                    ) : <div className="skeleton" style={{ width:60, height:32, borderRadius:6 }} />}
-                  </div>
-                  <div style={{ color:'#CCCCCC', flexShrink:0 }}>{isExp ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</div>
-                </div>
-
-                {/* Expanded */}
-                {isExp && (
-                  <div className="card-in" style={{ background: T.bgCard, borderBottom:`1px solid ${T.border}`, padding:'12px 16px 16px' }}>
-                    {isEdit ? (
-                      <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-                        <input value={editShares} onChange={e => setEditShares(e.target.value)} placeholder="Shares"
-                          style={{ width:100, padding:'8px 10px', border:`1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
-                        <input value={editCost} onChange={e => setEditCost(e.target.value)} placeholder="Avg cost"
-                          style={{ width:100, padding:'8px 10px', border:`1px solid ${T.border}`, borderRadius:8, fontSize:13, background: T.input, color: T.text, outline:'none' }} />
-                        <button onClick={() => { setPos(t,'shares',editShares); setPos(t,'cost',editCost); setEditTicker(null); }}
-                          style={{ padding:'8px 12px', background: T.text, color: T.bg, border:'none', borderRadius:8, cursor:'pointer' }}><Check size={14}/></button>
-                        <button onClick={() => setEditTicker(null)}
-                          style={{ padding:'8px 12px', border:`1px solid ${T.border}`, background: T.input, color: T.text, borderRadius:8, cursor:'pointer' }}><X size={14}/></button>
-                        <button onClick={() => { removeTicker(t); setExpanded(null); setEditTicker(null); }}
-                          style={{ padding:'8px 12px', border:`1px solid ${T.border}`, background: T.input, borderRadius:8, cursor:'pointer', color:RED }}><Trash2 size={14}/></button>
+                return (
+                  <motion.div key={t} variants={prefersReduced ? undefined : ITEM}>
+                    {/* Row */}
+                    <motion.div
+                      onClick={() => setExpanded(isExp ? null : t)}
+                      whileHover={{ background: T.bgCardHover }}
+                      whileTap={{ scale: 0.995 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 68, padding: '0 16px', borderBottom: `1px solid ${T.border}`, cursor: 'pointer', background: T.bgCard }}
+                    >
+                      <TickerLogo ticker={t} dark={dark} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{t}</div>
+                        {shares > 0 && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: T.text2, marginTop: 1 }}>{shares} sh{val > 0 ? ` · $${val.toFixed(0)}` : ''}</div>}
                       </div>
-                    ) : (
-                      <>
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:'8px 16px', marginBottom:12 }}>
-                          {[
-                            ['Shares',       shares > 0 ? `${shares}` : '—'],
-                            ['Avg Cost',     cost > 0 ? `$${cost.toFixed(2)}` : '—'],
-                            ['Market Value', val > 0 ? `$${val.toFixed(2)}` : '—'],
-                            ['Total Return', totRet !== null ? fmtPct(totRet) : '—'],
-                            ['Total P&L',    totPnL !== null ? `${totPnL>=0?'+':''}$${Math.abs(totPnL).toFixed(2)}` : '—'],
-                            ['Break-even',   cost > 0 ? `$${cost.toFixed(2)}` : '—'],
-                          ].map(([label, v]) => (
-                            <div key={label}>
-                              <div style={{ ...MFONT, fontSize:11, color: T.text3, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:2 }}>{label}</div>
-                              <div style={{ fontSize:14, fontWeight:500, color: label==='Total Return' && totRet!==null ? (totRet>=0?GRN:RED) : T.text }}>{v}</div>
-                            </div>
-                          ))}
-                        </div>
-                        <button onClick={e => { e.stopPropagation(); setEditTicker(t); setEditShares(pos.shares||''); setEditCost(pos.cost||''); }}
-                          style={{ ...FONT, fontSize:12, color: T.text2, display:'flex', alignItems:'center', gap:4, background:'none', border:`1px solid ${T.border}`, borderRadius:8, padding:'6px 10px', cursor:'pointer' }}>
-                          <Edit2 size={12}/> Edit position
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        {price > 0 ? (
+                          <>
+                            <div style={{ fontSize: 15, fontWeight: 500, color: T.text }}>${price.toFixed(2)}</div>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: dayPct >= 0 ? T.green : T.red, marginTop: 1 }}>{fmtPct(dayPct)}</div>
+                          </>
+                        ) : <div className="skeleton" style={{ width: 56, height: 30, borderRadius: 6 }} />}
+                      </div>
+                      <motion.div animate={{ rotate: isExp ? 180 : 0 }} transition={{ duration: 0.2 }} style={{ color: T.text3, flexShrink: 0 }}>
+                        <ChevronDown size={16} />
+                      </motion.div>
+                    </motion.div>
+
+                    {/* Expanded detail */}
+                    <AnimatePresence>
+                      {isExp && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <div style={{ background: T.bgElevated, borderBottom: `1px solid ${T.border}`, padding: '14px 16px 18px' }}>
+                            {isEdit ? (
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <input value={editShares} onChange={e => setEditShares(e.target.value)} placeholder="Shares"
+                                  style={{ width: 100, padding: '8px 10px', border: `1px solid ${T.inputBorder}`, borderRadius: 8, fontSize: 13, background: T.input, color: T.text, outline: 'none' }} />
+                                <input value={editCost} onChange={e => setEditCost(e.target.value)} placeholder="Avg cost"
+                                  style={{ width: 100, padding: '8px 10px', border: `1px solid ${T.inputBorder}`, borderRadius: 8, fontSize: 13, background: T.input, color: T.text, outline: 'none' }} />
+                                <motion.button whileTap={{ scale: 0.94 }} onClick={() => { setPos(t, 'shares', editShares); setPos(t, 'cost', editCost); setEditTicker(null); }}
+                                  style={{ padding: '8px 14px', background: T.accent, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}><Check size={14} /></motion.button>
+                                <motion.button whileTap={{ scale: 0.94 }} onClick={() => setEditTicker(null)}
+                                  style={{ padding: '8px 12px', border: `1px solid ${T.border}`, background: 'transparent', color: T.text, borderRadius: 8, cursor: 'pointer' }}><X size={14} /></motion.button>
+                                <motion.button whileTap={{ scale: 0.94 }} onClick={() => { removeTicker(t); setExpanded(null); setEditTicker(null); }}
+                                  style={{ padding: '8px 12px', border: `1px solid ${T.red}30`, background: 'transparent', borderRadius: 8, cursor: 'pointer', color: T.red }}><Trash2 size={14} /></motion.button>
+                              </div>
+                            ) : (
+                              <>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 16px', marginBottom: 14 }}>
+                                  {[
+                                    ['Avg Cost',     cost > 0 ? `$${cost.toFixed(2)}` : '—'],
+                                    ['Market Val',   val > 0  ? `$${val.toFixed(2)}`  : '—'],
+                                    ['Total Return', totRet !== null ? fmtPct(totRet) : '—', totRet],
+                                    ['Total P&L',    totPnL !== null ? `${totPnL >= 0 ? '+' : ''}$${Math.abs(totPnL).toFixed(2)}` : '—', totPnL],
+                                  ].map(([label, v, num]) => (
+                                    <div key={label}>
+                                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{label}</div>
+                                      <div style={{ fontSize: 14, fontWeight: 500, color: num != null ? (num >= 0 ? T.green : T.red) : T.text }}>{v}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  {onTabChange && (
+                                    <motion.button whileTap={{ scale: 0.96 }} onClick={e => { e.stopPropagation(); onTabChange('council'); }}
+                                      style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500, padding: '7px 14px', background: T.accent, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                                      Run Council
+                                    </motion.button>
+                                  )}
+                                  <motion.button whileTap={{ scale: 0.96 }} onClick={e => { e.stopPropagation(); setEditTicker(t); setEditShares(pos.shares || ''); setEditCost(pos.cost || ''); }}
+                                    style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: T.text2, display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 12px', cursor: 'pointer' }}>
+                                    <Edit2 size={12} /> Edit
+                                  </motion.button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+          )}
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useReducer } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send, Crown, AlertTriangle } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
@@ -565,244 +566,186 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
     setChatBusy(false);
   }
 
-  return (
-    <div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <MessageSquare size={16} style={{ color:T.text }} />
-          <span style={{ ...DISP, fontSize:14, fontWeight:600, letterSpacing:'0.04em', color:T.text }}>THE COUNCIL · {acct.label.toUpperCase()}</span>
-        </div>
-        <button onClick={toggleVoice}
-          style={{ fontFamily:'inherit', display:'flex', alignItems:'center', gap:6, padding:'6px 12px', borderRadius:8, border:`1px solid ${voiceOn ? T.text : T.border}`, background:T.bg, color: voiceOn ? T.text : T.text2, cursor:'pointer', fontSize:11 }}>
-          {voiceOn ? <Volume2 size={13} /> : <VolumeX size={13} />}
-          <span style={MONO}>{voiceOn ? 'VOICE ON' : 'MUTED'}</span>
-        </button>
-      </div>
+  const BUBBLE_BG_AGENT = dark ? '#27272A' : '#F4F4F5';
 
-      <div style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:12, overflow:'hidden', display:'flex', flexDirection:'column', height:'min(60vh,560px)' }}>
-        <div className="flex-1 overflow-y-auto no-scrollbar" style={{ padding:16, display:'flex', flexDirection:'column', gap:10 }}>
-          {chat.map((m, i) => {
-            if (m.role === 'user') return (
-              <div key={i} style={{ display:'flex', justifyContent:'flex-end', animation:'slideInRight .22s ease both' }}>
-                <div style={{ maxWidth:'82%', background:'#000000', color:'#FFFFFF', borderRadius:'16px 16px 4px 16px', padding:'10px 14px', fontSize:13, lineHeight:1.55 }}>{m.text}</div>
+  function renderMessage(m, i) {
+    if (m.role === 'user') return (
+      <motion.div key={i} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
+        style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ maxWidth: '80%', background: T.accent, color: '#fff', borderRadius: '18px 18px 4px 18px', padding: '10px 14px', fontSize: 14, lineHeight: 1.55 }}>{m.text}</div>
+      </motion.div>
+    );
+
+    if (m.role === 'pm') {
+      const vs = m.verdict ? (PS[m.verdict === 'SKIP' ? 'SKIP' : m.verdict === 'PASS' ? 'PASS_FINAL' : m.verdict] || null) : null;
+      return (
+        <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
+          style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
+          <div style={{ flexShrink: 0, marginTop: 2 }}><ArcReactor size={24} /></div>
+          <div style={{ maxWidth: '82%' }}>
+            <div style={{ ...MONO, fontSize: 9, color: T.accent, marginBottom: 4, letterSpacing: '0.08em' }}>AXIOM</div>
+            <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>
+              {speaking && i === chat.length - 1 && voiceOn && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginRight: 6, verticalAlign: 'middle' }}>
+                  {[0, 1, 2].map(d => <span key={d} className="blink" style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: T.accent, animationDelay: `${d * 0.2}s` }} />)}
+                </span>
+              )}
+              {m.text}
+            </div>
+            {vs && (
+              <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ ...MONO, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>{vs.label}</span>
+                <span style={{ ...MONO, fontSize: 9, color: T.text3 }}>{m.conviction}/10 · {m.ticker || ''}</span>
               </div>
-            );
+            )}
+          </div>
+        </motion.div>
+      );
+    }
 
-            if (m.role === 'pm') {
-              const vs = m.verdict ? (PS[m.verdict === 'SKIP' ? 'SKIP' : m.verdict === 'PASS' ? 'PASS_FINAL' : m.verdict] || null) : null;
-              return (
-                <div key={i} style={{ display:'flex', justifyContent:'flex-start', gap:10, animation:'slideInLeft .22s ease both' }}>
-                  <div style={{ flexShrink:0, marginTop:2 }}><ArcReactor size={26} /></div>
-                  <div style={{ maxWidth:'82%' }}>
-                    <div style={{ ...MONO, fontSize:8, color:'#38e0d4', marginBottom:4, letterSpacing:'0.08em' }}>AXIOM</div>
-                    <div style={{ background: dark ? '#2C2C2E' : '#F0F0F0', color:T.text, borderRadius:'16px 16px 16px 4px', padding:'10px 14px', fontSize:13, lineHeight:1.55 }}>
-                      {speaking && i === chat.length - 1 && voiceOn && (
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:4, marginRight:6, verticalAlign:'middle' }}>
-                          <span className="blink" style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:T.text }} />
-                        </span>
-                      )}
-                      {m.text}
-                    </div>
-                    {vs && (
-                      <div style={{ marginTop:6, display:'inline-flex', alignItems:'center', gap:8 }}>
-                        <span style={{ ...MONO, background:vs.bg, color:vs.fg, fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:6 }}>{vs.label}</span>
-                        <span style={{ ...MONO, fontSize:9, color:T.text3 }}>{m.conviction}/10 · {m.ticker || ''}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            }
+    if (m.role === 'agent') return (
+      <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
+        style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
+        <div style={{ flexShrink: 0, marginTop: 2, width: 26, height: 26, borderRadius: 8, background: `${m.accent}18`, border: `1px solid ${m.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{m.emoji}</div>
+        <div style={{ maxWidth: '82%' }}>
+          <div style={{ ...MONO, fontSize: 9, color: m.color || m.accent, marginBottom: 4, letterSpacing: '0.08em' }}>{m.name}</div>
+          <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>{m.text}</div>
+        </div>
+      </motion.div>
+    );
 
-            // Direct agent response
-            if (m.role === 'agent') {
-              return (
-                <div key={i} style={{ display:'flex', justifyContent:'flex-start', gap:10, animation:'slideInLeft .22s ease both' }}>
-                  <div style={{ flexShrink:0, marginTop:2, width:26, height:26, borderRadius:8, background:`${m.accent}18`, border:`1px solid ${m.accent}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>{m.emoji}</div>
-                  <div style={{ maxWidth:'82%' }}>
-                    <div style={{ ...MONO, fontSize:8, color:m.color, marginBottom:4, letterSpacing:'0.08em' }}>{m.name}</div>
-                    <div style={{ background: dark ? '#2C2C2E' : '#F0F0F0', color:T.text, borderRadius:'16px 16px 16px 4px', padding:'10px 14px', fontSize:13, lineHeight:1.55 }}>{m.text}</div>
-                  </div>
-                </div>
-              );
-            }
-
-            // Roundtable: all agents respond
-            if (m.role === 'roundtable') {
-              if (!m.agents || m.agents.length === 0) {
+    if (m.role === 'council') {
+      const finalStances = m.agents || {};
+      return (
+        <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
+          <div style={{ flexShrink: 0, width: 26, paddingTop: 2 }}>
+            <Crown size={16} style={{ color: T.amber, opacity: 0.8 }} />
+          </div>
+          <div style={{ maxWidth: '92%', width: '100%', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, padding: '12px 14px' }}>
+            <div style={{ ...MONO, fontSize: 9, color: T.amber, letterSpacing: '0.08em', marginBottom: 10 }}>
+              COUNCIL SESSION · {m.ticker}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {AGENTS.map(ag => {
+                const stance = finalStances[ag.id];
+                const ss = stance ? (PS[stance] || null) : null;
                 return (
-                  <div key={i} style={{ display:'flex', justifyContent:'flex-start', gap:10, animation:'fadeUp .3s ease both' }}>
-                    <div style={{ flexShrink:0, width:26 }} />
-                    <div style={{ background: dark ? '#1C1C1E' : '#F7F7F7', border:`1px solid ${T.border}`, borderRadius:10, padding:12 }}>
-                      <div style={{ ...MONO, fontSize:9, color:T.text3, marginBottom:6 }}>ROUNDTABLE — all agents responding…</div>
-                      <Loader2 size={13} className="animate-spin" style={{ color:T.text3 }} />
-                    </div>
+                  <div key={ag.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.bg, border: `1px solid ${stance ? ag.accent + '30' : T.border}`, borderLeft: stance ? `2px solid ${ag.accent}` : `1px solid ${T.border}`, borderRadius: 8, padding: '5px 8px' }}>
+                    <span style={{ fontSize: 11 }}>{ag.emoji}</span>
+                    <span style={{ ...MONO, fontSize: 9, color: T.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ag.name}</span>
+                    {stance ? <span style={{ ...MONO, fontSize: 8, fontWeight: 700, color: ss ? ss.fg : T.text2 }}>{ss ? ss.label : stance}</span>
+                            : <Loader2 size={10} className="animate-spin" style={{ color: T.text3 }} />}
                   </div>
                 );
-              }
-              return (
-                <div key={i} style={{ display:'flex', flexDirection:'column', gap:8, animation:'fadeUp .3s ease both' }}>
-                  {m.agents.map((ag, j) => (
-                    <div key={j} style={{ display:'flex', justifyContent:'flex-start', gap:10 }}>
-                      <div style={{ flexShrink:0, marginTop:2, width:26, height:26, borderRadius:8, background:`${ag.accent}18`, border:`1px solid ${ag.accent}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>{ag.emoji}</div>
-                      <div style={{ maxWidth:'82%' }}>
-                        <div style={{ ...MONO, fontSize:8, color:ag.color, marginBottom:4, letterSpacing:'0.08em' }}>{ag.name}</div>
-                        <div style={{ background: dark ? '#2C2C2E' : '#F0F0F0', color:T.text, borderRadius:'16px 16px 16px 4px', padding:'10px 14px', fontSize:13, lineHeight:1.55 }}>{ag.content}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            }
-
-            // Council session card
-            if (m.role === 'council') {
-              const finalStances = m.agents || {};
-              return (
-                <div key={i} style={{ display:'flex', justifyContent:'flex-start', gap:10, animation:'fadeUp .3s ease both' }}>
-                  <div style={{ flexShrink:0, width:26, paddingTop:2 }}>
-                    <Crown size={16} style={{ color:'#F59E0B', opacity:0.7 }} />
-                  </div>
-                  <div style={{ maxWidth:'92%', width:'100%', background: dark ? '#1C1C1E' : '#F7F7F7', border:`1px solid ${T.border}`, borderRadius:10, padding:'10px 12px' }}>
-                    <div style={{ ...MONO, fontSize:9, color:'#F59E0B', letterSpacing:'0.08em', marginBottom:8 }}>
-                      COUNCIL SESSION · {m.ticker} · 3-ROUND DELIBERATION
-                    </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
-                      {AGENTS.map(ag => {
-                        const stance = finalStances[ag.id];
-                        const ss = stance ? (PS[stance] || null) : null;
-                        return (
-                          <div key={ag.id} style={{ display:'flex', alignItems:'center', gap:6, background:T.bg, border:`1px solid ${stance ? ag.accent + '30' : T.border}`, borderRadius:8, padding:'5px 8px' }}>
-                            <span style={{ fontSize:11 }}>{ag.emoji}</span>
-                            <span style={{ ...MONO, fontSize:9, color:T.text2, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ag.name}</span>
-                            {stance
-                              ? <span style={{ ...MONO, fontSize:8, fontWeight:700, color: ss ? ss.fg : T.text2 }}>{ss ? ss.label : stance}</span>
-                              : <Loader2 size={10} className="animate-spin" style={{ color:T.text3 }} />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {m.hasUngrounded && !m.synth && (
-                      <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5, ...MONO, fontSize:9, color:'#B45309' }}>
-                        <AlertTriangle size={10} style={{ color:'#B45309', flexShrink:0 }} />
-                        <span>⚠ {(m.ungroundedWarnings?.length > 0 ? m.ungroundedWarnings[0] + (m.ungroundedWarnings.length > 1 ? ` (+${m.ungroundedWarnings.length - 1} more)` : '') : 'Some agents lacked live data this run')}</span>
-                      </div>
-                    )}
-                    {m.synth && (
-                      <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${T.border}` }}>
-                        {(() => {
-                          const vs = m.synth.verdict ? (PS[m.synth.verdict === 'SKIP' ? 'SKIP' : m.synth.verdict === 'PASS' ? 'PASS_FINAL' : m.synth.verdict] || null) : null;
-                          return vs ? (
-                            <span style={{ ...MONO, background:vs.bg, color:vs.fg, fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:6 }}>
-                              {vs.label} · {m.synth.conviction}/10
-                            </span>
-                          ) : null;
-                        })()}
-                        {m.hasUngrounded && (
-                          <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:5, ...MONO, fontSize:9, color:'#B45309' }}>
-                            <AlertTriangle size={10} style={{ color:'#B45309', flexShrink:0 }} />
-                            <span>⚠ {(m.ungroundedWarnings?.length > 0 ? m.ungroundedWarnings[0] + (m.ungroundedWarnings.length > 1 ? ` (+${m.ungroundedWarnings.length - 1} more)` : '') : 'Some agents lacked live data this run')}</span>
+              })}
+            </div>
+            {m.synth && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                {(() => {
+                  const vs = m.synth.verdict ? (PS[m.synth.verdict === 'SKIP' ? 'SKIP' : m.synth.verdict === 'PASS' ? 'PASS_FINAL' : m.synth.verdict] || null) : null;
+                  return vs ? <span style={{ ...MONO, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>{vs.label} · {m.synth.conviction}/10</span> : null;
+                })()}
+                {m.rulingData && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
+                    {chatTrackedMap[m.runId] ? (
+                      <span style={{ ...MONO, fontSize: 9, color: T.accent }}>✓ Saved · {chatTrackedMap[m.runId] === 'entered' ? 'ENTERED' : 'WATCHING'}</span>
+                    ) : chatTrackRunId === m.runId ? (
+                      <div>
+                        {chatTrackStatus === 'entered' && (
+                          <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
+                            <input value={chatTrackPrice} onChange={e => setChatTrackPrice(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Entry price" style={{ ...MONO, fontSize: 11, background: T.input, border: `1px solid ${T.inputBorder}`, color: T.text, borderRadius: 6, padding: '4px 8px', width: 90, outline: 'none' }} />
+                            <input value={chatTrackShares} onChange={e => setChatTrackShares(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Shares (opt)" style={{ ...MONO, fontSize: 11, background: T.input, border: `1px solid ${T.inputBorder}`, color: T.text, borderRadius: 6, padding: '4px 8px', width: 100, outline: 'none' }} />
                           </div>
                         )}
-                        {/* Track This Trade */}
-                        {m.rulingData && (
-                          <div style={{ marginTop:8, paddingTop:8, borderTop:`1px solid ${T.border}` }}>
-                            {chatTrackedMap[m.runId] ? (
-                              <span style={{ ...MONO, fontSize:9, color:'#38e0d4' }}>
-                                ✓ Saved · {chatTrackedMap[m.runId] === 'entered' ? 'ENTERED' : 'WATCHING'}
-                              </span>
-                            ) : chatTrackRunId === m.runId ? (
-                              <div>
-                                {chatTrackStatus === 'entered' && (
-                                  <div style={{ display:'flex', gap:6, marginBottom:6, flexWrap:'wrap' }}>
-                                    <input
-                                      value={chatTrackPrice}
-                                      onChange={e => setChatTrackPrice(e.target.value.replace(/[^0-9.]/g, ''))}
-                                      placeholder="Entry price"
-                                      style={{ ...MONO, fontSize:11, background:T.input, border:`1px solid ${T.inputBorder}`, color:T.text, borderRadius:5, padding:'4px 8px', width:90, outline:'none' }}
-                                    />
-                                    <input
-                                      value={chatTrackShares}
-                                      onChange={e => setChatTrackShares(e.target.value.replace(/[^0-9.]/g, ''))}
-                                      placeholder="Shares (opt)"
-                                      style={{ ...MONO, fontSize:11, background:T.input, border:`1px solid ${T.inputBorder}`, color:T.text, borderRadius:5, padding:'4px 8px', width:100, outline:'none' }}
-                                    />
-                                  </div>
-                                )}
-                                <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                                  <button
-                                    onClick={() => saveFromChat(m.runId, m.rulingData, chatTrackStatus, chatTrackPrice, chatTrackShares)}
-                                    disabled={chatTrackSaving}
-                                    style={{ ...MONO, fontSize:9, fontWeight:700, background:'#38e0d4', color:'#000', border:'none', borderRadius:4, padding:'3px 10px', cursor: chatTrackSaving ? 'not-allowed' : 'pointer', opacity: chatTrackSaving ? 0.7 : 1 }}
-                                  >
-                                    {chatTrackSaving ? 'Saving…' : `Save · ${chatTrackStatus === 'entered' ? 'ENTERED' : 'WATCHING'}`}
-                                  </button>
-                                  <button
-                                    onClick={() => { setChatTrackRunId(null); setChatTrackStatus(null); }}
-                                    style={{ ...MONO, fontSize:9, color:T.text3, background:'none', border:'none', cursor:'pointer', padding:'3px 6px' }}
-                                  >Cancel</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                                <span style={{ ...MONO, fontSize:9, color:T.text3 }}>TRACK:</span>
-                                <button
-                                  onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('entered'); setChatTrackPrice(m.rulingData.livePrice ? m.rulingData.livePrice.toFixed(2) : ''); setChatTrackShares(''); }}
-                                  style={{ ...MONO, fontSize:9, fontWeight:600, background:'rgba(56,224,212,0.12)', color:'#38e0d4', border:'1px solid rgba(56,224,212,0.25)', borderRadius:4, padding:'3px 10px', cursor:'pointer' }}
-                                >▸ Entered</button>
-                                <button
-                                  onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('watching'); setChatTrackPrice(''); setChatTrackShares(''); }}
-                                  style={{ ...MONO, fontSize:9, fontWeight:600, background:'rgba(176,131,255,0.12)', color:'#b083ff', border:'1px solid rgba(176,131,255,0.25)', borderRadius:4, padding:'3px 10px', cursor:'pointer' }}
-                                >◎ Watching</button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <motion.button whileTap={{ scale: 0.96 }} onClick={() => saveFromChat(m.runId, m.rulingData, chatTrackStatus, chatTrackPrice, chatTrackShares)} disabled={chatTrackSaving}
+                            style={{ ...MONO, fontSize: 9, fontWeight: 700, background: T.accent, color: '#fff', border: 'none', borderRadius: 5, padding: '4px 12px', cursor: chatTrackSaving ? 'not-allowed' : 'pointer', opacity: chatTrackSaving ? 0.7 : 1 }}>
+                            {chatTrackSaving ? 'Saving…' : `Save · ${chatTrackStatus === 'entered' ? 'ENTERED' : 'WATCHING'}`}
+                          </motion.button>
+                          <button onClick={() => { setChatTrackRunId(null); setChatTrackStatus(null); }} style={{ ...MONO, fontSize: 9, color: T.text3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ ...MONO, fontSize: 9, color: T.text3 }}>TRACK:</span>
+                        <motion.button whileTap={{ scale: 0.94 }} onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('entered'); setChatTrackPrice(m.rulingData.livePrice ? m.rulingData.livePrice.toFixed(2) : ''); setChatTrackShares(''); }}
+                          style={{ ...MONO, fontSize: 9, fontWeight: 600, background: `${T.accent}18`, color: T.accent, border: `1px solid ${T.accent}30`, borderRadius: 5, padding: '3px 10px', cursor: 'pointer' }}>▸ Entered</motion.button>
+                        <motion.button whileTap={{ scale: 0.94 }} onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('watching'); setChatTrackPrice(''); setChatTrackShares(''); }}
+                          style={{ ...MONO, fontSize: 9, fontWeight: 600, background: 'rgba(176,131,255,0.12)', color: '#b083ff', border: '1px solid rgba(176,131,255,0.25)', borderRadius: 5, padding: '3px 10px', cursor: 'pointer' }}>◎ Watching</motion.button>
                       </div>
                     )}
                   </div>
-                </div>
-              );
-            }
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      );
+    }
+    return null;
+  }
 
-            return null;
-          })}
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <MessageSquare size={15} style={{ color: T.text3 }} />
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: T.text }}>{acct.label}</span>
+        </div>
+        <motion.button whileTap={{ scale: 0.9 }} onClick={toggleVoice}
+          style={{ fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 20, border: `1px solid ${voiceOn ? T.accent : T.border}`, background: voiceOn ? `${T.accent}12` : 'transparent', color: voiceOn ? T.accent : T.text2, cursor: 'pointer', fontSize: 11 }}>
+          {voiceOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
+          <span style={MONO}>{voiceOn ? 'VOICE' : 'MUTED'}</span>
+        </motion.button>
+      </div>
+
+      <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 'min(62vh,580px)' }}>
+        <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <AnimatePresence initial={false}>
+            {chat.map((m, i) => renderMessage(m, i))}
+          </AnimatePresence>
 
           {chatBusy && (
-            <div style={{ display:'flex', justifyContent:'flex-start', gap:10, animation:'fadeIn .2s ease both' }}>
-              <div style={{ flexShrink:0, marginTop:2 }}><ArcReactor size={26} /></div>
-              <div style={{ background: dark ? '#2C2C2E' : '#F0F0F0', borderRadius:'16px 16px 16px 4px', padding:'12px 16px' }}>
-                <Loader2 size={14} className="animate-spin" style={{ color:T.text }} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
+              <div style={{ flexShrink: 0, marginTop: 2 }}><ArcReactor size={24} /></div>
+              <div style={{ background: BUBBLE_BG_AGENT, borderRadius: '18px 18px 18px 4px', padding: '12px 16px', display: 'flex', gap: 5, alignItems: 'center' }}>
+                {[0, 1, 2].map(d => (
+                  <motion.span key={d} animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, delay: d * 0.12, repeat: Infinity }}
+                    style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: T.text3 }} />
+                ))}
               </div>
-            </div>
+            </motion.div>
           )}
           <div ref={chatEndRef} />
         </div>
 
-        <div style={{ borderTop:`1px solid ${T.border}`, padding:10, display:'flex', alignItems:'center', gap:8 }}>
-          <button onClick={() => toggleListen(t => sendChat(t))} disabled={!srSupported || chatBusy}
-            style={{ flexShrink:0, width:44, height:44, borderRadius:10, border:'1px solid', borderColor: listening ? '#FF3B30' : T.border, background: listening ? '#FF3B30' : T.bgCard, color: listening ? '#fff' : srSupported ? T.text : T.text3, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all .15s ease', opacity: !srSupported || chatBusy ? .4 : 1 }}>
-            {srSupported ? <Mic size={18} /> : <MicOff size={18} />}
-          </button>
+        {/* Input bar */}
+        <div style={{ borderTop: `1px solid ${T.border}`, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => toggleListen(t => sendChat(t))} disabled={!srSupported || chatBusy}
+            style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: `1px solid ${listening ? T.red : T.border}`, background: listening ? T.red : 'transparent', color: listening ? '#fff' : srSupported ? T.text2 : T.text3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: !srSupported || chatBusy ? 0.4 : 1 }}>
+            {srSupported ? <Mic size={16} /> : <MicOff size={16} />}
+          </motion.button>
           <input
             value={chatInput}
             onChange={e => setChatInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendChat()}
             disabled={chatBusy}
-            placeholder={listening ? 'Listening…' : 'Ask anything — AXIOM routes to the right specialist automatically…'}
-            style={{ ...MONO, flex:1, background:T.input, border:`1px solid ${T.inputBorder}`, borderRadius:12, padding:'12px 16px', fontSize:14, color:T.text, outline:'none' }}
+            placeholder={listening ? 'Listening…' : 'Ask AXIOM anything…'}
+            style={{ fontFamily: 'var(--font-display)', flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 14, color: T.text, outline: 'none' }}
           />
-          <button onClick={() => sendChat()} disabled={chatBusy || !chatInput.trim()}
-            style={{ flexShrink:0, width:44, height:44, borderRadius:10, background: chatBusy || !chatInput.trim() ? T.btnDisabled : '#000000', color: chatBusy || !chatInput.trim() ? T.btnDisabledText : '#FFFFFF', border:'none', display:'flex', alignItems:'center', justifyContent:'center', cursor: chatBusy || !chatInput.trim() ? 'not-allowed' : 'pointer', transition:'all .15s ease' }}>
-            <Send size={17} />
-          </button>
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => sendChat()} disabled={chatBusy || !chatInput.trim()}
+            style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, background: chatBusy || !chatInput.trim() ? T.btnDisabled : T.accent, color: chatBusy || !chatInput.trim() ? T.btnDisabledText : '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: chatBusy || !chatInput.trim() ? 'not-allowed' : 'pointer' }}>
+            <Send size={15} />
+          </motion.button>
         </div>
       </div>
 
-      <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:6 }}>
-        {['How does CRDO look?','What\'s the macro picture?','Analyse NVDA for me'].map(q => (
-          <button key={q} onClick={() => sendChat(q)} disabled={chatBusy}
-            style={{ ...MONO, fontSize:10, padding:'6px 12px', borderRadius:20, border:`1px solid ${T.border}`, color:T.text2, background:'none', cursor:'pointer', transition:'all .15s ease' }}>{q}</button>
+      <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {["How's the market today?", "Any positive news?", "Analyse NVDA for me"].map(q => (
+          <motion.button key={q} whileTap={{ scale: 0.95 }} onClick={() => sendChat(q)} disabled={chatBusy}
+            style={{ fontFamily: 'var(--font-display)', fontSize: 12, padding: '6px 14px', borderRadius: 20, border: `1px solid ${T.border}`, color: T.text2, background: 'none', cursor: 'pointer' }}>{q}</motion.button>
         ))}
       </div>
       <p style={{ ...MONO, marginTop:8, fontSize:10, color:T.text3 }}>

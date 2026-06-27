@@ -13,6 +13,24 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 13)
+
+### Full UI Redesign ✓
+- [x] Design system: new color tokens (zinc-based darks, blue accent), CSS custom properties, Inter font
+- [x] `framer-motion` + `@headlessui/react` installed
+- [x] `theme.js` rewritten with new tokens; all legacy aliases preserved
+- [x] `index.css` stripped CSS keyframes → Framer Motion; `.glass` utility added
+- [x] `AnimatedNumber`, `Card` shared UI primitives
+- [x] App.jsx: 72px icon-only side rail + tooltips, `AnimatePresence` page transitions, mobile glass header
+- [x] `TopBar.jsx`: new desktop fixed glass top bar
+- [x] `BottomNav.jsx`: glass, shared layout pill animation, spring press
+- [x] `PortfolioTab.jsx`: animated counter hero, stagger holdings, animated expand, top movers horizontal scroll, Run Council button
+- [x] `CouncilTab.jsx`: colored left border agent cards, Framer Motion stagger, blue accent inputs, animated synthesis card
+- [x] `ChatTab.jsx`: clean chat bubbles, 3-dot typing indicator, glass input bar, AnimatePresence messages
+- [x] `AuthGate.jsx`: cinematic login with ambient glow + entrance animation
+
+---
+
 ## IN PROGRESS
 
 ### Alpha Tracker vs SPY ⚡

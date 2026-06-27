@@ -2,10 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-* { -webkit-tap-highlight-color: transparent; }
-input, textarea, select { font-size: max(16px, 1em) !important; }
+/* ── CSS Custom Properties ── */
+:root {
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  --font-body:    'Inter', -apple-system, sans-serif;
+  --font-mono:    'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --space-page: 20px;
+}
+@media (min-width: 1024px) { :root { --space-page: 32px; } }
 
-/* ── ArcReactor ── */
+/* ── Base ── */
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+body { font-family: var(--font-display); }
+input, textarea, select { font-size: max(16px, 1em) !important; font-family: var(--font-body); }
+
+/* ── Glass utility ── */
+.glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.glass-light {
+  background: rgba(255,255,255,0.80);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* ── ArcReactor (keep — SVG animations, Framer Motion doesn't cover SVG transforms) ── */
 @keyframes spin    { to { transform: rotate(360deg); } }
 @keyframes spinRev { to { transform: rotate(-360deg); } }
 @keyframes corePulse { 0%,100%{ opacity:.65; transform:scale(1);} 50%{ opacity:1; transform:scale(1.14);} }
@@ -13,77 +42,23 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .spin-rev   { animation: spinRev  10s linear infinite; transform-box: fill-box; transform-origin: center; }
 .core-pulse { animation: corePulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 
-/* ── Card / general entrance ── */
-@keyframes cardIn  { from { opacity:0; transform: translateY(12px) scale(.98); } to { opacity:1; transform: none; } }
-@keyframes fadeUp  { from { opacity:0; transform: translateY(8px);  } to { opacity:1; transform: none; } }
-@keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }
-@keyframes blink   { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
-.card-in { animation: cardIn .4s cubic-bezier(.2,.7,.2,1) both; }
-.fade-up  { animation: fadeUp .3s ease both; }
-.fade-in  { animation: fadeIn .3s ease both; }
-.blink    { animation: blink  1.4s ease-in-out infinite; }
-
-/* ── Tab content slide-up on switch ── */
-@keyframes slideUp { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform: none; } }
-.slide-up { animation: slideUp .32s cubic-bezier(.2,.7,.2,1) both; }
-
-/* ── Chat message slide-in ── */
-@keyframes slideInRight { from { opacity:0; transform: translateX(10px); } to { opacity:1; transform: none; } }
-@keyframes slideInLeft  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
-.slide-right { animation: slideInRight .22s ease both; }
-.slide-left  { animation: slideInLeft  .22s ease both; }
-
-/* ── Bottom-nav icon spring pop ── */
-@keyframes tabPop { 0%{ transform:scale(.72); } 58%{ transform:scale(1.18); } 100%{ transform:scale(1); } }
-.tab-pop { animation: tabPop .28s cubic-bezier(.34,1.56,.64,1) both; }
-
-/* ── Live market dot pulse ── */
+/* ── Live dot pulse ── */
 @keyframes liveDot { 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(2); opacity:.3; } }
 .live-dot { animation: liveDot 2.2s ease-in-out infinite; }
 
-/* ── Skeleton shimmer ── */
-@keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position:  400px 0; }
-}
-.skeleton {
-  background: linear-gradient(90deg, #F0F0F0 25%, #E8E8E8 50%, #F0F0F0 75%);
-  background-size: 800px 100%;
-  animation: shimmer 1.2s infinite linear;
-  border-radius: 6px;
-}
-
-/* ── Price flash ── */
-@keyframes priceGreenFlash { 0%,100%{ color: inherit; } 30%{ color: #00C805; } }
-@keyframes priceRedFlash   { 0%,100%{ color: inherit; } 30%{ color: #FF3B30; } }
-.price-up   { animation: priceGreenFlash .5s ease; }
-.price-down { animation: priceRedFlash   .5s ease; }
-
-/* ── Chart draw-in ── */
-@keyframes chartWipe {
-  from { clip-path: inset(0 100% 0 0); }
-  to   { clip-path: inset(0 0%   0 0); }
-}
-.draw-in    { animation: chartWipe 1s   ease forwards; }
-.chart-wipe { animation: chartWipe 0.4s ease forwards; }
-
-/* ── Market state ── */
-@keyframes starShimmer     { 0%,100%{ opacity:.2; } 50%{ opacity:1; } }
-@keyframes marketOpenFlash { 0%{ background:rgba(0,200,5,0); } 40%{ background:rgba(0,200,5,0.12); } 100%{ background:rgba(0,200,5,0); } }
-.star-shimmer      { animation: starShimmer     2s ease-in-out infinite; }
-.market-open-flash { animation: marketOpenFlash 1.5s ease; }
-
-/* ── Market overlay effects ── */
+/* ── Market overlay / environment effects (not replaced by Framer Motion) ── */
 @keyframes twinkle     { 0%,100%{ opacity:.05; transform:scale(1);   } 50%{ opacity:.9; transform:scale(1.45); } }
-@keyframes shootStar   { 0%{ transform:translate(0,0)   scaleX(0.2); opacity:0;   }
-                         8%{ opacity:1; transform:translate(0,0)   scaleX(1);   }
+@keyframes shootStar   { 0%{ transform:translate(0,0) scaleX(0.2); opacity:0; }
+                         8%{ opacity:1; transform:translate(0,0) scaleX(1); }
                         100%{ transform:translate(320px,90px) scaleX(0.3); opacity:0; } }
 @keyframes scanMove    { 0%{ transform:translateX(-200px); } 100%{ transform:translateX(calc(100vw + 200px)); } }
 @keyframes scanSlow    { 0%{ transform:translateX(-120px); } 100%{ transform:translateX(calc(100vw + 120px)); } }
 @keyframes dawnPulse   { 0%,100%{ opacity:.75; } 50%{ opacity:1; } }
-@keyframes auroraShift { 0%,100%{ opacity:.8; transform:scaleX(1)   translateY(0);  }
-                          50%{    opacity:1;   transform:scaleX(1.06) translateY(-8px); } }
-@keyframes auroraSlow  { 0%,100%{ opacity:.6; transform:scaleX(1);   } 50%{ opacity:1; transform:scaleX(1.1); } }
+@keyframes auroraShift { 0%,100%{ opacity:.8; transform:scaleX(1) translateY(0); } 50%{ opacity:1; transform:scaleX(1.06) translateY(-8px); } }
+@keyframes auroraSlow  { 0%,100%{ opacity:.6; transform:scaleX(1); } 50%{ opacity:1; transform:scaleX(1.1); } }
+@keyframes starShimmer { 0%,100%{ opacity:.2; } 50%{ opacity:1; } }
+@keyframes scan        { 0%{ transform: translateY(-100%); } 100%{ transform: translateY(400%); } }
+@keyframes blink       { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
 
 .twinkle-star   { animation: twinkle     var(--dur,3s) var(--delay,0s) ease-in-out infinite; }
 .shooting-star  { animation: shootStar   12s 2s ease-out infinite; }
@@ -92,14 +67,21 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
 .dawn-pulse     { animation: dawnPulse   4s  ease-in-out infinite; }
 .aurora         { animation: auroraShift 9s  ease-in-out infinite; }
 .aurora-slow    { animation: auroraSlow  13s 3s ease-in-out infinite; }
+.star-shimmer   { animation: starShimmer 2s ease-in-out infinite; }
+.scanline       { animation: scan 1.6s linear infinite; }
+.blink          { animation: blink 1.4s ease-in-out infinite; }
 
-/* ── Boot fade (safety net) ── */
-@keyframes bootFade { 0%,72%{ opacity:1; } 100%{ opacity:0; visibility:hidden; } }
-@keyframes bootText { from{ clip-path: inset(0 100% 0 0); } to{ clip-path: inset(0 0 0 0); } }
-
-/* ── Agent scan line ── */
-@keyframes scan { 0%{ transform: translateY(-100%); } 100%{ transform: translateY(400%); } }
-.scanline { animation: scan 1.6s linear infinite; }
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #27272A 25%, #3F3F46 50%, #27272A 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.2s infinite linear;
+  border-radius: 6px;
+}
 
 /* ── Ambient glow ── */
 .ambient-glow {
@@ -112,34 +94,16 @@ input, textarea, select { font-size: max(16px, 1em) !important; }
   height: 400px;
   filter: blur(80px);
   z-index: 0;
-  transition: background-color 2s ease;
+  transition: background-color 8s ease;
   border-radius: 50%;
 }
 @media (min-width: 1024px) { .ambient-glow { width: 600px; } }
-
-/* ── Position / holding rows ── */
-@media (hover:hover) {
-  .holding-row:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-    transform: translateY(-1px);
-    transition: box-shadow .15s ease, transform .15s ease;
-  }
-  .mover-card:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-    transform: translateY(-2px);
-    transition: box-shadow .18s ease, transform .18s ease;
-  }
-}
 
 /* ── Scrollbar hide ── */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ── Reduced motion ── */
+/* ── Reduced motion — disable all animations ── */
 @media (prefers-reduced-motion: reduce) {
-  .spin-slow,.spin-rev,.core-pulse,.card-in,.fade-up,.fade-in,
-  .blink,.draw-in,.chart-wipe,.star-shimmer,.market-open-flash,
-  .skeleton,.scanline,.price-up,.price-down,.slide-up,.slide-right,
-  .slide-left,.tab-pop,.live-dot,.twinkle-star,.shooting-star,
-  .scan-bar,.scan-bar-slow,.dawn-pulse,.aurora,.aurora-slow { animation: none !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

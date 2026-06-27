@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, ChevronRight, Loader2, AlertTriangle, Crown, Wallet } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, PROTOCOLS } from '../constants/agents.js';
@@ -59,6 +60,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     st.r1?.grounded === false || st.r2?.grounded === false || st.r3?.grounded === false
   );
   const quickPicks = ['AAPL','TSLA','OKLO','PLTR','AVGO','SMCI'];
+  const prefersReduced = useReducedMotion();
 
   async function saveToTracker() {
     if (!trackStatus || trackSaving || trackSaved) return;
@@ -418,81 +420,84 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
   const showCouncil = active !== null || synthesis.status !== 'idle';
 
   return (
-    <div className="mt-2">
-      <label style={{ ...MONO, display: 'block', fontSize: 11, color: T.text3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8 }}>Ticker to Convene the Council</label>
-      <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: T.text3 }} />
+    <div style={{ marginTop: 8 }}>
+      <label style={{ ...MONO, display: 'block', fontSize: 11, color: T.text3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>Convene the Council</label>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+          <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: T.text3 }} />
           <input
             value={ticker}
             onChange={e => setTicker(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && convene()}
-            placeholder="e.g. NVDA"
-            onFocus={e => e.target.style.borderColor = T.inputFocus}
-            onBlur={e => e.target.style.borderColor = T.inputBorder}
-            style={{ ...MONO, ...inp, letterSpacing: '0.15em', width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 12, paddingBottom: 12, fontSize: 18, textTransform: 'uppercase' }}
+            placeholder="TICKER"
+            onFocus={e => { e.target.style.borderColor = T.accent; }}
+            onBlur={e => { e.target.style.borderColor = T.inputBorder; }}
+            style={{ ...MONO, background: T.input, border: `1px solid ${T.inputBorder}`, color: T.text, borderRadius: 12, outline: 'none', letterSpacing: '0.15em', width: '100%', paddingLeft: 40, paddingRight: 12, paddingTop: 14, paddingBottom: 14, fontSize: 20, textTransform: 'uppercase', transition: 'border-color .15s ease' }}
           />
         </div>
-        <button
+        <motion.button
           onClick={convene}
           disabled={running || !ticker.trim()}
-          style={{ fontFamily: 'inherit', letterSpacing: '0.08em', background: running || !ticker.trim() ? T.btnDisabled : '#000000', color: running || !ticker.trim() ? T.btnDisabledText : '#FFFFFF', borderRadius: 8, border: 'none', cursor: running || !ticker.trim() ? 'not-allowed' : 'pointer', padding: '12px 24px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, whiteSpace: 'nowrap', transition: 'all .15s ease', width: 'auto' }}
+          whileTap={running || !ticker.trim() ? {} : { scale: 0.97 }}
+          style={{ fontFamily: 'var(--font-display)', letterSpacing: '0.06em', background: running || !ticker.trim() ? T.btnDisabled : T.accent, color: running || !ticker.trim() ? T.btnDisabledText : '#FFFFFF', borderRadius: 12, border: 'none', cursor: running || !ticker.trim() ? 'not-allowed' : 'pointer', padding: '14px 28px', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, whiteSpace: 'nowrap', transition: 'all .15s ease' }}
         >
-          {running ? <><Loader2 size={18} className="animate-spin" /> CONVENING…</> : <>CONVENE <ChevronRight size={18} /></>}
-        </button>
+          {running ? <><Loader2 size={16} className="animate-spin" /> Convening…</> : <>Convene <ChevronRight size={16} /></>}
+        </motion.button>
       </div>
 
-      <div className="mt-2">
-        <div className="relative">
-          <Wallet size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: T.text3 }} />
+      <div style={{ marginTop: 10 }}>
+        <div style={{ position: 'relative' }}>
+          <Wallet size={14} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: T.text3 }} />
           <input
             value={capital}
             onChange={e => setCapital(e.target.value.replace(/[^0-9.]/g, ''))}
             onKeyDown={e => e.key === 'Enter' && convene()}
             inputMode="decimal"
             placeholder="available capital (optional)"
-            onFocus={e => e.target.style.borderColor = T.inputFocus}
-            onBlur={e => e.target.style.borderColor = T.inputBorder}
-            style={{ ...MONO, ...inp, width: '100%', paddingLeft: 36, paddingRight: capital.trim() ? 80 : 12, paddingTop: 10, paddingBottom: 10, fontSize: 14 }}
+            onFocus={e => { e.target.style.borderColor = T.accent; }}
+            onBlur={e => { e.target.style.borderColor = T.inputBorder; }}
+            style={{ ...MONO, background: T.input, border: `1px solid ${T.inputBorder}`, color: T.text, borderRadius: 12, outline: 'none', width: '100%', paddingLeft: 40, paddingRight: capital.trim() ? 80 : 12, paddingTop: 10, paddingBottom: 10, fontSize: 14, transition: 'border-color .15s ease' }}
           />
-          {capital.trim() && <span style={{ ...MONO, color: '#00C805', position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 11 }}>${Number(capital).toLocaleString()}</span>}
+          {capital.trim() && <span style={{ ...MONO, color: T.green, position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 11 }}>${Number(capital).toLocaleString()}</span>}
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 flex-wrap">
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ ...MONO, fontSize: 10, color: T.text3 }}>QUICK:</span>
         {quickPicks.map(q => (
-          <button key={q} onClick={() => setTicker(q)} disabled={running}
-            style={{ ...MONO, fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${T.border}`, color: T.text2, background: 'none', cursor: 'pointer', transition: 'all .15s ease' }}>{q}</button>
+          <motion.button key={q} onClick={() => setTicker(q)} disabled={running} whileTap={{ scale: 0.94 }}
+            style={{ ...MONO, fontSize: 11, padding: '4px 11px', borderRadius: 8, border: `1px solid ${T.border}`, color: T.text2, background: 'none', cursor: 'pointer' }}>{q}</motion.button>
         ))}
       </div>
 
-      {/* Progress bar */}
-      {running && progressLabel && (
-        <div style={{ marginTop: 16, background: 'rgba(56,224,212,0.08)', border: '1px solid rgba(56,224,212,0.25)', borderRadius: 8, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Loader2 size={14} className="animate-spin" style={{ color: '#38e0d4', flexShrink: 0 }} />
-          <span style={{ ...MONO, fontSize: 12, color: '#38e0d4' }}>{progressLabel}</span>
-        </div>
-      )}
+      {/* Progress */}
+      <AnimatePresence>
+        {running && progressLabel && (
+          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ marginTop: 16, background: `${T.accent}10`, border: `1px solid ${T.accent}30`, borderRadius: 10, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Loader2 size={14} className="animate-spin" style={{ color: T.accent, flexShrink: 0 }} />
+            <span style={{ ...MONO, fontSize: 12, color: T.accent }}>{progressLabel}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Rate limit cooldown banner */}
       {synthesis.status === 'cooldown' && (
-        <div style={{ marginTop: 12, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 8, padding: '10px 16px', ...MONO, fontSize: 12, color: '#B45309' }}>
+        <div style={{ marginTop: 12, background: `${T.amber}15`, border: `1px solid ${T.amber}40`, borderRadius: 10, padding: '10px 16px', ...MONO, fontSize: 12, color: T.amber }}>
           Rate limit — resuming shortly…
         </div>
       )}
 
       {showCouncil && (
-        <div className="mt-8">
+        <div style={{ marginTop: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <div style={{ height: 1, flex: 1, background: T.border }} />
             <span style={{ ...MONO, fontSize: 10, color: T.text3, letterSpacing: '0.1em' }}>
-              COUNCIL ON {upperTicker || active} · {acct.label.toUpperCase()} · 3-ROUND DELIBERATION
+              {upperTicker || active} · {acct.label.toUpperCase()} · 3-ROUND COUNCIL
             </span>
             <div style={{ height: 1, flex: 1, background: T.border }} />
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
             {AGENTS.map((ag, idx) => {
               const st = agentState[ag.id] || {};
               const Icon = ag.icon;
@@ -522,13 +527,16 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
               ].filter(Boolean);
 
               return (
-                <div key={ag.id} style={{
-                  animation: isDone ? `cardIn .5s cubic-bezier(.2,.7,.2,1) ${idx * 55}ms both` : undefined,
-                  background: T.bg,
-                  border: `1px solid ${hasError ? 'rgba(255,59,48,0.3)' : T.border}`,
-                  borderRadius: 12, padding: 16, overflow: 'hidden', position: 'relative',
-                  boxShadow: dark ? 'none' : '0 2px 12px rgba(0,0,0,0.05)',
-                }}>
+                <motion.div key={ag.id}
+                  initial={prefersReduced ? false : { opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, delay: isDone ? idx * 0.05 : 0, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  style={{
+                    background: T.bgCard,
+                    border: `1px solid ${hasError ? T.red + '40' : T.border}`,
+                    borderLeft: `3px solid ${hasError ? T.red : ag.accent}`,
+                    borderRadius: 12, padding: 16, overflow: 'hidden', position: 'relative',
+                  }}>
                   {isCurrentlyRunning && (
                     <div className="absolute left-0 right-0 h-1 top-0" style={{ background: ag.accent, animation: 'shimmer 1.5s infinite linear', backgroundSize: '200% 100%', backgroundImage: `linear-gradient(90deg,${ag.accent}44 0%,${ag.accent} 50%,${ag.accent}44 100%)` }} />
                   )}
@@ -614,7 +622,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                       )}
                     </div>
                   )}
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -636,7 +644,16 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
             </div>
           )}
           {synthesis.status === 'done' && synthesis.result && vStyle && (
-            <div style={{ animation: 'cardIn .5s cubic-bezier(.2,.7,.2,1) both', background: '#000000', borderRadius: 12, padding: '20px 24px', color: '#FFFFFF' }}>
+            <motion.div
+              initial={prefersReduced ? false : { opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+              style={{
+                background: dark ? '#09090B' : '#09090B',
+                border: `1px solid ${vStyle.fg}25`,
+                boxShadow: `0 0 40px ${vStyle.fg}15`,
+                borderRadius: 16, padding: '24px 28px', color: '#FFFFFF',
+              }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                 <Crown size={16} style={{ color: '#F59E0B' }} />
                 <span style={{ ...DISP, fontSize: 14, fontWeight: 600, letterSpacing: '0.06em' }}>AXIOM · FINAL RULING · 3-ROUND COUNCIL</span>
@@ -731,17 +748,18 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                   )}
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
         </div>
       )}
 
       {!showCouncil && (
-        <div style={{ marginTop: 48, textAlign: 'center', padding: '40px 20px', border: `1px dashed ${T.border}`, borderRadius: 12 }}>
-          <Crown size={32} style={{ margin: '0 auto 12px', opacity: 0.25, color: '#F59E0B' }} />
-          <p style={{ color: T.text3, fontSize: 14, margin: 0 }}>Type a ticker and convene the council for {acct?.label}.</p>
-          <p style={{ ...MONO, color: T.text3, fontSize: 11, marginTop: 6, opacity: .7 }}>6 specialists run 3 rounds of deliberation → AXIOM delivers one ruling.</p>
-        </div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+          style={{ marginTop: 48, textAlign: 'center', padding: '48px 20px', border: `1px dashed ${T.border}`, borderRadius: 16 }}>
+          <Crown size={28} style={{ margin: '0 auto 12px', opacity: 0.2, color: T.amber }} />
+          <p style={{ color: T.text3, fontSize: 14, margin: 0 }}>Enter a ticker and convene the council for {acct?.label}.</p>
+          <p style={{ ...MONO, color: T.text3, fontSize: 11, marginTop: 6, opacity: 0.6 }}>6 specialists · 3 deliberation rounds · AXIOM final ruling</p>
+        </motion.div>
       )}
     </div>
   );

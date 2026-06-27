@@ -4,6 +4,31 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-27
+
+### BUG FIX — AXIOM chat web search enabled
+
+**Problem:** AXIOM in conversational mode (chat, route=[] path) had no web search capability. Asking "any positive news?" returned "no data" because AXIOM was answering purely from injected context without being able to search the web.
+
+**Root cause:** The `// === AXIOM DIRECT ANSWER ===` path in ChatTab.jsx simply displayed `router.speak` from the JSON routing call (which had `useSearch=false`). There was no separate search-enabled call for AXIOM's actual conversational response.
+
+**Fix — `src/components/ChatTab.jsx`:**
+- Replaced the passive `router.speak` display with a dedicated `callAgent` call using `useSearch=true` (compound-beta / groq web search).
+- System prompt: `AXIOM_CONVERSATIONAL` (imported from agents.js) + today's date + conversation history.
+- User message: investor's question + account context + portfolio data block (if active).
+- Fallback: if the search-enabled call fails, falls back to `router.speak` (original behavior).
+- Router call unchanged — stays fast JSON-only with `useSearch=false`; it only decides routing + provides a brief acknowledge for the direct-answer case.
+- Updated `axiomSys` router prompt: `route=[]` rule now explicitly says AXIOM has web search and lists news/macro/sector questions as direct-answer cases.
+
+**Fix — `src/constants/agents.js`:**
+- `AXIOM_CONVERSATIONAL`: Added `WEB SEARCH` instruction block — tells AXIOM to search when current data is needed; prohibits "I don't have current data" responses when search is available.
+
+**Scope:** Only AXIOM's chat direct-answer path changed. Council agents, key rotation, model names, and all other prompts are untouched.
+
+- Files: `src/components/ChatTab.jsx`, `src/constants/agents.js`
+
+---
+
 ## 2026-06-26 (session 12)
 
 ### Six-feature build: Scout Mode, Portfolio Alerts, AXIOM live data, AXIOM tone, Alpha vs SPY complete, debug/roadmap/changelog updates

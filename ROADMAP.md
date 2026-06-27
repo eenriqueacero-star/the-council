@@ -13,6 +13,16 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (recent)
+
+### AXIOM chat web search ✓
+- [x] AXIOM direct-answer path now calls `callAgent` with `useSearch=true` (compound-beta)
+- [x] `AXIOM_CONVERSATIONAL` updated with WEB SEARCH instruction block
+- [x] Router prompt updated: route=[] explicitly covers news/macro/sector questions AXIOM handles via search
+- [x] Fallback to `router.speak` if the search call fails
+
+---
+
 ## IN PROGRESS
 
 ### Alpha Tracker vs SPY ⚡

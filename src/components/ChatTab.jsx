@@ -394,14 +394,14 @@ ROUTING RULES:
 - route=["risk"] for risk, dilution, concentration, volatility.
 - route=["bear"] for bear case or "what could go wrong".
 - route=["sizer"] for position sizing or how much to buy.
-- route=[] — answer DIRECTLY as AXIOM for: greetings, portfolio questions, strategy, watchlist, anything that doesn't need a specialist.
+- route=[] — answer DIRECTLY as AXIOM (with web search) for: greetings, portfolio questions, strategy, watchlist, news questions ("any positive news?", "what happened to X today?"), macro outlook, sector updates, or anything that doesn't require a full specialist council deliberation. AXIOM has web search and can look up current information directly.
 
 MACRO GROUNDING RULE: When explaining why stocks moved, ONLY cite reasons that appear in the LIVE DATA, PORTFOLIO DATA, or RECENT NEWS blocks provided. Do NOT invent macro explanations (CPI surprises, Fed moves, geopolitical events, earnings reports) unless they are explicitly mentioned in the data you were given. If you don't know the specific reason for a move, say so honestly — "not sure what triggered it specifically, but the whole chip sector sold off" is better than inventing a CPI surprise that didn't happen. Honesty about uncertainty is always better than a confident fabrication.
 
 When routing: set "speak" to a brief 1-sentence intro ("Let me get REX on that chart.").
-When answering directly: set "speak" to your full casual answer.
+When answering directly (route=[]): set "speak" to a brief acknowledgment only — the actual answer will be generated separately with web search.
 Today: ${new Date().toDateString()}.${historyBlock}
-Output ONLY the raw JSON object — no code fences, no backticks, no prose before or after: {"speak":"<response or intro>","fullCouncil":<bool>,"ticker":"<TICKER or null>","route":["agentId1"]}`;
+Output ONLY the raw JSON object — no code fences, no backticks, no prose before or after: {"speak":"<brief ack or routing intro>","fullCouncil":<bool>,"ticker":"<TICKER or null>","route":["agentId1"]}`;
 
     let router;
     try {
@@ -549,10 +549,21 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       return;
     }
 
-    // === AXIOM DIRECT ANSWER ===
-    setChat(p => [...p, { role:'pm', text:router.speak }]);
-    speak(router.speak);
-    setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:router.speak }]);
+    // === AXIOM DIRECT ANSWER (with web search) ===
+    // Make a dedicated search-enabled call so AXIOM can look up current news, prices,
+    // macro events, or anything else it can't answer from the injected data alone.
+    let axiomAnswer = router.speak || "Let me look into that.";
+    try {
+      const directSys = AXIOM_CONVERSATIONAL + `\nToday: ${new Date().toDateString()}.${historyBlock}`;
+      const directUser = `${text}\n\nAccount context: ${acctLine}${portfolioDataBlock ? '\n' + portfolioDataBlock : ''}`;
+      const { text: txt } = await callAgent(directSys, directUser, true, 400);
+      if (txt && txt.trim()) axiomAnswer = txt.trim();
+    } catch {
+      flagApiDown();
+    }
+    setChat(p => [...p, { role:'pm', text:axiomAnswer }]);
+    speak(axiomAnswer);
+    setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:axiomAnswer }]);
     setChatBusy(false);
   }
 

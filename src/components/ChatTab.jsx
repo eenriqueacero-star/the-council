@@ -549,10 +549,19 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       return;
     }
 
-    // === AXIOM DIRECT ANSWER ===
-    setChat(p => [...p, { role:'pm', text:router.speak }]);
-    speak(router.speak);
-    setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:router.speak }]);
+    // === AXIOM DIRECT ANSWER (web-search enabled) ===
+    let axiomReply = router.speak;
+    try {
+      const axiomConvSys = AXIOM_CONVERSATIONAL + `\nToday: ${new Date().toDateString()}.${historyBlock}`;
+      const axiomConvMsg = `Investor: "${text}". ${acctLine}${portfolioDataBlock ? portfolioDataBlock : ''} Answer directly and conversationally. Search the web if you need current information.`;
+      const { text: axiomTxt } = await callAgent(axiomConvSys, axiomConvMsg, true, 400);
+      if (axiomTxt && axiomTxt.trim()) axiomReply = axiomTxt.trim();
+    } catch {
+      flagApiDown();
+    }
+    setChat(p => [...p, { role:'pm', text:axiomReply }]);
+    speak(axiomReply);
+    setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:axiomReply }]);
     setChatBusy(false);
   }
 

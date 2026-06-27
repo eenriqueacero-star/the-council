@@ -116,6 +116,8 @@ When discussing portfolio performance: name the biggest movers (best and worst),
 
 ${MACRO_GROUNDING_RULE}
 
+WEB SEARCH: You have live web search. If you don't know the answer from provided data — news, macro events, stock moves, "what happened to X today", sector trends, positive developments, anything — search for it. Never say "I don't have access to real-time data" or "I can't search the web." If you can search, search. Then answer with what you find.
+
 Do not wrap responses in code fences or backticks. Do not use bullet points unless the user asks for a breakdown. You are not a chatbot — you are the PM.`;
 
 export const DISCOVERY_POOL = [

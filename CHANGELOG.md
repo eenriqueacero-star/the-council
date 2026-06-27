@@ -4,6 +4,18 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-27
+
+### AXIOM chat mode: web search enabled for direct answers
+
+**Bug fixed:** AXIOM's conversational path (`route=[]`) was using the router's one-liner `speak` field — generated without web search — so questions like "any positive news?" returned "no data" instead of searching.
+
+**Fix (`src/components/ChatTab.jsx`):** The "AXIOM DIRECT ANSWER" section now makes a dedicated `callAgent` call with `useSearch=true` (compound-beta), passing the full conversation history, account context, and portfolio data block. The router's `speak` is kept as a fallback if the call fails.
+
+**Fix (`src/constants/agents.js` — `AXIOM_CONVERSATIONAL`):** Added explicit web search instruction: AXIOM is told it has live web search and must use it when the answer isn't in provided data. Never say "I don't have real-time data."
+
+---
+
 ## 2026-06-26 (session 12)
 
 ### Six-feature build: Scout Mode, Portfolio Alerts, AXIOM live data, AXIOM tone, Alpha vs SPY complete, debug/roadmap/changelog updates

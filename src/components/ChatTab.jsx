@@ -44,6 +44,9 @@ export default function ChatTab({ account, acct, posMap, positionsLine, flagApiD
   const [chatTrackSaving, setChatTrackSaving] = useState(false);
   const [chatTrackedMap,  setChatTrackedMap]  = useState({}); // { [runId]: 'entered' | 'watching' }
   const chatEndRef = useRef(null);
+  // Portfolio follow-up: after injecting data, carry it for next 3 messages
+  const lastPortfolioDataRef = useRef('');
+  const portfolioFollowUpRef = useRef(0);
   const T = theme(dark);
 
   const { voiceOn, listening, speaking, srSupported, speak, stopSpeaking, toggleVoice, toggleListen } = useVoice();
@@ -303,9 +306,11 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
     const acctLine = `Account: ${acct.label} (${acct.sub}). Holdings: ${positionsLine}. DCA: ${acct.dcaNote}.`;
     const historyBlock = buildHistoryBlock(convHistory);
 
-    // Portfolio data injection — fetch live prices if user asks about portfolio performance
+    // Portfolio data injection — fetch live prices if user asks about portfolio performance,
+    // then carry that data for the next 3 follow-up messages automatically.
     let portfolioDataBlock = '';
     if (isPortfolioQuery(text)) {
+      // Fresh fetch
       const tickers = Object.keys(posMap || {}).filter(t => t && t.trim());
       if (tickers.length > 0) {
         try {
@@ -329,17 +334,31 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
             rows.push(`${ticker}: $${price.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% today) | ${shares}sh | cost $${cost.toFixed(2)} | mkt val $${mktVal.toFixed(2)} | day gain $${dayGain.toFixed(2)}${unrealizedPL != null ? ` | unrealized P&L $${unrealizedPL.toFixed(2)}` : ''}`);
           }
           portfolioDataBlock = `\n\nPORTFOLIO DATA (live as of ${new Date().toLocaleTimeString()}):\n${rows.join('\n')}\nTOTAL: market value $${totalValue.toFixed(2)} | day change $${totalDayGain.toFixed(2)} (${totalValue > 0 ? ((totalDayGain / (totalValue - totalDayGain)) * 100).toFixed(2) : '0.00'}%) | total unrealized P&L $${totalUnrealizedPL.toFixed(2)}\n`;
+          lastPortfolioDataRef.current = portfolioDataBlock;
+          portfolioFollowUpRef.current = 3; // carry for next 3 follow-up messages
           writeDebug('CHAT', `Portfolio data injected for "${text.slice(0, 40)}"`, portfolioDataBlock);
         } catch (err) {
           console.error('[chat portfolio injection] quote fetch failed:', err?.message);
         }
       }
+    } else if (portfolioFollowUpRef.current > 0 && lastPortfolioDataRef.current) {
+      // Auto-inject cached data for follow-up questions
+      portfolioDataBlock = lastPortfolioDataRef.current;
+      portfolioFollowUpRef.current -= 1;
+      writeDebug('CHAT', `Portfolio data carried over (${portfolioFollowUpRef.current} left) for "${text.slice(0, 40)}"`, portfolioDataBlock);
     }
 
     // AXIOM reads the message and decides: answer directly, route to specialist(s), or convene full council
-    const axiomSys = `You are AXIOM, chair of THE COUNCIL — an elite private investment analysis team. You are direct, sharp, decisive, and genuinely knowledgeable about markets. ${PROTOCOLS}
+    const axiomSys = `You are AXIOM, chair of THE COUNCIL. Talk like a sharp, knowledgeable friend — direct, casual, no corporate speak. Strong opinions backed by data. ${PROTOCOLS}
 
-THE COUNCIL ROSTER (use ONLY these names — never invent others):
+TONE — always sound like the GOOD example:
+BAD: "Your portfolio declined 5.83% today, losing $194.07 in market value."
+GOOD: "Rough day — down about $194 (5.8%). CRDO and SNDK got destroyed, both down 10%+. Still up $758 unrealized overall though."
+BAD: "The equity exhibited significant downward pressure amid sector rotation."
+GOOD: "MU got hammered today, whole chip sector sold off after the CPI print."
+When discussing portfolio data: name the biggest movers, give dollar gain/loss, note whether you're up or down overall. 2-4 sentences max.
+
+THE COUNCIL ROSTER (use ONLY these names):
 - REX ⚡ (id: technical) — Technical Analyst: charts, price action, momentum, key levels
 - NOVA 🚀 (id: catalyst) — Catalyst Scout: earnings, product launches, upcoming events
 - SAGE 🛡️ (id: risk) — Risk Officer: dilution, volatility, concentration risk
@@ -347,22 +366,21 @@ THE COUNCIL ROSTER (use ONLY these names — never invent others):
 - VEGA 🐻 (id: bear) — Devil's Advocate: bear case, downside scenarios
 - ZEN ⚖️ (id: sizer) — Position Sizer: dollar amounts, sizing, portfolio allocation
 
-ROUTING RULES — choose the most useful response type:
-- fullCouncil=true ONLY when the investor explicitly wants a full BUY/SELL/HOLD ruling on a specific ticker ("should I buy X", "full analysis on X", "what's the council's take on X", "convene on X").
-- route=["catalyst","technical"] for stock search/discovery questions ("find stocks", "what should I add", "any good picks", "search for opportunities") — NOVA names specific tickers with catalysts, REX checks the charts.
+ROUTING RULES:
+- fullCouncil=true ONLY when the investor explicitly wants a full BUY/SELL/HOLD ruling on a specific ticker.
+- route=["catalyst","technical"] for stock search/discovery ("find stocks", "any good picks", "search for opportunities").
 - route=["technical"] for chart/momentum/price action questions about a specific ticker.
-- route=["macro"] for macro, Fed, rates, inflation, or geopolitical questions.
-- route=["catalyst"] for earnings dates, product launches, or upcoming catalysts on a specific ticker.
-- route=["risk"] for risk assessment, dilution, concentration, or volatility questions.
-- route=["bear"] for bear case, downside risk, or "what could go wrong" questions.
-- route=["sizer"] for position sizing, dollar amounts, or how much to buy.
-- route=["technical","macro"] — combine multiple specialists when the question spans domains.
-- route=[] — answer DIRECTLY as AXIOM for: greetings, general portfolio questions, strategy, watchlist discussion, anything that doesn't need a specialist.
+- route=["macro"] for macro, Fed, rates, inflation, geopolitical questions.
+- route=["catalyst"] for earnings dates, catalysts on a specific ticker.
+- route=["risk"] for risk, dilution, concentration, volatility.
+- route=["bear"] for bear case or "what could go wrong".
+- route=["sizer"] for position sizing or how much to buy.
+- route=[] — answer DIRECTLY as AXIOM for: greetings, portfolio questions, strategy, watchlist, anything that doesn't need a specialist.
 
-When routing to specialist(s), set "speak" to a brief 1-sentence intro using their real name (e.g. "Let me get REX's read on that chart." or "NOVA and ATLAS will cover this.").
-When answering directly, set "speak" to your full answer.
+When routing: set "speak" to a brief 1-sentence intro ("Let me get REX on that chart.").
+When answering directly: set "speak" to your full casual answer.
 Today: ${new Date().toDateString()}.${historyBlock}
-Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fullCouncil":<bool>,"ticker":"<TICKER or null>","route":["agentId1","agentId2"]}`;
+Output ONLY the raw JSON object — no code fences, no backticks, no prose before or after: {"speak":"<response or intro>","fullCouncil":<bool>,"ticker":"<TICKER or null>","route":["agentId1"]}`;
 
     let router;
     try {
@@ -384,6 +402,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
 
     // === FULL COUNCIL ===
     if (router.fullCouncil && router.ticker) {
+      // New topic — clear portfolio follow-up carry
+      portfolioFollowUpRef.current = 0;
+      lastPortfolioDataRef.current = '';
       const tkr = String(router.ticker).toUpperCase();
       const intro = router.speak || `Convening the full council on ${tkr}.`;
       setChat(p => [...p, { role:'pm', text:intro }]);

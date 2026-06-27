@@ -6,6 +6,14 @@ const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const ENTRIES = [
   {
+    version: '0.3.2', date: '2026-06-26', label: 'FIX',
+    changes: [
+      { type: 'FIX', text: 'Portfolio data lost on follow-ups — after fetching live quotes for a portfolio question, the data now carries over automatically for the next 3 follow-up messages (e.g. "why did it do that?" still has the data). Clears when a new ticker council is convened.' },
+      { type: 'FIX', text: 'AXIOM tone still corporate despite prompt update — rewrote the axiomSys router prompt with explicit BAD/GOOD tone examples and instructions to name biggest movers, use casual language, and give context. AXIOM_CONVERSATIONAL updated to match.' },
+      { type: 'FIX', text: 'AXIOM wrapping JSON in code fences — axiomSys format instruction changed from "Respond with JSON in a ```json block" to "Output ONLY the raw JSON object — no code fences, no backticks." Saves tokens every call.' },
+    ],
+  },
+  {
     version: '0.3.1', date: '2026-06-26', label: 'DEBUG',
     changes: [
       { type: 'FEAT', text: 'Universal Debug System — every feature pipes debug data into a single centralized store (src/utils/debugStore.js). No more prop drilling. Any component calls writeDebug(source, title, payload) and it appears in the Debug panel instantly.' },

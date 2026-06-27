@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Sun, Moon, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase.js';
-import ArcReactor from './ArcReactor.jsx';
+import SparkLogo from './SparkLogo.jsx';
 import { ACCOUNTS } from '../constants/agents.js';
 
 const FONT = { fontFamily: 'var(--font-display)' };
@@ -19,7 +19,7 @@ export default function TopBar({ dark, setDark, account, setAccount, running }) 
       background: dark ? 'rgba(9,9,11,0.8)' : 'rgba(250,250,250,0.8)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ArcReactor size={22} />
+        <SparkLogo size={22} />
         <span style={{ ...FONT, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', color: dark ? '#FAFAFA' : '#09090B' }}>
           THE COUNCIL
         </span>

@@ -31,6 +31,19 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 14)
+
+### Post-redesign UI polish ✓
+- [x] Kill all cyan/teal — zero `#38e0d4` or `#00C805` in app; replaced with `#22C55E` green, `#EF4444` red, `#3B82F6` blue accent
+- [x] Top Movers centered on desktop (justify-center, max-width 1200px)
+- [x] Chart redesigned — Catmull-Rom bezier curves, Y-axis dollar labels + grid lines, X-axis date/time labels, 3-stop gradient fill, scrub preserved
+- [x] Spark SVG logo — gradient starburst (6 spokes × agent colors); `SparkLogo.jsx` replaces all ArcReactor instances in App/TopBar/ChatTab; `favicon.svg` updated
+- [x] `CouncilLoader.jsx` — 6 colored dots orbiting, pure linear spin, sm/md/lg; replaced ArcReactor in AuthGate, Loader2 synthesis spinner in CouncilTab
+- [x] Agent colors: REX→`#6366F1`, NOVA→`#F59E0B`, SAGE→`#A855F7`, ATLAS→`#3B82F6`, VEGA→`#EF4444`, ZEN→`#22C55E`
+- [x] Market-closed alert guard: `checkAlerts` returns early when `getMarketState` returns 'closed' (no weekend/holiday alerts)
+
+---
+
 ## IN PROGRESS
 
 ### Alpha Tracker vs SPY ⚡

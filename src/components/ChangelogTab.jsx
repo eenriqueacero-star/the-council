@@ -120,10 +120,10 @@ const ENTRIES = [
 ];
 
 const BADGE = {
-  FEAT: { bg: 'rgba(0,200,5,0.1)',      fg: '#00C805' },
+  FEAT: { bg: 'rgba(34,197,94,0.1)',    fg: '#22C55E' },
   FIX:  { bg: 'rgba(245,158,11,0.1)',   fg: '#B45309' },
-  SEC:  { bg: 'rgba(255,59,48,0.1)',    fg: '#FF3B30' },
-  GUI:  { bg: 'rgba(176,131,255,0.15)', fg: '#b083ff' },
+  SEC:  { bg: 'rgba(239,68,68,0.1)',    fg: '#EF4444' },
+  GUI:  { bg: 'rgba(168,85,247,0.15)', fg: '#A855F7' },
 };
 
 export default function ChangelogTab({ dark }) {

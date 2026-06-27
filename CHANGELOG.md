@@ -4,6 +4,51 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-27 (session 14)
+
+### 6 post-redesign UI fixes
+
+**Fix 1 — Kill all cyan/teal:**
+- `src/constants/styles.js`: `CY` → `#3B82F6`, `GRN` → `#22C55E`, `RED` → `#EF4444`
+- `src/components/ScoutTab.jsx`: all `#38e0d4` → `#3B82F6`, `#00C805` → `#22C55E`, `#FF3B30` → `#EF4444`
+- `src/components/SettingsTab.jsx`: same replacements
+- `src/components/WatchdogTab.jsx`: `ACCENT` → `#3B82F6`, error red → `#EF4444`
+- `src/components/AlphaTrackerTab.jsx`: all color refs updated to new palette
+- `src/components/ChatTab.jsx`: PS stance map updated
+- `src/components/CouncilTab.jsx`: PS map + track buttons + error colors updated
+- `src/components/ChangelogTab.jsx`: badge colors updated, SAGE purple → `#A855F7`
+- `src/components/DCATab.jsx`: ACCENT `#f5c451` → `#F59E0B`
+- `src/components/RoadmapTab.jsx`: `#f5c451` → `#F59E0B`
+
+**Fix 2 — Top Movers centering on desktop:**
+- Added `justifyContent: 'center'`, `maxWidth: 1200`, `margin: '0 auto'` to movers scroll row in `PortfolioTab.jsx`
+
+**Fix 3 — Fidelity-style chart:**
+- Catmull-Rom → cubic bezier smooth curves (6-control-point spline)
+- Y-axis: 3 price labels at 10/50/90% of range with subtle grid lines
+- X-axis: 3 date/time labels (time format for 1D range, date format for others)
+- 3-stop gradient fill (more opaque at top)
+- Scrub crosshair preserved; dot has white stroke ring
+
+**Fix 4 — Spark SVG logo:**
+- New `public/favicon.svg`: 6-spoke starburst with multi-stop gradient (one spoke per agent color), center node
+- New `src/components/SparkLogo.jsx`: inline React SVG component
+- Replaced `ArcReactor` in `App.jsx`, `TopBar.jsx`, `ChatTab.jsx` with `SparkLogo`
+
+**Fix 5 — CouncilLoader:**
+- New `src/components/ui/CouncilLoader.jsx`: 6 colored dots orbiting, pure CSS linear spin, sm/md/lg sizes
+- Replaced `ArcReactor` in `AuthGate.jsx` with `CouncilLoader lg`
+- Replaced `Loader2` synthesis spinner in `CouncilTab.jsx` with `CouncilLoader sm`
+
+**Fix 6 — Agent colors:**
+- `src/constants/agents.js`: REX→`#6366F1`, NOVA→`#F59E0B`, SAGE→`#A855F7`, ATLAS→`#3B82F6`, VEGA→`#EF4444`, ZEN→`#22C55E`
+- ROADMAP tier colors: BUILT→`#22C55E`, HIGH VALUE→`#F59E0B`, STRONG EDGE→`#3B82F6`
+
+**Market-closed alert guard:**
+- `src/App.jsx` `checkAlerts`: added early return when `getMarketState(new Date()) === 'closed'` — alerts no longer fire on weekends or holidays
+
+---
+
 ## 2026-06-27 (session 13)
 
 ### Full UI Redesign — Apple-clean cinematic design system

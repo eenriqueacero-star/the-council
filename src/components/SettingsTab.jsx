@@ -22,7 +22,7 @@ export default function SettingsTab({ dark, setDark, alertSettings, setAlertSett
   }
 
   const NotifIcon = notifPerm === 'granted' ? BellRing : notifPerm === 'denied' ? BellOff : Bell;
-  const notifColor = notifPerm === 'granted' ? '#38e0d4' : notifPerm === 'denied' ? '#FF3B30' : T.text2;
+  const notifColor = notifPerm === 'granted' ? '#22C55E' : notifPerm === 'denied' ? '#EF4444' : T.text2;
   const notifLabel = notifPerm === 'granted' ? 'On' : notifPerm === 'denied' ? 'Blocked by browser' : 'Off';
 
   return (
@@ -65,7 +65,7 @@ export default function SettingsTab({ dark, setDark, alertSettings, setAlertSett
             </div>
           </div>
           {notifPerm !== 'granted' && notifPerm !== 'denied' && (
-            <button onClick={enableNotifs} style={{ ...MFONT, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#38e0d4', color: '#000', cursor: 'pointer' }}>
+            <button onClick={enableNotifs} style={{ ...MFONT, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 8, border: 'none', background: '#3B82F6', color: '#fff', cursor: 'pointer' }}>
               Enable
             </button>
           )}
@@ -81,9 +81,9 @@ export default function SettingsTab({ dark, setDark, alertSettings, setAlertSett
                 onClick={() => setAlertSettings(prev => ({ ...prev, globalThreshold: t }))}
                 style={{
                   ...MFONT, fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8,
-                  border: `1px solid ${alertSettings?.globalThreshold === t ? '#38e0d4' : T.border}`,
-                  background: alertSettings?.globalThreshold === t ? 'rgba(56,224,212,0.15)' : 'transparent',
-                  color: alertSettings?.globalThreshold === t ? '#38e0d4' : T.text2,
+                  border: `1px solid ${alertSettings?.globalThreshold === t ? '#3B82F6' : T.border}`,
+                  background: alertSettings?.globalThreshold === t ? 'rgba(59,130,246,0.15)' : 'transparent',
+                  color: alertSettings?.globalThreshold === t ? '#3B82F6' : T.text2,
                   cursor: 'pointer',
                 }}
               >

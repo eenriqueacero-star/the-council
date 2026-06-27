@@ -44,10 +44,10 @@ function computeReturns(r, exitPrice, spyExitPrice) {
 
 function StatusBadge({ status }) {
   if (status === 'entered') return (
-    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(56,224,212,0.12)', color: '#38e0d4', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>ENTERED</span>
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(99,102,241,0.12)', color: '#6366F1', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>ENTERED</span>
   );
   if (status === 'watching') return (
-    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(176,131,255,0.12)', color: '#b083ff', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>WATCHING</span>
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(168,85,247,0.12)', color: '#A855F7', padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap' }}>WATCHING</span>
   );
   return null;
 }
@@ -60,12 +60,12 @@ function OutcomeBadge({ outcome, T }) {
     </span>
   );
   if (outcome === 'target' || outcome === 'win') return (
-    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(0,200,5,0.12)', color: '#00C805', padding: '2px 7px', borderRadius: 4 }}>
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(34,197,94,0.12)', color: '#22C55E', padding: '2px 7px', borderRadius: 4 }}>
       {outcome === 'win' ? 'WIN ✓' : 'TARGET ✓'}
     </span>
   );
   if (outcome === 'stop' || outcome === 'loss') return (
-    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(255,59,48,0.12)', color: '#FF3B30', padding: '2px 7px', borderRadius: 4 }}>
+    <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: 'rgba(239,68,68,0.12)', color: '#EF4444', padding: '2px 7px', borderRadius: 4 }}>
       {outcome === 'loss' ? 'LOSS ✗' : 'STOP ✗'}
     </span>
   );
@@ -90,9 +90,9 @@ function AlphaCell({ r, T }) {
   if (r.alpha == null) {
     return <span style={{ ...MFONT, color: T.text3, fontSize: 11 }}>—</span>;
   }
-  const myColor  = r.myReturn  >= 0 ? '#00C805' : '#FF3B30';
-  const spyColor = r.spyReturn >= 0 ? '#00C805' : '#FF3B30';
-  const aColor   = r.alpha     >= 0 ? '#00C805' : '#FF3B30';
+  const myColor  = r.myReturn  >= 0 ? '#22C55E' : '#EF4444';
+  const spyColor = r.spyReturn >= 0 ? '#22C55E' : '#EF4444';
+  const aColor   = r.alpha     >= 0 ? '#22C55E' : '#EF4444';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       <span style={{ ...MFONT, fontSize: 9, color: myColor,  fontWeight: 600 }}>Me {pctStr(r.myReturn)}</span>
@@ -333,11 +333,11 @@ export default function AlphaTrackerTab({ account, dark }) {
   // Alpha summary panel colors
   const alphaPositive = stats.totalAlpha != null && stats.totalAlpha >= 0;
   const alphaBorderColor = stats.withAlphaCount === 0 ? 'transparent'
-    : alphaPositive ? 'rgba(0,200,5,0.25)' : 'rgba(255,59,48,0.25)';
+    : alphaPositive ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)';
   const alphaBgColor = stats.withAlphaCount === 0 ? T.bgCard
-    : alphaPositive ? 'rgba(0,200,5,0.05)' : 'rgba(255,59,48,0.05)';
+    : alphaPositive ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.05)';
   const alphaTextColor = stats.withAlphaCount === 0 ? T.text
-    : alphaPositive ? '#00C805' : '#FF3B30';
+    : alphaPositive ? '#22C55E' : '#EF4444';
 
   return (
     <div style={{ ...FONT, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -365,9 +365,9 @@ export default function AlphaTrackerTab({ account, dark }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
             {[
               { label: 'TRACKED',        value: String(stats.total), sub: `${stats.enteredCount} entered · ${stats.watchingCount} watching`, color: undefined },
-              { label: 'WIN RATE',        value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} entered`, color: '#00C805' },
-              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped    / stats.graded * 100)}%` : '—', sub: `${stats.stopped} losses`, color: '#FF3B30' },
-              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `entered trades only`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#00C805' : '#FF3B30') : undefined },
+              { label: 'WIN RATE',        value: stats.graded ? `${Math.round(stats.targetHit / stats.graded * 100)}%` : '—', sub: `${stats.targetHit} of ${stats.graded} entered`, color: '#22C55E' },
+              { label: 'STOPPED OUT',    value: stats.graded ? `${Math.round(stats.stopped    / stats.graded * 100)}%` : '—', sub: `${stats.stopped} losses`, color: '#EF4444' },
+              { label: 'AVG 30D RETURN', value: stats.avgReturn != null ? `${stats.avgReturn >= 0 ? '+' : ''}${stats.avgReturn.toFixed(1)}%` : '—', sub: `entered trades only`, color: stats.avgReturn != null ? (stats.avgReturn >= 0 ? '#22C55E' : '#EF4444') : undefined },
             ].map((c, i) => (
               <div key={i} style={{ borderRadius: 12, padding: 16, background: T.bgCard, border: `1px solid ${T.border}` }}>
                 <div style={{ ...MFONT, fontSize: 9, letterSpacing: '0.10em', color: T.text2, marginBottom: 6 }}>{c.label}</div>
@@ -383,8 +383,8 @@ export default function AlphaTrackerTab({ account, dark }) {
               {stats.withAlphaCount === 0
                 ? <Minus size={13} style={{ color: T.text3 }} />
                 : alphaPositive
-                  ? <TrendingUp size={13} style={{ color: '#00C805' }} />
-                  : <TrendingDown size={13} style={{ color: '#FF3B30' }} />}
+                  ? <TrendingUp size={13} style={{ color: '#22C55E' }} />
+                  : <TrendingDown size={13} style={{ color: '#EF4444' }} />}
               <span style={{ ...MFONT, fontSize: 10, letterSpacing: '0.10em', color: T.text2, fontWeight: 600 }}>ALPHA vs SPY BENCHMARK</span>
               {stats.withAlphaCount > 0 && (
                 <span style={{ ...MFONT, fontSize: 9, color: T.text3, marginLeft: 'auto' }}>{stats.withAlphaCount} trade{stats.withAlphaCount !== 1 ? 's' : ''} benchmarked</span>
@@ -408,13 +408,13 @@ export default function AlphaTrackerTab({ account, dark }) {
                     label: 'AVG ALPHA / TRADE',
                     value: pctStr(stats.avgAlpha, 1) || '—',
                     sub: 'vs SPY over same period',
-                    color: stats.avgAlpha != null ? (stats.avgAlpha >= 0 ? '#00C805' : '#FF3B30') : T.text,
+                    color: stats.avgAlpha != null ? (stats.avgAlpha >= 0 ? '#22C55E' : '#EF4444') : T.text,
                   },
                   {
                     label: 'BEAT SPY RATE',
                     value: stats.winVsSpy != null ? `${stats.winVsSpy}%` : '—',
                     sub: `${stats.beatSpy} of ${stats.withAlphaCount} trades`,
-                    color: stats.winVsSpy != null ? (stats.winVsSpy >= 50 ? '#00C805' : '#FF3B30') : T.text,
+                    color: stats.winVsSpy != null ? (stats.winVsSpy >= 50 ? '#22C55E' : '#EF4444') : T.text,
                   },
                 ].map((c, i) => (
                   <div key={i}>
@@ -434,9 +434,9 @@ export default function AlphaTrackerTab({ account, dark }) {
                 {AGENTS.map(a => {
                   const s        = stats.agentAcc[a.id];
                   const barColor = s.pct == null ? T.border
-                    : s.pct >= 65 ? '#00C805'
+                    : s.pct >= 65 ? '#22C55E'
                     : s.pct >= 45 ? T.text
-                    : '#FF3B30';
+                    : '#EF4444';
                   return (
                     <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{ borderRadius: 6, padding: 6, flexShrink: 0, background: `${a.accent}1a`, border: `1px solid ${a.accent}22` }}>
@@ -502,7 +502,7 @@ export default function AlphaTrackerTab({ account, dark }) {
                         <td style={{ ...MFONT, color: T.text2, fontSize: 11, padding: '10px 12px' }}>{displayPrice ? `$${displayPrice.toFixed(2)}` : '—'}</td>
                         <td style={{ padding: '10px 12px' }}>
                           {move != null
-                            ? <span style={{ ...MFONT, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#00C805' : '#FF3B30' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
+                            ? <span style={{ ...MFONT, fontSize: 11, fontWeight: 600, color: move >= 0 ? '#22C55E' : '#EF4444' }}>{move >= 0 ? '+' : ''}{move.toFixed(1)}%</span>
                             : <span style={{ ...MFONT, color: T.text3, fontSize: 11 }}>—</span>}
                         </td>
                         <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
@@ -516,12 +516,12 @@ export default function AlphaTrackerTab({ account, dark }) {
                                 <button
                                   onClick={() => closeRuling(r.id, 'win')}
                                   title="Mark as Win"
-                                  style={{ ...btnBase, background: 'rgba(0,200,5,0.12)', color: '#00C805' }}
+                                  style={{ ...btnBase, background: 'rgba(34,197,94,0.12)', color: '#22C55E' }}
                                 >WIN</button>
                                 <button
                                   onClick={() => closeRuling(r.id, 'loss')}
                                   title="Mark as Loss"
-                                  style={{ ...btnBase, background: 'rgba(255,59,48,0.12)', color: '#FF3B30' }}
+                                  style={{ ...btnBase, background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}
                                 >LOSS</button>
                               </>
                             )}
@@ -529,7 +529,7 @@ export default function AlphaTrackerTab({ account, dark }) {
                               <button
                                 onClick={() => markEntered(r.id)}
                                 title="Reclassify as Entered"
-                                style={{ ...btnBase, background: 'rgba(56,224,212,0.1)', color: '#38e0d4' }}
+                                style={{ ...btnBase, background: 'rgba(99,102,241,0.1)', color: '#6366F1' }}
                               >→ ENT</button>
                             )}
                             {!isPending ? (
@@ -544,7 +544,7 @@ export default function AlphaTrackerTab({ account, dark }) {
                               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                                 <button
                                   onClick={() => deleteRuling(r.id)}
-                                  style={{ ...btnBase, background: 'rgba(255,59,48,0.15)', color: '#FF3B30' }}
+                                  style={{ ...btnBase, background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}
                                 >DEL</button>
                                 <button
                                   onClick={() => setDeletePending(prev => { const n = new Set(prev); n.delete(r.id); return n; })}

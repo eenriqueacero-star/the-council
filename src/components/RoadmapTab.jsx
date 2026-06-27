@@ -59,10 +59,10 @@ export default function RoadmapTab({ dark }) {
         ))}
       </div>
 
-      <div style={{ marginTop:24, borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'flex-start', gap:12, background:'rgba(245,196,81,0.06)', border:'1px solid rgba(245,196,81,0.22)' }}>
-        <Clock size={14} style={{ color:'#f5c451', marginTop:1, flexShrink:0 }} />
+      <div style={{ marginTop:24, borderRadius:12, padding:'14px 16px', display:'flex', alignItems:'flex-start', gap:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.22)' }}>
+        <Clock size={14} style={{ color:'#F59E0B', marginTop:1, flexShrink:0 }} />
         <div>
-          <div style={{ ...MFONT, fontSize:10, fontWeight:600, letterSpacing:'0.10em', color:'#f5c451', marginBottom:4 }}>WHEN READY</div>
+          <div style={{ ...MFONT, fontSize:10, fontWeight:600, letterSpacing:'0.10em', color:'#F59E0B', marginBottom:4 }}>WHEN READY</div>
           <p style={{ fontSize:12, color:T.text2, lineHeight:1.55 }}>
             Morning Brief, Shared Recon, Trade Log, All-Accounts mode, Consensus Meter, and real watchlist picks are coming in Phase E.
           </p>

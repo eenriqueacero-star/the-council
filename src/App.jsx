@@ -6,7 +6,7 @@ import { auth, db } from './firebase.js';
 import { ACCOUNTS } from './constants/agents.js';
 import { getMarketState, getTimeToNextOpen } from './utils/marketState.js';
 import { theme } from './utils/theme.js';
-import ArcReactor from './components/ArcReactor.jsx';
+import SparkLogo from './components/SparkLogo.jsx';
 import TopBar from './components/TopBar.jsx';
 import MarketBanner from './components/MarketBanner.jsx';
 import BottomNav from './components/BottomNav.jsx';
@@ -183,6 +183,7 @@ export default function App() {
     const today = new Date().toDateString();
     if (lastAlertDate.current !== today) { alertFiredToday.current = {}; lastAlertDate.current = today; }
     if (getPermissionState() !== 'granted') return;
+    if (getMarketState(new Date()) === 'closed') return;
     const uid = auth.currentUser?.uid;
     const positionsNow = positionsRef.current;
     const tickers = Object.keys(positionsNow[account] || {}).filter(t => t && t.trim());
@@ -285,7 +286,7 @@ export default function App() {
         borderRight: `1px solid ${T.border}`,
         zIndex: 50, alignItems: 'center', paddingTop: 16, paddingBottom: 16,
       }}>
-        <div style={{ marginBottom: 24 }}><ArcReactor size={26} /></div>
+        <div style={{ marginBottom: 24 }}><SparkLogo size={26} /></div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, width: '100%' }}>
           {SIDEBAR_TABS.map(({ id, Icon, label }) => {
             const active = tab === id;
@@ -348,7 +349,7 @@ export default function App() {
           borderBottom: `1px solid ${T.border}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ArcReactor size={20} />
+            <SparkLogo size={20} />
             <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', color: T.text }}>THE COUNCIL</span>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>

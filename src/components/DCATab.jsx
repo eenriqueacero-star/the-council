@@ -8,7 +8,7 @@ import { writeDebug } from '../utils/debugStore.js';
 
 const MFONT  = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 const FONT   = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
-const ACCENT = '#f5c451';
+const ACCENT = '#F59E0B';
 
 export default function DCATab({ acct, acctHoldings, positionsLine, flagApiDown, dark }) {
   const T = theme(dark);

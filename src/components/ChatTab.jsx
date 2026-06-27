@@ -12,18 +12,18 @@ import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
 import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from '../utils/agentMemory.js';
 import { useVoice } from '../hooks/useVoice.js';
 import { theme } from '../utils/theme.js';
-import ArcReactor from './ArcReactor.jsx';
+import SparkLogo from './SparkLogo.jsx';
 import { writeDebug } from '../utils/debugStore.js';
 
 const PS = {
-  PASS:       { bg:'rgba(0,200,5,0.1)',    fg:'#00C805', label:'PASS'    },
-  FAIL:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'FAIL'    },
-  CAUTION:    { bg:'rgba(245,158,11,0.1)', fg:'#B45309', label:'CAUTION' },
-  BEARISH:    { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'BEAR'    },
-  BUY:        { bg:'rgba(0,200,5,0.15)',   fg:'#00C805', label:'BUY'     },
-  WATCH:      { bg:'rgba(245,158,11,0.15)',fg:'#B45309', label:'WATCH'   },
-  SKIP:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // AXIOM rejection
-  PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // backward-compat
+  PASS:       { bg:'rgba(34,197,94,0.1)',   fg:'#22C55E', label:'PASS'    },
+  FAIL:       { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'FAIL'    },
+  CAUTION:    { bg:'rgba(245,158,11,0.1)',  fg:'#B45309', label:'CAUTION' },
+  BEARISH:    { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'BEAR'    },
+  BUY:        { bg:'rgba(34,197,94,0.15)',  fg:'#22C55E', label:'BUY'     },
+  WATCH:      { bg:'rgba(245,158,11,0.15)', fg:'#B45309', label:'WATCH'   },
+  SKIP:       { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'SKIP'    },  // AXIOM rejection
+  PASS_FINAL: { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'SKIP'    },  // backward-compat
 };
 
 const PORTFOLIO_KEYWORDS = ['portfolio','holdings','p&l','pnl','how did','performance','today','positions','my stocks','how are we doing','green','red','down','up','gains','losses','unrealized','total value'];
@@ -581,7 +581,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       return (
         <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
           style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
-          <div style={{ flexShrink: 0, marginTop: 2 }}><ArcReactor size={24} /></div>
+          <div style={{ flexShrink: 0, marginTop: 2 }}><SparkLogo size={24} /></div>
           <div style={{ maxWidth: '82%' }}>
             <div style={{ ...MONO, fontSize: 9, color: T.accent, marginBottom: 4, letterSpacing: '0.08em' }}>AXIOM</div>
             <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>
@@ -672,7 +672,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
                         <motion.button whileTap={{ scale: 0.94 }} onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('entered'); setChatTrackPrice(m.rulingData.livePrice ? m.rulingData.livePrice.toFixed(2) : ''); setChatTrackShares(''); }}
                           style={{ ...MONO, fontSize: 9, fontWeight: 600, background: `${T.accent}18`, color: T.accent, border: `1px solid ${T.accent}30`, borderRadius: 5, padding: '3px 10px', cursor: 'pointer' }}>▸ Entered</motion.button>
                         <motion.button whileTap={{ scale: 0.94 }} onClick={() => { setChatTrackRunId(m.runId); setChatTrackStatus('watching'); setChatTrackPrice(''); setChatTrackShares(''); }}
-                          style={{ ...MONO, fontSize: 9, fontWeight: 600, background: 'rgba(176,131,255,0.12)', color: '#b083ff', border: '1px solid rgba(176,131,255,0.25)', borderRadius: 5, padding: '3px 10px', cursor: 'pointer' }}>◎ Watching</motion.button>
+                          style={{ ...MONO, fontSize: 9, fontWeight: 600, background: 'rgba(168,85,247,0.12)', color: '#A855F7', border: '1px solid rgba(168,85,247,0.25)', borderRadius: 5, padding: '3px 10px', cursor: 'pointer' }}>◎ Watching</motion.button>
                       </div>
                     )}
                   </div>
@@ -709,7 +709,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
           {chatBusy && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
-              <div style={{ flexShrink: 0, marginTop: 2 }}><ArcReactor size={24} /></div>
+              <div style={{ flexShrink: 0, marginTop: 2 }}><SparkLogo size={24} /></div>
               <div style={{ background: BUBBLE_BG_AGENT, borderRadius: '18px 18px 18px 4px', padding: '12px 16px', display: 'flex', gap: 5, alignItems: 'center' }}>
                 {[0, 1, 2].map(d => (
                   <motion.span key={d} animate={{ y: [0, -5, 0] }} transition={{ duration: 0.6, delay: d * 0.12, repeat: Infinity }}

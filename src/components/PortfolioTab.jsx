@@ -107,15 +107,34 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const displayValue = (scrubIdx !== null && chartPoints[scrubIdx]) ? chartPoints[scrubIdx] : totalValue;
 
   // SVG chart
-  const W = 400, H = 140;
+  const W = 400, H = 160, PAD_L = 52, PAD_B = 28, PAD_T = 12, PAD_R = 8;
+  const CW = W - PAD_L - PAD_R, CH = H - PAD_T - PAD_B;
+
+  // Catmull-Rom → cubic bezier conversion
+  function catmullRomPath(xs, ys) {
+    if (xs.length < 2) return `M${xs[0]},${ys[0]}`;
+    let d = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`;
+    for (let i = 0; i < xs.length - 1; i++) {
+      const p0 = i > 0 ? i - 1 : i;
+      const p1 = i, p2 = i + 1, p3 = i + 2 < xs.length ? i + 2 : i + 1;
+      const cp1x = xs[p1] + (xs[p2] - xs[p0]) / 6;
+      const cp1y = ys[p1] + (ys[p2] - ys[p0]) / 6;
+      const cp2x = xs[p2] - (xs[p3] - xs[p1]) / 6;
+      const cp2y = ys[p2] - (ys[p3] - ys[p1]) / 6;
+      d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${xs[p2].toFixed(1)},${ys[p2].toFixed(1)}`;
+    }
+    return d;
+  }
+
   const renderChart = () => {
     if (!withShares.length) return (
       <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3 }}>Add positions with share counts to see your equity curve</span>
       </div>
     );
-    if (!chartPoints.length && !candlesLoaded) return <div className="skeleton" style={{ height: 80, borderRadius: 8 }} />;
+    if (!chartPoints.length && !candlesLoaded) return <div className="skeleton" style={{ height: H, borderRadius: 8 }} />;
     const effectivePoints = chartPoints.length ? chartPoints : (prevValue > 0 ? [prevValue, totalValue || prevValue] : []);
+    const effectiveTimes  = candles.length ? candles.map(c => c.t) : null;
     if (!effectivePoints.length) return (
       <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3 }}>No chart data</span>
@@ -124,19 +143,40 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
     const isSynthetic = !chartPoints.length;
     const min = Math.min(...effectivePoints), max = Math.max(...effectivePoints);
-    const rng = max - min || 1;
-    const xs  = effectivePoints.map((_, i) => (i / Math.max(effectivePoints.length - 1, 1)) * W);
-    const ys  = effectivePoints.map(p => H - ((p - min) / rng) * (H - 20) - 10);
-    const linePath = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
-    const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
+    const rng = max - min || max * 0.01 || 1;
+    const padMin = min - rng * 0.08, padMax = max + rng * 0.08;
+    const padRng = padMax - padMin;
+
+    const xs = effectivePoints.map((_, i) => PAD_L + (i / Math.max(effectivePoints.length - 1, 1)) * CW);
+    const ys = effectivePoints.map(p => PAD_T + CH - ((p - padMin) / padRng) * CH);
+
+    const linePath = catmullRomPath(xs, ys);
+    const areaPath = `${linePath} L${xs[xs.length-1].toFixed(1)},${(PAD_T+CH).toFixed(1)} L${PAD_L},${(PAD_T+CH).toFixed(1)} Z`;
     const gradId   = `cg${chartKey}`;
     const scrubX   = scrubIdx !== null ? xs[scrubIdx] : null;
     const scrubY   = scrubIdx !== null ? ys[scrubIdx] : null;
 
+    // Y-axis: 3 labels
+    const yLabels = [padMin + padRng * 0.1, padMin + padRng * 0.5, padMin + padRng * 0.9].map((v, i) => ({
+      v, y: PAD_T + CH - ((v - padMin) / padRng) * CH
+    }));
+
+    // X-axis: 3 date labels
+    const fmtDate = (ts) => {
+      if (!ts) return '';
+      const d = new Date(ts * 1000);
+      return range === '1D'
+        ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+    const xLabelIdxs = effectiveTimes ? [0, Math.floor(effectiveTimes.length / 2), effectiveTimes.length - 1] : [];
+
     const handleMove = e => {
       const rect = e.currentTarget.getBoundingClientRect();
       const cx   = e.touches ? e.touches[0].clientX : e.clientX;
-      const idx  = Math.round(((cx - rect.left) / rect.width) * (effectivePoints.length - 1));
+      const relX = cx - rect.left - (rect.width * PAD_L / W);
+      const plotW = rect.width * CW / W;
+      const idx  = Math.round((relX / plotW) * (effectivePoints.length - 1));
       setScrubIdx(Math.max(0, Math.min(effectivePoints.length - 1, idx)));
     };
 
@@ -147,20 +187,37 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={lineColor} stopOpacity="0.18" />
+              <stop offset="0%"   stopColor={lineColor} stopOpacity="0.22" />
+              <stop offset="75%"  stopColor={lineColor} stopOpacity="0.06" />
               <stop offset="100%" stopColor={lineColor} stopOpacity="0"    />
             </linearGradient>
           </defs>
+          {/* Y-axis grid lines + labels */}
+          {yLabels.map(({ v, y }, i) => (
+            <g key={i}>
+              <line x1={PAD_L} y1={y.toFixed(1)} x2={W - PAD_R} y2={y.toFixed(1)} stroke={T.border} strokeWidth="0.5" strokeDasharray="3 4" />
+              <text x={PAD_L - 4} y={(y + 4).toFixed(1)} textAnchor="end" fontSize="9" fill={T.text3} fontFamily="var(--font-mono)">
+                ${v >= 1000 ? (v/1000).toFixed(1)+'k' : v.toFixed(0)}
+              </text>
+            </g>
+          ))}
+          {/* X-axis date labels */}
+          {xLabelIdxs.map((idx, i) => effectiveTimes?.[idx] && (
+            <text key={i} x={xs[idx].toFixed(1)} y={(H - 6).toFixed(1)} textAnchor={i === 0 ? 'start' : i === 2 ? 'end' : 'middle'} fontSize="9" fill={T.text3} fontFamily="var(--font-mono)">
+              {fmtDate(effectiveTimes[idx])}
+            </text>
+          ))}
+          {/* Chart area + line */}
           <path d={areaPath} fill={`url(#${gradId})`} />
-          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           {scrubX !== null && (
             <>
-              <line x1={scrubX} y1="0" x2={scrubX} y2={H} stroke={T.text3} strokeWidth="1" strokeDasharray="4 3" />
-              <circle cx={scrubX} cy={scrubY} r="3.5" fill={lineColor} />
+              <line x1={scrubX.toFixed(1)} y1={PAD_T} x2={scrubX.toFixed(1)} y2={PAD_T + CH} stroke={T.text3} strokeWidth="1" strokeDasharray="4 3" />
+              <circle cx={scrubX.toFixed(1)} cy={scrubY.toFixed(1)} r="3.5" fill={lineColor} stroke={T.bg} strokeWidth="1.5" />
             </>
           )}
         </svg>
-        {isSynthetic && <div style={{ position: 'absolute', bottom: 4, right: 8, fontFamily: 'var(--font-mono)', fontSize: 9, color: T.text3 }}>PREV CLOSE REF</div>}
+        {isSynthetic && <div style={{ position: 'absolute', bottom: PAD_B + 4, right: PAD_R + 4, fontFamily: 'var(--font-mono)', fontSize: 9, color: T.text3 }}>PREV CLOSE REF</div>}
       </div>
     );
   };
@@ -258,7 +315,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
           <div style={{ ...S, paddingBottom: 8 }}>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top Movers</span>
           </div>
-          <div className="no-scrollbar" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 'var(--space-page)', paddingRight: 'var(--space-page)', paddingBottom: 4 }}>
+          <div className="no-scrollbar" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 'var(--space-page)', paddingRight: 'var(--space-page)', paddingBottom: 4, justifyContent: 'center', maxWidth: 1200, margin: '0 auto' }}>
             {movers.map(({ t, pct, price }) => (
               <motion.div key={t} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{
                 flexShrink: 0, background: T.bgCard, border: `1px solid ${pct >= 0 ? T.green + '25' : T.red + '25'}`,

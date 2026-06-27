@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, ChevronRight, Loader2, AlertTriangle, Crown, Wallet } from 'lucide-react';
+import CouncilLoader from './ui/CouncilLoader.jsx';
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
@@ -14,15 +15,15 @@ import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from 
 import { theme } from '../utils/theme.js';
 
 const PS = {
-  PASS:       { bg:'rgba(0,200,5,0.1)',    fg:'#00C805', label:'PASS'    },  // individual agent gate
-  FAIL:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'FAIL'    },
-  CAUTION:    { bg:'rgba(245,158,11,0.1)', fg:'#B45309', label:'CAUTION' },
-  BEARISH:    { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'BEAR'    },
-  BUY:        { bg:'rgba(0,200,5,0.15)',   fg:'#00C805', label:'BUY'     },
-  WATCH:      { bg:'rgba(245,158,11,0.15)',fg:'#B45309', label:'WATCH'   },
-  SKIP:       { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // AXIOM rejection
-  PASS_FINAL: { bg:'rgba(255,59,48,0.1)',  fg:'#FF3B30', label:'SKIP'    },  // backward-compat for old rulings
-  TIMEOUT:    { bg:'rgba(120,120,120,0.1)',fg:'#888',    label:'N/A'     },
+  PASS:       { bg:'rgba(34,197,94,0.1)',   fg:'#22C55E', label:'PASS'    },  // individual agent gate
+  FAIL:       { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'FAIL'    },
+  CAUTION:    { bg:'rgba(245,158,11,0.1)',  fg:'#B45309', label:'CAUTION' },
+  BEARISH:    { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'BEAR'    },
+  BUY:        { bg:'rgba(34,197,94,0.15)',  fg:'#22C55E', label:'BUY'     },
+  WATCH:      { bg:'rgba(245,158,11,0.15)', fg:'#B45309', label:'WATCH'   },
+  SKIP:       { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'SKIP'    },  // AXIOM rejection
+  PASS_FINAL: { bg:'rgba(239,68,68,0.1)',   fg:'#EF4444', label:'SKIP'    },  // backward-compat for old rulings
+  TIMEOUT:    { bg:'rgba(120,120,120,0.1)', fg:'#888',    label:'N/A'     },
 };
 
 function StanceBadge({ stance, small }) {
@@ -568,7 +569,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                   )}
 
                   {hasError && !isDone && (
-                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, ...MONO, color: '#FF3B30' }}>
+                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, ...MONO, color: '#EF4444' }}>
                       <AlertTriangle size={13} /><span style={{ fontSize: 11 }}>agent error</span>
                     </div>
                   )}
@@ -634,12 +635,12 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
         <div ref={synthRef} style={{ marginTop: 20 }}>
           {synthesis.status === 'running' && (
             <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 12, padding: 24, display: 'flex', alignItems: 'center', gap: 12, ...MONO, color: '#B45309' }}>
-              <Loader2 size={18} className="animate-spin" />
+              <CouncilLoader size="sm" />
               <span style={{ fontSize: 14 }}>{progressLabel || 'AXIOM synthesizing…'}</span>
             </div>
           )}
           {synthesis.status === 'error' && (
-            <div style={{ background: 'rgba(255,59,48,0.08)', border: '1px solid rgba(255,59,48,0.3)', borderRadius: 12, padding: 20, display: 'flex', alignItems: 'center', gap: 10, ...MONO, color: '#FF3B30' }}>
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: 20, display: 'flex', alignItems: 'center', gap: 10, ...MONO, color: '#EF4444' }}>
               <AlertTriangle size={16} /><span style={{ fontSize: 13 }}>Synthesis failed — retry by convening again.</span>
             </div>
           )}
@@ -671,8 +672,8 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                     <div style={{ width: `${(synthesis.result.conviction / 10) * 100}%`, background: vStyle.fg, height: '100%', borderRadius: 4, transition: 'width .8s ease' }} />
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 10, ...MONO, fontSize: 11, color: 'rgba(255,255,255,0.55)', flexWrap: 'wrap' }}>
-                    {synthesis.result.stopLoss   && <span>STOP <strong style={{ color: '#FF3B30' }}>{synthesis.result.stopLoss}</strong></span>}
-                    {synthesis.result.takeProfit && <span>TARGET <strong style={{ color: '#00C805' }}>{synthesis.result.takeProfit}</strong></span>}
+                    {synthesis.result.stopLoss   && <span>STOP <strong style={{ color: '#EF4444' }}>{synthesis.result.stopLoss}</strong></span>}
+                    {synthesis.result.takeProfit && <span>TARGET <strong style={{ color: '#22C55E' }}>{synthesis.result.takeProfit}</strong></span>}
                   </div>
                 </div>
               </div>
@@ -691,7 +692,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
               {synthesis.rulingData && (
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                   {trackSaved ? (
-                    <div style={{ ...MONO, fontSize: 11, color: '#38e0d4', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ ...MONO, fontSize: 11, color: '#22C55E', display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>✓</span>
                       <span>Saved to Alpha Tracker · {trackStatus === 'entered' ? 'ENTERED' : 'WATCHING'}</span>
                     </div>
@@ -700,13 +701,13 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                       <span style={{ ...MONO, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>TRACK:</span>
                       <button
                         onClick={() => { setTrackStatus('entered'); setTrackPrice(synthesis.rulingData.livePrice ? synthesis.rulingData.livePrice.toFixed(2) : ''); }}
-                        style={{ ...MONO, fontSize: 11, fontWeight: 600, background: 'rgba(56,224,212,0.15)', color: '#38e0d4', border: '1px solid rgba(56,224,212,0.3)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}
+                        style={{ ...MONO, fontSize: 11, fontWeight: 600, background: 'rgba(34,197,94,0.15)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}
                       >
                         ▸ Entered
                       </button>
                       <button
                         onClick={() => setTrackStatus('watching')}
-                        style={{ ...MONO, fontSize: 11, fontWeight: 600, background: 'rgba(176,131,255,0.15)', color: '#b083ff', border: '1px solid rgba(176,131,255,0.3)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}
+                        style={{ ...MONO, fontSize: 11, fontWeight: 600, background: 'rgba(168,85,247,0.15)', color: '#A855F7', border: '1px solid rgba(168,85,247,0.3)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer' }}
                       >
                         ◎ Watching
                       </button>
@@ -733,7 +734,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                         <button
                           onClick={saveToTracker}
                           disabled={trackSaving}
-                          style={{ ...MONO, fontSize: 11, fontWeight: 600, background: '#38e0d4', color: '#000', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: trackSaving ? 'not-allowed' : 'pointer', opacity: trackSaving ? 0.7 : 1 }}
+                          style={{ ...MONO, fontSize: 11, fontWeight: 600, background: '#22C55E', color: '#000', border: 'none', borderRadius: 6, padding: '6px 14px', cursor: trackSaving ? 'not-allowed' : 'pointer', opacity: trackSaving ? 0.7 : 1 }}
                         >
                           {trackSaving ? 'Saving…' : `Save · ${trackStatus === 'entered' ? 'ENTERED' : 'WATCHING'}`}
                         </button>

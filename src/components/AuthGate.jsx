@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase.js';
-import ArcReactor from './ArcReactor.jsx';
+import CouncilLoader from './ui/CouncilLoader.jsx';
 
 export default function AuthGate({ children, user }) {
   const [email,    setEmail]    = useState('');
@@ -38,7 +38,7 @@ export default function AuthGate({ children, user }) {
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         style={{ width: '100%', maxWidth: 360, padding: '0 24px' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><ArcReactor size={48} /></div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><CouncilLoader size="lg" /></div>
           <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '0.12em', color: '#FAFAFA' }}>THE COUNCIL</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.18em', marginTop: 6 }}>PRIVATE ACCESS</div>
         </div>

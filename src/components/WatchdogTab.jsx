@@ -9,7 +9,7 @@ import { writeDebug } from '../utils/debugStore.js';
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
 
-const ACCENT = '#38e0d4';
+const ACCENT = '#3B82F6';
 
 export default function WatchdogTab({ acct, acctHoldings, flagApiDown, wdRunning, setWdRunning, dark }) {
   const T = theme(dark);
@@ -93,7 +93,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
           background: wdFlagged ? 'rgba(255,59,48,0.07)' : 'rgba(245,158,11,0.07)',
           border: `1px solid ${wdFlagged ? 'rgba(255,59,48,0.2)' : 'rgba(245,158,11,0.2)'}`,
         }}>
-          <AlertTriangle size={14} style={{ color: wdFlagged ? '#FF3B30' : '#F59E0B', flexShrink: 0 }} />
+          <AlertTriangle size={14} style={{ color: wdFlagged ? '#EF4444' : '#F59E0B', flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: T.text }}>
             {wdFlagged > 0 ? `${wdFlagged} holding(s) tripping the sell protocol` : `${wdWatch} holding(s) weakening — watch closely`}
             {wdFlagged > 0 && wdWatch > 0 ? `, ${wdWatch} more on watch.` : '.'}
@@ -126,7 +126,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
                     {sty && <span style={{ ...MFONT, fontSize: 9, fontWeight: 700, background: sty.bg, color: sty.fg, padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap', letterSpacing: '0.08em' }}>{sty.label}</span>}
                   </div>
                   {st.status === 'running' && <div style={{ fontSize: 11, color: T.text3, marginTop: 3 }}>checking weekly…</div>}
-                  {st.status === 'error'   && <div style={{ fontSize: 11, color: '#FF3B30', marginTop: 3 }}>scan error</div>}
+                  {st.status === 'error'   && <div style={{ fontSize: 11, color: '#EF4444', marginTop: 3 }}>scan error</div>}
                   {r && <p style={{ fontSize: 12, color: T.text2, lineHeight: 1.4, marginTop: 4 }}>{r.note}</p>}
                 </div>
               </div>

@@ -14,9 +14,9 @@ import { theme } from '../utils/theme.js';
 const WATCHLIST_DEFAULTS = ['OKLO','LPTH','UNH','KKR','ACMR','NU','SERV','RXRX'];
 
 const VERDICT_STYLE = {
-  BUY:   { bg: 'rgba(0,200,5,0.15)',    fg: '#00C805', label: 'BUY'   },
+  BUY:   { bg: 'rgba(34,197,94,0.15)',  fg: '#22C55E', label: 'BUY'   },
   WATCH: { bg: 'rgba(245,158,11,0.15)', fg: '#B45309', label: 'WATCH' },
-  SKIP:  { bg: 'rgba(255,59,48,0.12)',  fg: '#FF3B30', label: 'SKIP'  },
+  SKIP:  { bg: 'rgba(239,68,68,0.12)',  fg: '#EF4444', label: 'SKIP'  },
 };
 
 function VerdictBadge({ verdict }) {
@@ -30,7 +30,7 @@ function VerdictBadge({ verdict }) {
 
 function ConvictionBar({ value }) {
   const pct = ((value ?? 0) / 10) * 100;
-  const color = value >= 7 ? '#00C805' : value >= 5 ? '#B45309' : '#FF3B30';
+  const color = value >= 7 ? '#22C55E' : value >= 5 ? '#B45309' : '#EF4444';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 48, height: 5, borderRadius: 3, background: 'rgba(128,128,128,0.2)', overflow: 'hidden' }}>
@@ -234,7 +234,7 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
                 <span style={{ ...MONO, fontSize: 11, color: T.text3, flexShrink: 0 }}>${r.price.toFixed(2)}</span>
               )}
               {r.changePct != null && (
-                <span style={{ ...MONO, fontSize: 10, color: r.changePct >= 0 ? '#00C805' : '#FF3B30', flexShrink: 0 }}>
+                <span style={{ ...MONO, fontSize: 10, color: r.changePct >= 0 ? '#22C55E' : '#EF4444', flexShrink: 0 }}>
                   {r.changePct >= 0 ? '+' : ''}{r.changePct.toFixed(2)}%
                 </span>
               )}
@@ -279,13 +279,13 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Telescope size={20} style={{ color: '#38e0d4' }} />
+          <Telescope size={20} style={{ color: '#3B82F6' }} />
           <span style={{ ...DISP, fontSize: 18, fontWeight: 700, color: T.text }}>Scout Mode</span>
         </div>
         <button
           onClick={runScout}
           disabled={scoutRunning}
-          style={{ ...MONO, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: scoutRunning ? T.btnDisabled : '#38e0d4', color: scoutRunning ? T.btnDisabledText : '#000', fontWeight: 700, fontSize: 12, cursor: scoutRunning ? 'not-allowed' : 'pointer', transition: 'all .15s' }}
+          style={{ ...MONO, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: scoutRunning ? T.btnDisabled : '#3B82F6', color: scoutRunning ? T.btnDisabledText : '#fff', fontWeight: 700, fontSize: 12, cursor: scoutRunning ? 'not-allowed' : 'pointer', transition: 'all .15s' }}
         >
           {scoutRunning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           {scoutRunning ? 'Scouting…' : 'Run Scout'}
@@ -294,14 +294,14 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
 
       {/* Progress */}
       {scoutRunning && (
-        <div style={{ marginBottom: 16, background: 'rgba(56,224,212,0.08)', border: '1px solid rgba(56,224,212,0.25)', borderRadius: 10, padding: '10px 16px' }}>
+        <div style={{ marginBottom: 16, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 10, padding: '10px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <Loader2 size={13} className="animate-spin" style={{ color: '#38e0d4', flexShrink: 0 }} />
-            <span style={{ ...MONO, fontSize: 12, color: '#38e0d4' }}>{progress}</span>
+            <Loader2 size={13} className="animate-spin" style={{ color: '#3B82F6', flexShrink: 0 }} />
+            <span style={{ ...MONO, fontSize: 12, color: '#3B82F6' }}>{progress}</span>
           </div>
           {progressTotal > 0 && (
-            <div style={{ height: 4, borderRadius: 2, background: 'rgba(56,224,212,0.15)', overflow: 'hidden' }}>
-              <div style={{ width: `${(progressN / progressTotal) * 100}%`, height: '100%', background: '#38e0d4', borderRadius: 2, transition: 'width .4s ease' }} />
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(59,130,246,0.15)', overflow: 'hidden' }}>
+              <div style={{ width: `${(progressN / progressTotal) * 100}%`, height: '100%', background: '#3B82F6', borderRadius: 2, transition: 'width .4s ease' }} />
             </div>
           )}
         </div>
@@ -312,7 +312,7 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
           <div
             onClick={() => setAutoDiscover(v => !v)}
-            style={{ width: 40, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: autoDiscover ? '#38e0d4' : (dark ? '#2C2C2E' : '#E0E0E0'), position: 'relative', transition: 'background .2s', flexShrink: 0 }}
+            style={{ width: 40, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: autoDiscover ? '#3B82F6' : (dark ? '#2C2C2E' : '#E0E0E0'), position: 'relative', transition: 'background .2s', flexShrink: 0 }}
           >
             <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: autoDiscover ? 19 : 3, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
           </div>
@@ -320,13 +320,13 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
         </label>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Bell size={13} style={{ color: notifPerm === 'granted' ? '#38e0d4' : T.text3 }} />
+          <Bell size={13} style={{ color: notifPerm === 'granted' ? '#22C55E' : T.text3 }} />
           {notifPerm === 'granted' ? (
-            <span style={{ ...MONO, fontSize: 11, color: '#38e0d4' }}>Notifications on</span>
+            <span style={{ ...MONO, fontSize: 11, color: '#22C55E' }}>Notifications on</span>
           ) : notifPerm === 'denied' ? (
-            <span style={{ ...MONO, fontSize: 11, color: '#FF3B30' }}>Notifications blocked</span>
+            <span style={{ ...MONO, fontSize: 11, color: '#EF4444' }}>Notifications blocked</span>
           ) : (
-            <button onClick={enableNotifications} style={{ ...MONO, fontSize: 11, color: '#38e0d4', background: 'none', border: '1px solid rgba(56,224,212,0.3)', borderRadius: 5, padding: '3px 8px', cursor: 'pointer' }}>
+            <button onClick={enableNotifications} style={{ ...MONO, fontSize: 11, color: '#3B82F6', background: 'none', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 5, padding: '3px 8px', cursor: 'pointer' }}>
               Enable notifications
             </button>
           )}

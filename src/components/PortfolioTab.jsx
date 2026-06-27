@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown } from 'lucide-react';
-import { getQuotes, getCandles } from '../api.js';
+import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Coins, Loader2 } from 'lucide-react';
+import { getQuotes, getCandles, callAgent } from '../api.js';
 import { theme } from '../utils/theme.js';
+import { PROTOCOLS } from '../constants/agents.js';
+import { extractJSON } from '../utils.js';
 import AnimatedNumber from './ui/AnimatedNumber.jsx';
 
 const LOGO_DOMAINS = {
@@ -33,6 +35,149 @@ function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
 const STAGGER = { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } };
 const ITEM    = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
 
+function DCASheet({ acct, acctHoldings, positionsLine, flagApiDown, dark, onClose }) {
+  const T = theme(dark);
+  const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
+  const [dcaAmount, setDcaAmount] = useState('');
+  const [dca, setDca] = useState({ status: 'idle', result: null });
+  const ACCENT = '#F59E0B';
+
+  async function allocateDCA() {
+    if (dca.status === 'running') return;
+    const amt = (dcaAmount.trim() ? Number(dcaAmount) : acct.dca) || 0;
+    if (!amt) { setDca({ status: 'done', result: { allocations: [], summary: 'No DCA amount set. Enter an amount above.' } }); return; }
+    setDca({ status: 'running', result: null });
+    const sys = `You are the DCA ALLOCATOR. ${PROTOCOLS}
+The investor makes a recurring DCA buy into the ${acct.label} account (current positions: ${positionsLine}). Available this round: $${amt}. Search recent price action for these holdings and allocate the dollars toward the 1-2 best "buy the dip" setups — most oversold / closest to weekly support while still in an uptrend. Concentrate, don't spread thin. NEVER add to a name tripping the sell protocol (note it if so).
+Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amount":<dollars>,"pct":<0-100>,"reason":"<one line>"}],"summary":"<2 sentences>"}`;
+    try {
+      const { text: txt } = await callAgent(sys, `Allocate this round's $${amt} for ${acct.label}. Today is ${new Date().toDateString()}. Return ONLY the JSON.`, true);
+      const p = extractJSON(txt);
+      setDca({ status: 'done', result: p || { allocations: [], summary: 'Could not parse allocation.' } });
+    } catch {
+      flagApiDown?.();
+      setDca({ status: 'error', result: null });
+    }
+  }
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+
+  const sheetStyle = isMobile ? {
+    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
+    background: dark ? 'rgba(24,24,27,0.98)' : 'rgba(250,250,250,0.98)',
+    borderRadius: '16px 16px 0 0', backdropFilter: 'blur(24px)',
+    padding: '0 0 env(safe-area-inset-bottom, 0px)',
+    maxHeight: '82vh', overflowY: 'auto',
+    boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
+    border: `1px solid ${T.border}`,
+  } : {
+    position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, zIndex: 200,
+    background: dark ? 'rgba(24,24,27,0.98)' : 'rgba(250,250,250,0.98)',
+    backdropFilter: 'blur(24px)', overflowY: 'auto',
+    boxShadow: '-8px 0 40px rgba(0,0,0,0.3)',
+    border: `1px solid ${T.border}`,
+  };
+
+  const initialAnim = isMobile ? { y: '100%' } : { x: '100%' };
+  const animateAnim = isMobile ? { y: 0 } : { x: 0 };
+  const exitAnim    = isMobile ? { y: '100%' } : { x: '100%' };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 199 }}
+      />
+      <motion.div
+        initial={initialAnim} animate={animateAnim} exit={exitAnim}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        drag={isMobile ? 'y' : false}
+        dragConstraints={{ top: 0 }}
+        dragElastic={0.1}
+        onDragEnd={(_, info) => { if (info.offset.y > 100) onClose(); }}
+        style={sheetStyle}
+      >
+        {/* Drag handle (mobile) */}
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+            <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.2)' }} />
+          </div>
+        )}
+        <div style={{ padding: '16px 20px 28px', fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Coins size={16} style={{ color: ACCENT }} />
+              <span style={{ ...MFONT, fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', color: T.text }}>
+                SMART DCA · {acct.label.toUpperCase()}
+              </span>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: 4, display: 'flex' }}><X size={18} /></button>
+          </div>
+          <p style={{ fontSize: 13, color: T.text2, lineHeight: 1.55, marginBottom: 16 }}>
+            Concentrates your DCA into the 1–2 best "buy the dip" setups. Skips anything tripping the sell protocol.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 140 }}>
+              <Coins size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: T.text3 }} />
+              <input
+                value={dcaAmount}
+                onChange={e => setDcaAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                inputMode="decimal"
+                placeholder={`amount (default $${acct.dca || '—'})`}
+                style={{ ...MFONT, fontSize: 13, width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 11, paddingBottom: 11, background: T.input, border: `1px solid ${T.inputBorder}`, borderRadius: 10, color: T.text, outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <button onClick={allocateDCA} disabled={dca.status === 'running'} style={{
+              ...MFONT, fontSize: 13, fontWeight: 600, letterSpacing: '0.06em',
+              background: dca.status === 'running' ? T.bgHover : (dark ? '#F2F2F7' : '#000000'),
+              color: dca.status === 'running' ? T.text2 : (dark ? '#000000' : '#FFFFFF'),
+              border: 'none', borderRadius: 10, padding: '11px 22px',
+              cursor: dca.status === 'running' ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
+            }}>
+              {dca.status === 'running' ? <><Loader2 size={15} className="animate-spin" /> ALLOCATING…</> : 'ALLOCATE'}
+            </button>
+          </div>
+          {dca.status === 'running' && (
+            <div style={{ border: `1px solid ${ACCENT}22`, borderRadius: 12, padding: '16px', display: 'flex', alignItems: 'center', gap: 10, background: T.bgCard, ...MFONT, color: ACCENT }}>
+              <Loader2 size={14} className="animate-spin" />
+              <span style={{ fontSize: 13 }}>Scanning {acctHoldings.length} holdings for the best dip…</span>
+            </div>
+          )}
+          {dca.status === 'done' && dca.result && (
+            <div>
+              {(dca.result.allocations || []).map((al, i) => (
+                <div key={i} style={{ marginBottom: 8, background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ textAlign: 'center', minWidth: 60 }}>
+                    <div style={{ ...MFONT, fontSize: 20, fontWeight: 700, color: ACCENT }}>${al.amount}</div>
+                    <div style={{ ...MFONT, fontSize: 9, color: T.text3 }}>{al.pct}%</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>{al.ticker}</div>
+                    <div style={{ fontSize: 12, color: T.text2, lineHeight: 1.4, marginTop: 2 }}>{al.reason}</div>
+                  </div>
+                </div>
+              ))}
+              {dca.result.summary && (
+                <p style={{ fontSize: 13, color: T.text2, lineHeight: 1.55, marginTop: 12, paddingLeft: 12, borderLeft: `2px solid ${ACCENT}55` }}>{dca.result.summary}</p>
+              )}
+              <p style={{ ...MFONT, fontSize: 10, color: T.text3, marginTop: 12 }}>You execute the buys — this is a suggestion, not an order.</p>
+            </div>
+          )}
+          {dca.status === 'idle' && (
+            <div style={{ marginTop: 16, textAlign: 'center', padding: '32px 16px', border: `1px dashed ${T.border}`, borderRadius: 12 }}>
+              <Coins size={24} style={{ color: T.text3, margin: '0 auto 10px' }} />
+              <p style={{ fontSize: 13, color: T.text2 }}>Hit ALLOCATE to route {acct?.label}'s DCA into the best dip.</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
 export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus, authReady, onTabChange }) {
   const T = theme(dark);
   const prefersReduced = useReducedMotion();
@@ -50,6 +195,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [editTicker,    setEditTicker]    = useState(null);
   const [editShares,    setEditShares]    = useState('');
   const [editCost,      setEditCost]      = useState('');
+  const [dcaOpen,       setDcaOpen]       = useState(false);
   const timerRef = useRef(null);
 
   const tickers    = acctHoldings.filter(t => posMap[t]);
@@ -477,7 +623,44 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
             </motion.div>
           )}
         </div>
+
+        {/* DCA Allocator button */}
+        {withShares.length > 0 && (
+          <div style={{ padding: '16px var(--space-page) 32px', maxWidth: 760, margin: '0 auto' }}>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setDcaOpen(true)}
+              style={{
+                fontFamily: 'var(--font-display)', width: '100%', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', gap: 8, padding: '13px', borderRadius: 12,
+                border: `1px solid ${T.border}`, background: 'transparent',
+                color: T.text2, fontSize: 14, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              <Coins size={15} style={{ color: '#F59E0B' }} />
+              DCA Allocator
+            </motion.button>
+          </div>
+        )}
       </div>
+
+      {/* DCA Bottom Sheet / Side Panel */}
+      <AnimatePresence>
+        {dcaOpen && (
+          <DCASheet
+            acct={acct}
+            acctHoldings={acctHoldings}
+            positionsLine={Object.keys(posMap).map(t => {
+              const p = posMap[t] || {};
+              const costNum = parseFloat(String(p.cost || '').replace(/[^0-9.]/g, ''));
+              return p.shares ? `${t} ${p.shares}sh${costNum > 0 ? ` @ $${costNum.toFixed(2)} avg` : ''}` : t;
+            }).join(', ')}
+            flagApiDown={flagApiDown}
+            dark={dark}
+            onClose={() => setDcaOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -31,6 +31,17 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 15)
+
+### Tab restructure & feature merge ✓
+- [x] Watchdog tab removed — all references cleaned from App.jsx, BottomNav
+- [x] DCA merged into Portfolio as bottom sheet (mobile) / side panel (desktop) with Framer Motion
+- [x] Updates tab created — Roadmap + Changelog in accordion (roadmap open by default, changelog collapsed)
+- [x] Navigation: 7-tab side rail, 5-tab bottom nav (More menu: Alpha, Updates, Settings)
+- [x] MarketOverlay particles stripped — only subtle ambient glow remains per market state
+
+---
+
 ## DONE (session 14)
 
 ### Post-redesign UI polish ✓

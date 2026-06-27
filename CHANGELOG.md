@@ -4,6 +4,43 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-27 (session 15)
+
+### Tab restructure & feature merge
+
+**Change 1 — Remove Watchdog tab:**
+- Deleted `WatchdogTab.jsx` import from `App.jsx`
+- Removed from `SIDEBAR_TABS`, `MORE_ROWS`, `renderTab`
+- Removed `wdRunning`/`setWdRunning` state; references cleaned up
+
+**Change 2 — DCA merged into Portfolio:**
+- Removed `DCATab.jsx` as standalone tab
+- Added `DCASheet` component inline in `PortfolioTab.jsx` — Framer Motion bottom sheet (mobile) or side panel (desktop)
+- Mobile: slides up from bottom, drag-to-dismiss, drag handle pill
+- Desktop: slides in from right, close button
+- Backdrop tap-to-close on both. Identical DCA logic (same prompt, same API call)
+- Trigger: "DCA Allocator" button below holdings list (shown only when positions exist)
+
+**Change 3 — Updates tab (Roadmap + Changelog merged):**
+- Created `src/components/UpdatesTab.jsx` with two accordion sections
+- Roadmap section: open by default; same ROADMAP data from constants
+- Changelog section: collapsed by default; consolidated entries (v0.1.0–v0.4.0)
+- Accordion: chevron rotates, `AnimatePresence` height animation, independent toggles
+
+**Change 4 — Navigation updated:**
+- `SIDEBAR_TABS`: 7 tabs — Portfolio, Council, Chat, Scout, Alpha, Updates, Settings (+ Debug)
+- `MORE_ROWS`: Alpha Tracker, Updates, Settings
+- `BottomNav.MORE_IDS`: `['alpha','updates','settings','debug']`
+- Bottom nav unchanged: Portfolio, Council, Chat, Scout, More
+
+**Change 5 — MarketOverlay stripped:**
+- Removed all particle effects: twinkle stars, constellation lines, shooting star, scan bars, aurora bands, dawn pulse
+- Kept only: ambient color tint (subtle radial gradient, blur 32px) for each market state
+- Removed all unused CSS keyframes + classes from `index.css`: `twinkle`, `shootStar`, `scanMove`, `scanSlow`, `dawnPulse`, `auroraShift`, `auroraSlow`, `starShimmer`, `.twinkle-star`, `.shooting-star`, `.scan-bar`, etc.
+- `scan` and `blink` keyframes kept (used by other UI)
+
+---
+
 ## 2026-06-27 (session 14)
 
 ### 6 post-redesign UI fixes

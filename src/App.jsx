@@ -13,11 +13,8 @@ import BottomNav from './components/BottomNav.jsx';
 import PortfolioTab from './components/PortfolioTab.jsx';
 import ChatTab from './components/ChatTab.jsx';
 import CouncilTab from './components/CouncilTab.jsx';
-import DCATab from './components/DCATab.jsx';
-import WatchdogTab from './components/WatchdogTab.jsx';
 import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
-import RoadmapTab from './components/RoadmapTab.jsx';
-import ChangelogTab from './components/ChangelogTab.jsx';
+import UpdatesTab from './components/UpdatesTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import ScoutTab from './components/ScoutTab.jsx';
 import DebugTab from './components/DebugTab.jsx';
@@ -25,30 +22,28 @@ import { getQuotes } from './api.js';
 import { sendNotification, getPermissionState } from './utils/notify.js';
 import { writeDebug } from './utils/debugStore.js';
 import {
-  LayoutDashboard, Users, MessageSquare, Telescope, Eye, PieChart,
-  TrendingUp, Map, FileText, Settings, Bug, ChevronRight, LogOut, Sun, Moon,
+  LayoutDashboard, Users, MessageSquare, Telescope,
+  TrendingUp, Newspaper, Settings, Bug, ChevronRight, LogOut, Sun, Moon,
   MoreHorizontal,
 } from 'lucide-react';
 
 const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
 
 const SIDEBAR_TABS = [
-  { id: 'portfolio', Icon: LayoutDashboard, label: 'Portfolio'  },
-  { id: 'council',   Icon: Users,           label: 'Council'    },
-  { id: 'chat',      Icon: MessageSquare,   label: 'Chat'       },
-  { id: 'scout',     Icon: Telescope,       label: 'Scout'      },
-  { id: 'watchdog',  Icon: Eye,             label: 'Watchdog'   },
-  { id: 'dca',       Icon: PieChart,        label: 'DCA'        },
-  { id: 'alpha',     Icon: TrendingUp,      label: 'Alpha'      },
-  { id: 'roadmap',   Icon: Map,             label: 'Roadmap'    },
-  { id: 'changelog', Icon: FileText,        label: 'Changelog'  },
-  { id: 'settings',  Icon: Settings,        label: 'Settings'   },
+  { id: 'portfolio', Icon: LayoutDashboard, label: 'Portfolio' },
+  { id: 'council',   Icon: Users,           label: 'Council'   },
+  { id: 'chat',      Icon: MessageSquare,   label: 'Chat'      },
+  { id: 'scout',     Icon: Telescope,       label: 'Scout'     },
+  { id: 'alpha',     Icon: TrendingUp,      label: 'Alpha'     },
+  { id: 'updates',   Icon: Newspaper,       label: 'Updates'   },
+  { id: 'settings',  Icon: Settings,        label: 'Settings'  },
   ...(isDebugMode ? [{ id:'debug', Icon: Bug, label:'Debug' }] : []),
 ];
 
 const MORE_ROWS = [
-  ['watchdog','Watchdog'],['dca','DCA Allocator'],['alpha','Alpha Tracker'],
-  ['roadmap','Roadmap'],['changelog','Changelog'],['settings','Settings'],
+  ['alpha',    'Alpha Tracker'],
+  ['updates',  'Updates'],
+  ['settings', 'Settings'],
   ...(isDebugMode ? [['debug','Debug']] : []),
 ];
 
@@ -76,7 +71,6 @@ export default function App() {
   const alertFiredToday = useRef({});
   const lastAlertDate   = useRef(new Date().toDateString());
   const [running,    setRunning]    = useState(false);
-  const [wdRunning,  setWdRunning]  = useState(false);
   const [ticker,     setTicker]     = useState('');
   const [capital,    setCapital]    = useState('');
   const [active,     setActive]     = useState(null);
@@ -251,13 +245,10 @@ export default function App() {
       </div>
     );
     if (tab === 'chat')      return <div style={padded}><ChatTab {...shared} posMap={posMap} /></div>;
-    if (tab === 'scout')     return <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} />;
-    if (tab === 'watchdog')  return <div style={padded}><WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} /></div>;
-    if (tab === 'dca')       return <div style={padded}><DCATab {...shared} /></div>;
-    if (tab === 'alpha')     return <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>;
-    if (tab === 'roadmap')   return <div style={padded}><RoadmapTab dark={dark} /></div>;
-    if (tab === 'changelog') return <div style={padded}><ChangelogTab dark={dark} /></div>;
-    if (tab === 'settings')  return <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} /></div>;
+    if (tab === 'scout')    return <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} />;
+    if (tab === 'alpha')    return <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>;
+    if (tab === 'updates')  return <UpdatesTab dark={dark} />;
+    if (tab === 'settings') return <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} /></div>;
     if (tab === 'debug' && isDebugMode) return <DebugTab dark={dark} />;
     if (tab === 'more') return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: 'var(--space-page)' }}>
@@ -336,7 +327,7 @@ export default function App() {
       </aside>
 
       {/* Top bar (desktop) */}
-      <TopBar dark={dark} setDark={setDark} account={account} setAccount={setAccount} running={running || wdRunning} />
+      <TopBar dark={dark} setDark={setDark} account={account} setAccount={setAccount} running={running} />
 
       {/* Main content */}
       <div className="lg:ml-[72px]" style={{ position: 'relative', zIndex: 1 }}>
@@ -354,7 +345,7 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {Object.entries(ACCOUNTS).map(([id, v]) => (
-              <motion.button key={id} onClick={() => !(running || wdRunning) && setAccount(id)} whileTap={{ scale: 0.95 }} style={{
+              <motion.button key={id} onClick={() => !(running) && setAccount(id)} whileTap={{ scale: 0.95 }} style={{
                 fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: account === id ? 600 : 400,
                 padding: '4px 12px', borderRadius: 20, cursor: 'pointer',
                 border: `1px solid ${account === id ? T.borderActive : T.border}`,

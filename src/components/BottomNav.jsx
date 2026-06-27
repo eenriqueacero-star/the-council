@@ -9,7 +9,7 @@ const TABS = [
   { id: 'scout',     label: 'Scout',     Icon: Telescope },
   { id: 'more',      label: 'More',      Icon: MoreHorizontal },
 ];
-const MORE_IDS = new Set(['dca','alpha','roadmap','changelog','watchdog','settings']);
+const MORE_IDS = new Set(['alpha','updates','settings','debug']);
 
 export default function BottomNav({ tab, setTab, dark }) {
   return (

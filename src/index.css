@@ -34,7 +34,7 @@ input, textarea, select { font-size: max(16px, 1em) !important; font-family: var
   border: 1px solid rgba(0,0,0,0.06);
 }
 
-/* ── ArcReactor (keep — SVG animations, Framer Motion doesn't cover SVG transforms) ── */
+/* ── SVG spin animations — used by CouncilLoader ── */
 @keyframes spin    { to { transform: rotate(360deg); } }
 @keyframes spinRev { to { transform: rotate(-360deg); } }
 @keyframes corePulse { 0%,100%{ opacity:.65; transform:scale(1);} 50%{ opacity:1; transform:scale(1.14);} }
@@ -46,30 +46,11 @@ input, textarea, select { font-size: max(16px, 1em) !important; font-family: var
 @keyframes liveDot { 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(2); opacity:.3; } }
 .live-dot { animation: liveDot 2.2s ease-in-out infinite; }
 
-/* ── Market overlay / environment effects (not replaced by Framer Motion) ── */
-@keyframes twinkle     { 0%,100%{ opacity:.05; transform:scale(1);   } 50%{ opacity:.9; transform:scale(1.45); } }
-@keyframes shootStar   { 0%{ transform:translate(0,0) scaleX(0.2); opacity:0; }
-                         8%{ opacity:1; transform:translate(0,0) scaleX(1); }
-                        100%{ transform:translate(320px,90px) scaleX(0.3); opacity:0; } }
-@keyframes scanMove    { 0%{ transform:translateX(-200px); } 100%{ transform:translateX(calc(100vw + 200px)); } }
-@keyframes scanSlow    { 0%{ transform:translateX(-120px); } 100%{ transform:translateX(calc(100vw + 120px)); } }
-@keyframes dawnPulse   { 0%,100%{ opacity:.75; } 50%{ opacity:1; } }
-@keyframes auroraShift { 0%,100%{ opacity:.8; transform:scaleX(1) translateY(0); } 50%{ opacity:1; transform:scaleX(1.06) translateY(-8px); } }
-@keyframes auroraSlow  { 0%,100%{ opacity:.6; transform:scaleX(1); } 50%{ opacity:1; transform:scaleX(1.1); } }
-@keyframes starShimmer { 0%,100%{ opacity:.2; } 50%{ opacity:1; } }
-@keyframes scan        { 0%{ transform: translateY(-100%); } 100%{ transform: translateY(400%); } }
-@keyframes blink       { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
-
-.twinkle-star   { animation: twinkle     var(--dur,3s) var(--delay,0s) ease-in-out infinite; }
-.shooting-star  { animation: shootStar   12s 2s ease-out infinite; }
-.scan-bar       { animation: scanMove    5s  linear infinite; }
-.scan-bar-slow  { animation: scanSlow    9s  2.5s linear infinite; }
-.dawn-pulse     { animation: dawnPulse   4s  ease-in-out infinite; }
-.aurora         { animation: auroraShift 9s  ease-in-out infinite; }
-.aurora-slow    { animation: auroraSlow  13s 3s ease-in-out infinite; }
-.star-shimmer   { animation: starShimmer 2s ease-in-out infinite; }
-.scanline       { animation: scan 1.6s linear infinite; }
-.blink          { animation: blink 1.4s ease-in-out infinite; }
+/* ── Misc animations ── */
+@keyframes scan  { 0%{ transform: translateY(-100%); } 100%{ transform: translateY(400%); } }
+@keyframes blink { 0%,100%{ opacity:1; } 50%{ opacity:.2; } }
+.scanline { animation: scan 1.6s linear infinite; }
+.blink    { animation: blink 1.4s ease-in-out infinite; }
 
 /* ── Skeleton shimmer ── */
 @keyframes shimmer {

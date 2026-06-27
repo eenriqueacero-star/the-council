@@ -4,6 +4,7 @@ import { theme } from '../utils/theme.js';
 import { PROTOCOLS, WD_STYLE } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent } from '../api.js';
+import { writeDebug } from '../utils/debugStore.js';
 
 const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 const FONT  = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
@@ -22,6 +23,7 @@ export default function WatchdogTab({ acct, acctHoldings, flagApiDown, wdRunning
   async function scanWatchdog() {
     if (wdRunning) return;
     setWdRunning(true); setWdRan(true);
+    const debugResults = {};
     const init = {}; acctHoldings.forEach(h => (init[h] = { status: 'running' })); setWd(init);
     const sys = `You are the SELL-PROTOCOL WATCHDOG. ${PROTOCOLS}
 Check ONE holding against the SELL PROTOCOL: a SELL signal requires red candles forming AND a confirmed weekly downtrend (lower highs / lower lows). Otherwise HOLD. Use WATCH if weakening but not yet confirmed. Search recent weekly price action.
@@ -34,7 +36,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
           // useSearch=false: base model is far more reliable on free Groq tier
           const { text: txt } = await callAgent(sys, `Holding: ${h}. Today is ${new Date().toDateString()}. Check it against the sell protocol. Return ONLY the JSON.`, false);
           const p = extractJSON(txt);
-          setWd(prev => ({ ...prev, [h]: { status: 'done', result: p || { status: 'WATCH', note: 'Could not parse.' } } }));
+          const result = p || { status: 'WATCH', note: 'Could not parse.' };
+          debugResults[h] = { raw: txt, parsed: result };
+          setWd(prev => ({ ...prev, [h]: { status: 'done', result } }));
           break;
         } catch (err) {
           attempts++;
@@ -51,6 +55,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"status":"HOLD"|"WATCH"|"SELL","n
       if (i < acctHoldings.length - 1) await new Promise(r => setTimeout(r, 5000));
     }
     setWdRunning(false);
+    if (new URLSearchParams(window.location.search).get('debug') === '1') {
+      writeDebug('RECON', 'Watchdog scan complete', debugResults);
+    }
   }
 
   return (

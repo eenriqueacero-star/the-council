@@ -4,6 +4,7 @@ import { theme } from '../utils/theme.js';
 import { PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent } from '../api.js';
+import { writeDebug } from '../utils/debugStore.js';
 
 const MFONT  = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 const FONT   = { fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif" };
@@ -25,7 +26,11 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
     try {
       const { text: txt } = await callAgent(sys, `Allocate this round's $${amt} for ${acct.label}. Today is ${new Date().toDateString()}. Return ONLY the JSON.`, true);
       const p = extractJSON(txt);
-      setDca({ status: 'done', result: p || { allocations: [], summary: 'Could not parse allocation.' } });
+      const result = p || { allocations: [], summary: 'Could not parse allocation.' };
+      if (new URLSearchParams(window.location.search).get('debug') === '1') {
+        writeDebug('CHAT', `DCA allocation $${amt} · ${acct.label}`, { raw: txt, parsed: result });
+      }
+      setDca({ status: 'done', result });
     } catch {
       flagApiDown();
       setDca({ status: 'error', result: null });

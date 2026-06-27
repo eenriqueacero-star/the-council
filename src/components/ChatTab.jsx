@@ -12,6 +12,7 @@ import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from 
 import { useVoice } from '../hooks/useVoice.js';
 import { theme } from '../utils/theme.js';
 import ArcReactor from './ArcReactor.jsx';
+import { writeDebug } from '../utils/debugStore.js';
 
 const PS = {
   PASS:       { bg:'rgba(0,200,5,0.1)',    fg:'#00C805', label:'PASS'    },
@@ -328,9 +329,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
             rows.push(`${ticker}: $${price.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% today) | ${shares}sh | cost $${cost.toFixed(2)} | mkt val $${mktVal.toFixed(2)} | day gain $${dayGain.toFixed(2)}${unrealizedPL != null ? ` | unrealized P&L $${unrealizedPL.toFixed(2)}` : ''}`);
           }
           portfolioDataBlock = `\n\nPORTFOLIO DATA (live as of ${new Date().toLocaleTimeString()}):\n${rows.join('\n')}\nTOTAL: market value $${totalValue.toFixed(2)} | day change $${totalDayGain.toFixed(2)} (${totalValue > 0 ? ((totalDayGain / (totalValue - totalDayGain)) * 100).toFixed(2) : '0.00'}%) | total unrealized P&L $${totalUnrealizedPL.toFixed(2)}\n`;
-          if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1') {
-            console.log('[chat portfolio injection]', portfolioDataBlock);
-          }
+          writeDebug('CHAT', `Portfolio data injected for "${text.slice(0, 40)}"`, portfolioDataBlock);
         } catch (err) {
           console.error('[chat portfolio injection] quote fetch failed:', err?.message);
         }
@@ -372,6 +371,9 @@ Respond ONLY with JSON in a \`\`\`json block: {"speak":"<response or intro>","fu
       const parsed = extractJSON(txt);
       if (!parsed) console.error('[AXIOM router] JSON parse failed. Raw txt:', JSON.stringify(txt));
       router = parsed || { speak: "I didn't quite catch that.", fullCouncil: false, ticker: null, route: [] };
+      if (new URLSearchParams(window.location.search).get('debug') === '1') {
+        writeDebug('CHAT', `AXIOM router · "${text.slice(0, 50)}"`, { raw: txt, parsed: router });
+      }
     } catch {
       flagApiDown();
       router = { speak: "I can't reach the council right now.", fullCouncil: false, ticker: null, route: [] };

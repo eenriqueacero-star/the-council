@@ -20,6 +20,7 @@ import ScoutTab from './components/ScoutTab.jsx';
 import DebugTab from './components/DebugTab.jsx';
 import { getQuotes } from './api.js';
 import { sendNotification, getPermissionState } from './utils/notify.js';
+import { writeDebug } from './utils/debugStore.js';
 import { ChevronRight, LogOut } from 'lucide-react';
 
 const isDebugMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
@@ -59,11 +60,9 @@ export default function App() {
   useEffect(() => { localStorage.setItem('council_dark', String(dark)); }, [dark]);
   useEffect(() => { localStorage.setItem('council_account', account); }, [account]);
 
-  const [scoutDebugLog, setScoutDebugLog] = useState(null);
   const [alertSettings, setAlertSettings] = useState({ globalThreshold: 5, perStock: {} });
   const alertFiredToday = useRef({}); // ticker → true; reset daily
   const lastAlertDate   = useRef(new Date().toDateString());
-  const [debugLog,   setDebugLog]   = useState(null);
   const [running,    setRunning]    = useState(false);
   const [wdRunning,  setWdRunning]  = useState(false);
   const [ticker,     setTicker]     = useState('');
@@ -218,7 +217,7 @@ export default function App() {
     }
 
     if (isDebugMode) {
-      console.log('[alerts] checked:', tickers, 'quotes:', JSON.stringify(quotes));
+      writeDebug('ALERTS', `Alert check · ${tickers.join(', ')}`, { tickers, quotes, threshold: alertSettings.globalThreshold, fired: { ...alertFiredToday.current } });
     }
   }, [account, alertSettings]);
 
@@ -330,19 +329,18 @@ export default function App() {
                 active={active} setActive={setActive}
                 agentState={agentState} setAgentState={setAgentState}
                 synthesis={synthesis} setSynthesis={setSynthesis}
-                setDebugLog={isDebugMode ? setDebugLog : undefined}
               />
             </div>
           )}
           {tab === 'chat'      && <div style={padded}><ChatTab {...shared} posMap={posMap} /></div>}
-          {tab === 'scout'     && <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} onDebugLog={isDebugMode ? log => setScoutDebugLog(log) : undefined} />}
+          {tab === 'scout'     && <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} />}
           {tab === 'watchdog'  && <div style={padded}><WatchdogTab {...shared} wdRunning={wdRunning} setWdRunning={setWdRunning} /></div>}
           {tab === 'dca'       && <div style={padded}><DCATab {...shared} /></div>}
           {tab === 'alpha'     && <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>}
           {tab === 'roadmap'   && <div style={padded}><RoadmapTab dark={dark} /></div>}
           {tab === 'changelog' && <div style={padded}><ChangelogTab dark={dark} /></div>}
           {tab === 'settings'  && <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} /></div>}
-          {tab === 'debug'     && isDebugMode && <DebugTab debugLog={debugLog} scoutDebugLog={scoutDebugLog} dark={dark} />}
+          {tab === 'debug'     && isDebugMode && <DebugTab dark={dark} />}
           {tab === 'more' && (
             <div style={{ maxWidth:480, margin:'0 auto', padding:'16px' }}>
               {MORE_ROWS.map(([t, label]) => (

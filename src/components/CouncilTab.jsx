@@ -8,6 +8,7 @@ import { auth, db } from '../firebase.js';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { loadTickerHistory } from '../utils/rulingContext.js';
 import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
+import { writeDebug } from '../utils/debugStore.js';
 import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from '../utils/agentMemory.js';
 import { theme } from '../utils/theme.js';
 
@@ -36,7 +37,7 @@ function StanceBadge({ stance, small }) {
   );
 }
 
-export default function CouncilTab({ account, acct, positionsLine, flagApiDown, running, setRunning, ticker, setTicker, capital, setCapital, active, setActive, agentState, setAgentState, synthesis, setSynthesis, dark, setDebugLog }) {
+export default function CouncilTab({ account, acct, positionsLine, flagApiDown, running, setRunning, ticker, setTicker, capital, setCapital, active, setActive, agentState, setAgentState, synthesis, setSynthesis, dark }) {
   const synthRef = useRef(null);
   const T = theme(dark);
   const [progressLabel, setProgressLabel] = useState('');
@@ -379,7 +380,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
       }
       if (debugRef.current) {
         debugRef.current.synthesis = { systemPrompt: synthSys, userPrompt: synthUserMsg, rawResponse: txt, parseOk: synthParseOk, parsed: result, ms: _sms, warning: synthWarn || null, verdict: result.verdict, conviction: result.conviction };
-        setDebugLog?.({ ...debugRef.current });
+        writeDebug('COUNCIL', `${debugRef.current.ticker} council run`, { ...debugRef.current });
       }
 
       // Build agentStances for when user clicks Track This Trade
@@ -398,7 +399,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
       console.error('[synthesis] callAgent threw:', err?.message);
       if (debugRef.current) {
         debugRef.current.synthesis = { systemPrompt: synthSys, userPrompt: synthUserMsg, rawResponse: null, parseOk: false, parsed: null, ms: Date.now() - _st0, warning: err?.message || 'callAgent threw' };
-        setDebugLog?.({ ...debugRef.current });
+        writeDebug('COUNCIL', `${debugRef.current.ticker} council run (error)`, { ...debugRef.current });
       }
       flagApiDown();
       setSynthesis({ status: 'error', result: null });

@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { scoutTicker } from '../utils/councilRunner.js';
 import { sendNotification, requestPermission, getPermissionState } from '../utils/notify.js';
+import { writeDebug } from '../utils/debugStore.js';
 import { theme } from '../utils/theme.js';
 
 const WATCHLIST_DEFAULTS = ['OKLO','LPTH','UNH','KKR','ACMR','NU','SERV','RXRX'];
@@ -50,7 +51,7 @@ function timeSince(isoStr) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode, onDebugLog }) {
+export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
   const T = theme(dark);
   const uid = auth.currentUser?.uid;
 
@@ -134,7 +135,7 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode, onDe
 
         if (isDebugMode && result.debugData) {
           scoutDebugRef.current[ticker] = result.debugData;
-          onDebugLog?.({ type: 'scout', tickers: scoutDebugRef.current });
+          writeDebug('SCOUT', `Scout run · ${Object.keys(scoutDebugRef.current).join(', ')}`, { type: 'scout', tickers: { ...scoutDebugRef.current } });
         }
 
         // Save result to Firestore (watchlist only — discovery saved to a temp subcollection)
@@ -179,7 +180,7 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode, onDe
     setScoutRunning(false);
     setProgress('');
     setProgressN(0);
-  }, [scoutRunning, uid, watchlist, autoDiscover, acctHoldings, isDebugMode, onDebugLog]);
+  }, [scoutRunning, uid, watchlist, autoDiscover, acctHoldings, isDebugMode]);
 
   async function enableNotifications() {
     const result = await requestPermission();

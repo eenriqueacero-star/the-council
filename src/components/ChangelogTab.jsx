@@ -6,6 +6,18 @@ const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
 
 const ENTRIES = [
   {
+    version: '0.3.1', date: '2026-06-26', label: 'DEBUG',
+    changes: [
+      { type: 'FEAT', text: 'Universal Debug System — every feature pipes debug data into a single centralized store (src/utils/debugStore.js). No more prop drilling. Any component calls writeDebug(source, title, payload) and it appears in the Debug panel instantly.' },
+      { type: 'FEAT', text: 'Debug panel section tabs: COUNCIL / SCOUT / ALERTS / CHAT / RECON / ALL. Each tab shows only entries from that feature with a live count badge. Clear per section or clear all.' },
+      { type: 'FEAT', text: 'Per-section empty states with feature-specific instructions for how to generate debug data.' },
+      { type: 'FEAT', text: 'CHAT section: logs AXIOM router decision (raw response + parsed route) and portfolio data injection block for every chat message in debug mode.' },
+      { type: 'FEAT', text: 'ALERTS section: logs every alert check (tickers checked, live quotes, threshold, fired map) in debug mode.' },
+      { type: 'FEAT', text: 'RECON section: logs Watchdog scan results (raw response + parsed verdict per ticker) and DCA allocation results in debug mode.' },
+      { type: 'FIX',  text: 'Removed setDebugLog / onDebugLog prop drilling from CouncilTab, ScoutTab, and App.jsx — all debug writes now go through debugStore directly.' },
+    ],
+  },
+  {
     version: '0.3.0', date: '2026-06-26', label: 'MAJOR',
     changes: [
       { type: 'FEAT', text: 'Scout Mode — watchlist + auto-discovery pool (30 tickers) scanned in a single-round lightweight council. Results sorted by conviction. BUY 7+ highlighted green. Tap rows to expand agent stance summary. Vercel Cron auto-runs daily at 9 AM ET (configure CRON_USER_IDS in Vercel env).' },

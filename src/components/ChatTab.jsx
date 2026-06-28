@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useReducer } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send, Crown, AlertTriangle } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
-import { AGENTS, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
+import { AGENTS, AXIOM_AVATAR, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent, getQuotes, getNews, sleep } from '../api.js';
 import { auth, db } from '../firebase.js';
@@ -511,7 +511,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
         spokenThisTurn.push({ agentId: agId, name: ag.name, response });
         totalCalls++;
 
-        setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
+        setChat(p => [...p, { role:'agent', agentId:ag.id, name:ag.name, avatar:ag.avatar, emoji:ag.emoji, color:ag.color, accent:ag.accent, text:response }]);
         setConvHistory(prev => [...prev, { role:'assistant', agentId:ag.id, content:response }]);
 
         // Any agent mentioned by name gets appended to the queue (once only)
@@ -581,7 +581,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       return (
         <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
           style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
-          <div style={{ flexShrink: 0, marginTop: 2 }}><SparkLogo size={24} /></div>
+          <div style={{ flexShrink: 0, marginTop: 2 }}><img src={AXIOM_AVATAR} alt="AXIOM" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} /></div>
           <div style={{ maxWidth: '82%' }}>
             <div style={{ ...MONO, fontSize: 9, color: T.accent, marginBottom: 4, letterSpacing: '0.08em' }}>AXIOM</div>
             <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>
@@ -606,7 +606,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
     if (m.role === 'agent') return (
       <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
         style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
-        <div style={{ flexShrink: 0, marginTop: 2, width: 26, height: 26, borderRadius: 8, background: `${m.accent}18`, border: `1px solid ${m.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{m.emoji}</div>
+        <img src={m.avatar} alt={m.name} style={{ flexShrink: 0, marginTop: 2, width: 26, height: 26, borderRadius: 8, objectFit: 'cover' }} />
         <div style={{ maxWidth: '82%' }}>
           <div style={{ ...MONO, fontSize: 9, color: m.color || m.accent, marginBottom: 4, letterSpacing: '0.08em' }}>{m.name}</div>
           <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>{m.text}</div>
@@ -632,7 +632,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
                 const ss = stance ? (PS[stance] || null) : null;
                 return (
                   <div key={ag.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: T.bg, border: `1px solid ${stance ? ag.accent + '30' : T.border}`, borderLeft: stance ? `2px solid ${ag.accent}` : `1px solid ${T.border}`, borderRadius: 8, padding: '5px 8px' }}>
-                    <span style={{ fontSize: 11 }}>{ag.emoji}</span>
+                    <img src={ag.avatar} alt={ag.name} style={{ width: 16, height: 16, borderRadius: 4, objectFit: 'cover', flexShrink: 0 }} />
                     <span style={{ ...MONO, fontSize: 9, color: T.text2, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ag.name}</span>
                     {stance ? <span style={{ ...MONO, fontSize: 8, fontWeight: 700, color: ss ? ss.fg : T.text2 }}>{ss ? ss.label : stance}</span>
                             : <Loader2 size={10} className="animate-spin" style={{ color: T.text3 }} />}

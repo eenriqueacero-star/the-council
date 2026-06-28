@@ -4,6 +4,28 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-28 (session 16)
+
+### Agent PNG avatars + 3D infrastructure
+
+**Part 1 — Agent PNG avatars replace emoji:**
+- `src/constants/agents.js`: added `avatar` field to all 6 agents (`/agents/rex.png` … `/agents/zen.png`); exported `AXIOM_AVATAR = '/agents/axiom.png'`. Emoji fields kept for prompt strings only.
+- `src/components/CouncilTab.jsx`: import `AXIOM_AVATAR`; agent cards now show `<img src={ag.avatar}>` (36×36, radius 8) instead of icon box + emoji. AXIOM synthesis card header now shows `<img src={AXIOM_AVATAR}>` (48×48, radius 12) alongside Crown icon. Progress label string stripped of emoji.
+- `src/components/ChatTab.jsx`: import `AXIOM_AVATAR`; AXIOM chat bubble avatar replaced SparkLogo with `<img src={AXIOM_AVATAR}>` (32×32); agent chat bubbles use `<img src={m.avatar}>` (26×26); council grid uses `<img src={ag.avatar}>` (16×16). Agent push now includes `avatar: ag.avatar`.
+- `src/components/AlphaTrackerTab.jsx`: agent accuracy bars now show avatar img (14×14) + name instead of emoji + name.
+- `src/components/DebugTab.jsx`: debug card title stripped of emoji (string context, can't use img).
+- PNG files: 7 emblem PNGs already committed to `public/agents/` (session 16 prep).
+
+**Part 2 — React Three Fiber 3D infrastructure:**
+- Installed `@react-three/fiber@^8`, `@react-three/drei@^9`, `three` (R3F v8 targets React 18).
+- Created `src/components/3d/CouncilScene.jsx`: lazy-imports `Canvas` from R3F so Three.js is code-split and doesn't bloat the initial bundle. Props: `agents`, `speaking`, `verdict`. Currently renders ambient + point lights only; agent models and table are TODO.
+- Created `src/components/3d/AgentModel.jsx`: placeholder mesh (sphere + emissive glow in agent color); `isSpeaking` prop raises emissive intensity. Ready for future GLTF model swap.
+- Created `src/components/3d/CouncilTable.jsx`: hexagonal cylinder (`CylinderGeometry args=[3,3,0.2,6]`), metallic dark material. Ready for future seating layout.
+- Created `src/components/3d/index.js`: re-exports all three components.
+- Not wired to any tab — infrastructure only; lazy import keeps bundle clean.
+
+---
+
 ## 2026-06-27 (session 15)
 
 ### Tab restructure & feature merge

@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, ChevronRight, Loader2, AlertTriangle, Crown, Wallet } from 'lucide-react';
 import CouncilLoader from './ui/CouncilLoader.jsx';
 import { MONO, DISP } from '../constants/styles.js';
-import { AGENTS, PROTOCOLS } from '../constants/agents.js';
+import { AGENTS, AXIOM_AVATAR, PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent, getQuotes, getNews, sleep } from '../api.js';
 import { auth, db } from '../firebase.js';
@@ -242,7 +242,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
       for (let i = 0; i < AGENTS.length; i++) {
         const ag = AGENTS[i];
-        setProgressLabel(`Round ${round + 1} · ${ag.name} ${ag.emoji}`);
+        setProgressLabel(`Round ${round + 1} · ${ag.name}`);
         setAgentState(prev => ({
           ...prev,
           [ag.id]: { ...prev[ag.id], [`r${round + 1}`]: { status: 'running' } },
@@ -544,12 +544,10 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
 
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ background: `${ag.accent}18`, border: `1px solid ${ag.accent}30`, borderRadius: 8, padding: 7 }}>
-                        <Icon size={16} style={{ color: ag.accent }} />
-                      </div>
+                      <img src={ag.avatar} alt={ag.name} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                       <div>
                         <div style={{ ...DISP, fontSize: 14, fontWeight: 600, color: T.text, lineHeight: 1.2 }}>
-                          {ag.emoji} {ag.name}
+                          {ag.name}
                         </div>
                         <div style={{ ...MONO, fontSize: 9, color: T.text3, marginTop: 2 }}>{ag.role}</div>
                       </div>
@@ -655,9 +653,12 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                 boxShadow: `0 0 40px ${vStyle.fg}15`,
                 borderRadius: 16, padding: '24px 28px', color: '#FFFFFF',
               }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <Crown size={16} style={{ color: '#F59E0B' }} />
-                <span style={{ ...DISP, fontSize: 14, fontWeight: 600, letterSpacing: '0.06em' }}>AXIOM · FINAL RULING · 3-ROUND COUNCIL</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <img src={AXIOM_AVATAR} alt="AXIOM" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Crown size={16} style={{ color: '#F59E0B' }} />
+                  <span style={{ ...DISP, fontSize: 14, fontWeight: 600, letterSpacing: '0.06em' }}>AXIOM · FINAL RULING · 3-ROUND COUNCIL</span>
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
                 <div style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, padding: '12px 24px', textAlign: 'center' }}>

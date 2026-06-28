@@ -444,7 +444,10 @@ export default function AlphaTrackerTab({ account, dark }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginBottom: 4 }}>
-                          <span style={{ ...MFONT, color: T.text2, fontSize: 10 }}>{a.emoji} {a.name}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <img src={a.avatar} alt={a.name} style={{ width: 14, height: 14, borderRadius: 3, objectFit: 'cover' }} />
+                            <span style={{ ...MFONT, color: T.text2, fontSize: 10 }}>{a.name}</span>
+                          </span>
                           <span style={{ ...MFONT, color: barColor, fontSize: 10, fontWeight: 700 }}>
                             {s.pct != null ? `${s.pct}%` : '—'}
                           </span>

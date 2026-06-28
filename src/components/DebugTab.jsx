@@ -104,7 +104,7 @@ function AgentRoundCard({ ag, round, data }) {
   ].filter(l => l !== undefined).join('\n');
 
   return (
-    <Card title={`${ag.emoji} ${ag.name} · Round ${round}`} accent={accent} copyText={fullCopyText}>
+    <Card title={`${ag.name} · Round ${round}`} accent={accent} copyText={fullCopyText}>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
         <span style={{
           ...MONO, fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,

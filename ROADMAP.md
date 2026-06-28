@@ -55,6 +55,26 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 16)
+
+### Agent PNG Avatars ✓
+- [x] `avatar` field added to all 6 agents in `agents.js`; `AXIOM_AVATAR` exported
+- [x] CouncilTab: agent cards show emblem PNG (36px), AXIOM synthesis card shows axiom.png (48px)
+- [x] ChatTab: AXIOM chat bubbles use axiom.png (32px), agent bubbles use agent PNG (26px), council grid uses PNG (16px)
+- [x] AlphaTrackerTab: accuracy bars show agent PNG (14px) instead of emoji
+- [x] DebugTab: card title emoji removed (string context)
+- [x] Zero emoji rendering references remain in JSX (grep confirmed)
+
+### 3D Council Infrastructure ✓ (Phase 1)
+- [x] `@react-three/fiber@^8`, `@react-three/drei@^9`, `three` installed (React 18 compatible)
+- [x] `src/components/3d/CouncilScene.jsx` — lazy Canvas, camera, lights; ready for agents + table
+- [x] `src/components/3d/AgentModel.jsx` — sphere placeholder with emissive agent-color glow + `isSpeaking` prop
+- [x] `src/components/3d/CouncilTable.jsx` — hexagonal cylinder, metallic dark material
+- [x] `src/components/3d/index.js` — re-exports all 3D components
+- [x] Three.js lazy-loaded via dynamic import; not in initial bundle
+
+---
+
 ## IN PROGRESS
 
 ### Alpha Tracker vs SPY ⚡
@@ -133,6 +153,9 @@ Current state of planned work. Update statuses here at the end of every session.
 ---
 
 ## NEXT
+
+### 3D Council Meeting — Phase 2
+Animated scene where agent characters sit around the hexagonal table and present verdicts. R3F infrastructure installed (Phase 1 done). Next: design agent 3D models, speaking animations (emissive pulse + camera focus), camera choreography (cut to speaking agent), GLTF model import.
 
 ### Council on Holdings (HOLD/TRIM)
 Point the same 6-agent council at existing positions, not just new buys. Verdict options: HOLD, TRIM, ADD, EXIT.

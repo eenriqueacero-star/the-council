@@ -41,9 +41,8 @@ export default function BottomNav({ tab, setTab, dark }) {
                 <motion.div
                   layoutId="nav-pill"
                   style={{
-                    position: 'absolute', top: '50%', left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: 36, height: 36, borderRadius: 10,
+                    position: 'absolute', inset: 0,
+                    borderRadius: 10,
                     background: 'rgba(59,130,246,0.12)',
                     zIndex: 0,
                   }}

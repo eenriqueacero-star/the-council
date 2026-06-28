@@ -235,8 +235,9 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [editShares,    setEditShares]    = useState('');
   const [editCost,      setEditCost]      = useState('');
   const [dcaOpen,       setDcaOpen]       = useState(false);
-  const [newsItems,     setNewsItems]     = useState(null); // null = not fetched, [] = fetched empty
+  const [newsItems,     setNewsItems]     = useState(null); // null = not fetched yet
   const [newsLoading,   setNewsLoading]   = useState(false);
+  const [newsWeekend,   setNewsWeekend]   = useState(false);
   const timerRef = useRef(null);
 
   const tickers    = acctHoldings.filter(t => posMap[t]);
@@ -255,8 +256,8 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   }, [fetchQuotes, authReady]);
 
   const fetchNews = useCallback(async (holdingsBySize) => {
-    if (newsItems !== null || newsLoading) return;
-    if (isWeekend()) { setNewsItems([]); return; }
+    if (newsItems !== null || newsLoading || newsWeekend) return;
+    if (isWeekend()) { setNewsWeekend(true); return; }
     setNewsLoading(true);
     try {
       const top5 = holdingsBySize.slice(0, 5);
@@ -293,10 +294,10 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     } finally {
       setNewsLoading(false);
     }
-  }, [newsItems, newsLoading]);
+  }, [newsItems, newsLoading, newsWeekend]);
 
   useEffect(() => {
-    if (!authReady || !withShares.length || newsItems !== null || newsLoading) return;
+    if (!authReady || !withShares.length || newsItems !== null || newsLoading || newsWeekend) return;
     const bySize = [...withShares].sort((a, b) => {
       const qa = quotes[a] || {}, qb = quotes[b] || {};
       const va = (parseFloat(posMap[a]?.shares) || 0) * (qa.price || 0);
@@ -304,7 +305,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       return vb - va;
     });
     fetchNews(bySize);
-  }, [authReady, withShares.join(','), newsItems, newsLoading]);
+  }, [authReady, withShares.join(','), newsItems, newsLoading, newsWeekend]);
 
   const fetchCandles = useCallback(async () => {
     if (!withShares.length) { setCandlesLoaded(true); return; }
@@ -733,9 +734,10 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Market News</span>
             </div>
 
-            {isWeekend() && newsItems === null ? (
-              <div style={{ padding: '20px 16px', textAlign: 'center', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, fontSize: 13, color: T.text3 }}>
-                Markets closed — news refreshes Monday
+            {newsWeekend ? (
+              <div style={{ padding: '20px 16px', textAlign: 'center', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16 }}>📅</span>
+                <span style={{ fontSize: 13, color: T.text3 }}>Markets closed — news refreshes Monday</span>
               </div>
             ) : newsLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>

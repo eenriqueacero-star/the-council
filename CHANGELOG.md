@@ -4,6 +4,21 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-28 (session 18)
+
+### Two follow-up fixes
+
+**Fix 1 — BottomNav pill transform conflict (`src/components/BottomNav.jsx`):**
+- Removed `top: '50%', left: '50%', transform: 'translate(-50%, -50%)'` from the `layoutId="nav-pill"` div — those transforms conflicted with Framer Motion's layout animation transforms, causing the pill to jump off-center when switching tabs
+- Replaced with `inset: 0` — pill fills the 36×36 `position: relative` parent container exactly, no transform needed
+
+**Fix 2 — Weekend shows "no news" instead of market closed message (`src/components/PortfolioTab.jsx`):**
+- Added `newsWeekend` boolean state; weekend check now sets `newsWeekend: true` instead of `newsItems: []`
+- Render branch checks `newsWeekend` first and shows a dedicated "Markets closed — news refreshes Monday" message with a calendar icon in `text3` color
+- "No recent news for your holdings" message now only appears when a real fetch returned zero articles on a weekday
+
+---
+
 ## 2026-06-28 (session 17)
 
 ### 3 bug fixes + Portfolio News feature

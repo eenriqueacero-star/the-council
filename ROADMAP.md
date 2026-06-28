@@ -75,6 +75,16 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 17)
+
+### 3 Bug Fixes + Portfolio News ✓
+- [x] Top Movers: capped at 5, mobile-responsive sizing (72px min-width, smaller fonts/padding)
+- [x] BottomNav pill: centered behind icon using translate(-50%,-50%) inside 36×36 icon container
+- [x] Scout Mode: mobile-responsive row layout — stacks vertically, headline wraps, agents shown as cards
+- [x] Portfolio News: "Market News" section below Holdings; Finnhub news for top 5 holdings, AI summaries via Groq, sentiment/category detection, ticker pills, stagger animation, weekend guard
+
+---
+
 ## IN PROGRESS
 
 ### Alpha Tracker vs SPY ⚡

@@ -4,6 +4,45 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-28 (session 17)
+
+### 3 bug fixes + Portfolio News feature
+
+**Bug 1 — Top Movers mobile scroll (`src/components/PortfolioTab.jsx`):**
+- `.slice(0, 5)` on movers array — always cap at 5 cards regardless of portfolio size
+- Mobile (< 768px): `minWidth: 72` (was 90), `padding: '10px 10px'`, font sizes reduced 1px each, logo 24px (was 28px)
+- Desktop: unchanged sizing, still capped at 5
+- Section already hidden when all positions are flat (no change needed)
+
+**Bug 2 — BottomNav blue pill off-center (`src/components/BottomNav.jsx`):**
+- Moved pill inside the icon `<span>` container (36×36, `position: relative`) instead of being absolute on the whole button
+- Pill now uses `top: '50%', left: '50%', transform: 'translate(-50%, -50%)'` — perfectly centers behind the icon
+- Pill size: `width: 36, height: 36, borderRadius: 10`
+
+**Bug 3 — Scout Mode mobile overflow (`src/components/ScoutTab.jsx`):**
+- `renderRow` reworked to be mobile-responsive: header row (ticker + verdict badge + time + chevron) + data row (conviction + price + headline)
+- Mobile: data row stacks vertically; headline wraps (`wordBreak: 'break-word'`) instead of `whiteSpace: nowrap`
+- Expanded agent stances: mobile shows each agent as a card (name, verdict badge, reasoning) instead of cramped inline pills
+- Desktop expanded: unchanged pill layout
+- Progress bar: `maxWidth: calc(100vw - 40px)` so it never overflows
+
+**Feature — Portfolio News with AI Summaries (`src/components/PortfolioTab.jsx`):**
+- New "Market News" section below Holdings list
+- Fetches news via existing `getNews()` for top 5 holdings by position size; 3 articles per ticker, 15 max total
+- AI summaries: `callAgent` runs in parallel (`Promise.all`) for all articles; 1-sentence portfolio-impact summary per article
+- Sentiment detection: keyword regex → `positive` / `negative` / `neutral`; colored left border (green/red/zinc) + badge pill
+- Category detection: Fed / Earnings / Tech / Energy / Defense / Market based on headline keywords
+- Ticker pills: shows which portfolio holdings are mentioned in the article
+- Cards: glass card + colored left border, source + time ago + sentiment badge, headline (wrapping), AI summary (italic, ✨), ticker pills + category tag
+- Framer Motion stagger entrance (50ms per card)
+- Tap to open article URL in new tab
+- Weekend guard: shows "Markets closed — news refreshes Monday" on Sat/Sun
+- Loading: `<CouncilLoader size="sm" />` while fetching
+- Cached in component state — no re-fetch on tab switch
+- Imports: added `getNews`, `Newspaper`, `CouncilLoader`
+
+---
+
 ## 2026-06-28 (session 16)
 
 ### Agent PNG avatars + 3D infrastructure

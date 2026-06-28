@@ -207,64 +207,87 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
     setExpandedTickers(prev => ({ ...prev, [ticker]: !prev[ticker] }));
   }
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   function renderRow(item, isDiscovery = false) {
     const r = item.lastResult;
     const expanded = expandedTickers[item.ticker];
-    const vs = r ? (VERDICT_STYLE[r.verdict] || VERDICT_STYLE.WATCH) : null;
     const rowBg = r?.verdict === 'BUY' && r.conviction >= 7 ? 'rgba(0,200,5,0.04)' : 'transparent';
 
     return (
       <div key={item.ticker} style={{ borderBottom: `1px solid ${T.border}` }}>
         <div
           onClick={() => r && toggleExpand(item.ticker)}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', cursor: r ? 'pointer' : 'default', background: rowBg, transition: 'background .15s' }}
+          style={{ padding: '12px 16px', cursor: r ? 'pointer' : 'default', background: rowBg, transition: 'background .15s' }}
         >
-          <div style={{ flex: '0 0 64px' }}>
-            <span style={{ ...MONO, fontSize: 13, fontWeight: 700, color: T.text }}>{item.ticker}</span>
+          {/* Header row: ticker + remove + chevron */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: r ? 6 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ ...MONO, fontSize: 13, fontWeight: 700, color: T.text }}>{item.ticker}</span>
+              {r && <VerdictBadge verdict={r.verdict} />}
+              {!r && <span style={{ ...MONO, fontSize: 11, color: T.text3 }}>Not yet scouted</span>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {r && (
+                <>
+                  <span style={{ ...MONO, fontSize: 10, color: T.text3 }}>{timeSince(r.scoutedAt)}</span>
+                  {expanded ? <ChevronDown size={14} style={{ color: T.text3 }} /> : <ChevronRight size={14} style={{ color: T.text3 }} />}
+                </>
+              )}
+              {!isDiscovery && (
+                <button
+                  onClick={e => { e.stopPropagation(); removeFromWatchlist(item.ticker); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: 4 }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
 
-          {r ? (
-            <>
-              <VerdictBadge verdict={r.verdict} />
-              <ConvictionBar value={r.conviction} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: T.text2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.headline}</div>
+          {/* Data row: conviction + price/pct + headline */}
+          {r && (
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 6 : 10, alignItems: isMobile ? 'flex-start' : 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ConvictionBar value={r.conviction} />
+                {r.price && <span style={{ ...MONO, fontSize: 11, color: T.text3 }}>${r.price.toFixed(2)}</span>}
+                {r.changePct != null && (
+                  <span style={{ ...MONO, fontSize: 10, color: r.changePct >= 0 ? '#22C55E' : '#EF4444' }}>
+                    {r.changePct >= 0 ? '+' : ''}{r.changePct.toFixed(2)}%
+                  </span>
+                )}
               </div>
-              {r.price && (
-                <span style={{ ...MONO, fontSize: 11, color: T.text3, flexShrink: 0 }}>${r.price.toFixed(2)}</span>
+              {r.headline && (
+                <div style={{ flex: 1, fontSize: 12, color: T.text2, lineHeight: 1.4, wordBreak: 'break-word' }}>
+                  {r.headline}
+                </div>
               )}
-              {r.changePct != null && (
-                <span style={{ ...MONO, fontSize: 10, color: r.changePct >= 0 ? '#22C55E' : '#EF4444', flexShrink: 0 }}>
-                  {r.changePct >= 0 ? '+' : ''}{r.changePct.toFixed(2)}%
-                </span>
-              )}
-              <span style={{ ...MONO, fontSize: 10, color: T.text3, flexShrink: 0 }}>{timeSince(r.scoutedAt)}</span>
-              {r && (expanded ? <ChevronDown size={14} style={{ color: T.text3, flexShrink: 0 }} /> : <ChevronRight size={14} style={{ color: T.text3, flexShrink: 0 }} />)}
-            </>
-          ) : (
-            <span style={{ ...MONO, fontSize: 11, color: T.text3 }}>Not yet scouted</span>
-          )}
-
-          {!isDiscovery && (
-            <button
-              onClick={e => { e.stopPropagation(); removeFromWatchlist(item.ticker); }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: 4, flexShrink: 0 }}
-            >
-              <X size={13} />
-            </button>
+            </div>
           )}
         </div>
 
         {expanded && r && (
-          <div style={{ padding: '0 16px 14px 90px', background: rowBg }}>
-            <p style={{ fontSize: 12, color: T.text2, lineHeight: 1.6, margin: '0 0 10px' }}>{r.rationale}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {r.agents && Object.entries(r.agents).map(([id, ag]) => (
-                <span key={id} style={{ ...MONO, fontSize: 10, padding: '2px 7px', borderRadius: 4, background: T.bgCard, color: T.text2 }}>
-                  {id.slice(0,3).toUpperCase()} {ag.stance} {ag.score != null ? `${ag.score}/10` : ''}
-                </span>
-              ))}
-            </div>
+          <div style={{ padding: '0 16px 14px', paddingLeft: isMobile ? 16 : 90, background: rowBg }}>
+            <p style={{ fontSize: 12, color: T.text2, lineHeight: 1.6, margin: '0 0 10px', wordBreak: 'break-word' }}>{r.rationale}</p>
+            {r.agents && (
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', flexWrap: isMobile ? undefined : 'wrap', gap: 6 }}>
+                {Object.entries(r.agents).map(([id, ag]) => (
+                  isMobile ? (
+                    <div key={id} style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 8, padding: '8px 10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ ...MONO, fontSize: 11, fontWeight: 700, color: T.text }}>{id.slice(0,3).toUpperCase()}</span>
+                        <span style={{ ...MONO, fontSize: 10, color: T.text2 }}>{ag.stance}{ag.score != null ? ` ${ag.score}/10` : ''}</span>
+                      </div>
+                      {ag.reasoning && <div style={{ fontSize: 11, color: T.text2, lineHeight: 1.4 }}>{ag.reasoning}</div>}
+                    </div>
+                  ) : (
+                    <span key={id} style={{ ...MONO, fontSize: 10, padding: '2px 7px', borderRadius: 4, background: T.bgCard, color: T.text2 }}>
+                      {id.slice(0,3).toUpperCase()} {ag.stance} {ag.score != null ? `${ag.score}/10` : ''}
+                    </span>
+                  )
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -300,7 +323,7 @@ export default function ScoutTab({ dark, posMap, acctHoldings, isDebugMode }) {
             <span style={{ ...MONO, fontSize: 12, color: '#3B82F6' }}>{progress}</span>
           </div>
           {progressTotal > 0 && (
-            <div style={{ height: 4, borderRadius: 2, background: 'rgba(59,130,246,0.15)', overflow: 'hidden' }}>
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(59,130,246,0.15)', overflow: 'hidden', maxWidth: 'calc(100vw - 40px)' }}>
               <div style={{ width: `${(progressN / progressTotal) * 100}%`, height: '100%', background: '#3B82F6', borderRadius: 2, transition: 'width .4s ease' }} />
             </div>
           )}

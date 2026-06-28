@@ -32,27 +32,29 @@ export default function BottomNav({ tab, setTab, dark }) {
             style={{
               flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 3, border: 'none', background: 'none', cursor: 'pointer', padding: '0 4px',
-              position: 'relative',
               color: active ? '#3B82F6' : (dark ? '#52525B' : '#A1A1AA'),
               fontFamily: 'var(--font-display)',
             }}
           >
-            {active && (
-              <motion.div
-                layoutId="nav-pill"
-                style={{
-                  position: 'absolute', top: -2, left: '50%', transform: 'translateX(-50%)',
-                  width: 32, height: 32, borderRadius: 10,
-                  background: 'rgba(59,130,246,0.12)',
-                  zIndex: 0,
-                }}
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-              />
-            )}
-            <span style={{ display: 'flex', position: 'relative', zIndex: 1 }}>
-              <Icon size={22} strokeWidth={active ? 2.2 : 1.7} />
+            <span style={{ display: 'flex', position: 'relative', alignItems: 'center', justifyContent: 'center', width: 36, height: 36 }}>
+              {active && (
+                <motion.div
+                  layoutId="nav-pill"
+                  style={{
+                    position: 'absolute', top: '50%', left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 36, height: 36, borderRadius: 10,
+                    background: 'rgba(59,130,246,0.12)',
+                    zIndex: 0,
+                  }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+              <span style={{ position: 'relative', zIndex: 1, display: 'flex' }}>
+                <Icon size={22} strokeWidth={active ? 2.2 : 1.7} />
+              </span>
             </span>
-            <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, position: 'relative', zIndex: 1 }}>
+            <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>
               {label}
             </span>
           </motion.button>

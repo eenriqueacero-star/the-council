@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Coins, Loader2 } from 'lucide-react';
-import { getQuotes, getCandles, callAgent } from '../api.js';
+import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Coins, Loader2, Newspaper } from 'lucide-react';
+import { getQuotes, getCandles, getNews, callAgent } from '../api.js';
 import { theme } from '../utils/theme.js';
 import { PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import AnimatedNumber from './ui/AnimatedNumber.jsx';
+import CouncilLoader from './ui/CouncilLoader.jsx';
 
 const LOGO_DOMAINS = {
   NVDA:'nvidia.com',  MU:'micron.com',    AMD:'amd.com',       AAPL:'apple.com',
@@ -31,6 +32,44 @@ function TickerLogo({ ticker, dark, size = 36 }) {
 }
 
 function fmtPct(n) { return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`; }
+
+function detectSentiment(text) {
+  const t = (text || '').toLowerCase();
+  if (/beat|raise|upgrade|growth|partnership|record|accelerat|bullish|unveils|launches/.test(t)) return 'positive';
+  if (/miss|downgrade|cut|decline|risk|concern|warning|oversupply|slips|fall|drops/.test(t)) return 'negative';
+  return 'neutral';
+}
+
+function detectCategory(text) {
+  const t = (text || '').toLowerCase();
+  if (/\bfed\b|rate|inflation|monetary/.test(t)) return 'Fed';
+  if (/earnings|revenue|\beps\b|beat|miss/.test(t)) return 'Earnings';
+  if (/\bai\b|chip|semiconductor|data center/.test(t)) return 'Tech';
+  if (/oil|energy|opec/.test(t)) return 'Energy';
+  if (/defense|military|contract/.test(t)) return 'Defense';
+  return 'Market';
+}
+
+function timeAgo(datetime) {
+  const diff = Date.now() - datetime * 1000;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function isWeekend() {
+  const day = new Date().getDay();
+  return day === 0 || day === 6;
+}
+
+const SENTIMENT_COLORS = {
+  positive: { border: '#22C55E', badge: 'rgba(34,197,94,0.15)', text: '#22C55E', label: 'Positive' },
+  negative: { border: '#EF4444', badge: 'rgba(239,68,68,0.15)', text: '#EF4444', label: 'Negative' },
+  neutral:  { border: '#52525B', badge: 'rgba(82,82,91,0.15)',  text: '#71717A', label: 'Neutral'  },
+};
 
 const STAGGER = { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } };
 const ITEM    = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
@@ -196,6 +235,8 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [editShares,    setEditShares]    = useState('');
   const [editCost,      setEditCost]      = useState('');
   const [dcaOpen,       setDcaOpen]       = useState(false);
+  const [newsItems,     setNewsItems]     = useState(null); // null = not fetched, [] = fetched empty
+  const [newsLoading,   setNewsLoading]   = useState(false);
   const timerRef = useRef(null);
 
   const tickers    = acctHoldings.filter(t => posMap[t]);
@@ -212,6 +253,58 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     timerRef.current = setInterval(fetchQuotes, 60000);
     return () => clearInterval(timerRef.current);
   }, [fetchQuotes, authReady]);
+
+  const fetchNews = useCallback(async (holdingsBySize) => {
+    if (newsItems !== null || newsLoading) return;
+    if (isWeekend()) { setNewsItems([]); return; }
+    setNewsLoading(true);
+    try {
+      const top5 = holdingsBySize.slice(0, 5);
+      const newsPerTicker = await Promise.all(top5.map(t => getNews(t)));
+      const allArticles = [];
+      newsPerTicker.forEach((result, i) => {
+        const ticker = top5[i];
+        const articles = (result.articles || []).slice(0, 3);
+        articles.forEach(a => allArticles.push({ ...a, ticker }));
+      });
+      const limited = allArticles.slice(0, 15);
+
+      const summarized = await Promise.all(limited.map(async (article) => {
+        try {
+          const sys = `You are a portfolio analyst. Given this news about ${article.ticker}, write ONE sentence explaining how this could affect someone holding ${article.ticker}. Be specific and actionable. No fluff.`;
+          const usr = `Headline: ${article.headline}\nSummary: ${article.summary || article.headline}`;
+          const { text } = await callAgent(sys, usr, false, 80);
+          return { ...article, aiSummary: text?.trim() || null };
+        } catch {
+          return { ...article, aiSummary: null };
+        }
+      }));
+
+      const enriched = summarized.map(a => ({
+        ...a,
+        sentiment: detectSentiment(a.headline + ' ' + (a.summary || '')),
+        category: detectCategory(a.headline + ' ' + (a.summary || '')),
+        mentionedTickers: top5.filter(t => (a.headline + ' ' + (a.summary || '')).includes(t)),
+      }));
+
+      setNewsItems(enriched);
+    } catch {
+      setNewsItems([]);
+    } finally {
+      setNewsLoading(false);
+    }
+  }, [newsItems, newsLoading]);
+
+  useEffect(() => {
+    if (!authReady || !withShares.length || newsItems !== null || newsLoading) return;
+    const bySize = [...withShares].sort((a, b) => {
+      const qa = quotes[a] || {}, qb = quotes[b] || {};
+      const va = (parseFloat(posMap[a]?.shares) || 0) * (qa.price || 0);
+      const vb = (parseFloat(posMap[b]?.shares) || 0) * (qb.price || 0);
+      return vb - va;
+    });
+    fetchNews(bySize);
+  }, [authReady, withShares.join(','), newsItems, newsLoading]);
 
   const fetchCandles = useCallback(async () => {
     if (!withShares.length) { setCandlesLoaded(true); return; }
@@ -372,7 +465,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     const q   = quotes[t] || {};
     const pct = q.prevClose ? ((q.price - q.prevClose) / q.prevClose) * 100 : 0;
     return { t, pct, price: q.price || 0 };
-  }).filter(m => Math.abs(m.pct) > 0.01).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+  }).filter(m => Math.abs(m.pct) > 0.01).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 5);
 
   const S = { padding: '0 var(--space-page)', maxWidth: 760, margin: '0 auto' };
 
@@ -455,27 +548,35 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         </div>
       </div>
 
-      {/* Top movers — horizontal scroll */}
-      {movers.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ ...S, paddingBottom: 8 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top Movers</span>
+      {/* Top movers — horizontal scroll (max 5, mobile-responsive) */}
+      {movers.length > 0 && (() => {
+        const isMob = typeof window !== 'undefined' && window.innerWidth < 768;
+        const cardMin  = isMob ? 72 : 90;
+        const cardPad  = isMob ? '10px 10px' : '12px 14px';
+        const nameSz   = isMob ? 12 : 13;
+        const pctSz    = isMob ? 11 : 12;
+        const priceSz  = isMob ? 10 : 11;
+        return (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ ...S, paddingBottom: 8 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top Movers</span>
+            </div>
+            <div className="no-scrollbar" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 'var(--space-page)', paddingRight: 'var(--space-page)', paddingBottom: 4, justifyContent: 'center', maxWidth: 1200, margin: '0 auto' }}>
+              {movers.map(({ t, pct, price }) => (
+                <motion.div key={t} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{
+                  flexShrink: 0, background: T.bgCard, border: `1px solid ${pct >= 0 ? T.green + '25' : T.red + '25'}`,
+                  borderRadius: 12, padding: cardPad, minWidth: cardMin, cursor: 'pointer',
+                }}>
+                  <TickerLogo ticker={t} dark={dark} size={isMob ? 24 : 28} />
+                  <div style={{ marginTop: 8, fontFamily: 'var(--font-display)', fontSize: nameSz, fontWeight: 600, color: T.text }}>{t}</div>
+                  <div style={{ fontSize: pctSz, fontWeight: 500, color: pct >= 0 ? T.green : T.red, marginTop: 2 }}>{fmtPct(pct)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: priceSz, color: T.text2, marginTop: 1 }}>${price.toFixed(2)}</div>
+                </motion.div>
+              ))}
+            </div>
           </div>
-          <div className="no-scrollbar" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingLeft: 'var(--space-page)', paddingRight: 'var(--space-page)', paddingBottom: 4, justifyContent: 'center', maxWidth: 1200, margin: '0 auto' }}>
-            {movers.map(({ t, pct, price }) => (
-              <motion.div key={t} whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} style={{
-                flexShrink: 0, background: T.bgCard, border: `1px solid ${pct >= 0 ? T.green + '25' : T.red + '25'}`,
-                borderRadius: 12, padding: '12px 14px', minWidth: 90, cursor: 'pointer',
-              }}>
-                <TickerLogo ticker={t} dark={dark} size={28} />
-                <div style={{ marginTop: 8, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600, color: T.text }}>{t}</div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: pct >= 0 ? T.green : T.red, marginTop: 2 }}>{fmtPct(pct)}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text2, marginTop: 1 }}>${price.toFixed(2)}</div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Holdings */}
       <div style={{ ...S, paddingBottom: 32 }}>
@@ -623,6 +724,94 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
             </motion.div>
           )}
         </div>
+
+        {/* Portfolio News section */}
+        {withShares.length > 0 && (
+          <div style={{ marginTop: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <Newspaper size={14} style={{ color: T.text3 }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Market News</span>
+            </div>
+
+            {isWeekend() && newsItems === null ? (
+              <div style={{ padding: '20px 16px', textAlign: 'center', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, fontSize: 13, color: T.text3 }}>
+                Markets closed — news refreshes Monday
+              </div>
+            ) : newsLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+                <CouncilLoader size="sm" />
+              </div>
+            ) : newsItems && newsItems.length === 0 ? (
+              <div style={{ padding: '20px 16px', textAlign: 'center', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, fontSize: 13, color: T.text3 }}>
+                No recent news for your holdings
+              </div>
+            ) : newsItems && newsItems.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {newsItems.map((article, i) => {
+                  const sc = SENTIMENT_COLORS[article.sentiment] || SENTIMENT_COLORS.neutral;
+                  return (
+                    <motion.div
+                      key={`${article.ticker}-${i}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05, duration: 0.25 }}
+                      onClick={() => article.url && window.open(article.url, '_blank')}
+                      style={{
+                        background: T.bgCard,
+                        border: `1px solid ${T.border}`,
+                        borderLeft: `3px solid ${sc.border}`,
+                        borderRadius: 12,
+                        padding: 16,
+                        cursor: article.url ? 'pointer' : 'default',
+                        maxWidth: 800,
+                      }}
+                    >
+                      {/* Row 1: source + time + sentiment badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600, color: T.text }}>{article.source || 'News'}</span>
+                          <span style={{ fontSize: 12, color: T.text3 }}>· {timeAgo(article.datetime)}</span>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20, background: sc.badge, color: sc.text }}>
+                          {sc.label}
+                        </span>
+                      </div>
+
+                      {/* Row 2: headline */}
+                      <div style={{ fontSize: 15, fontWeight: 500, color: T.text, lineHeight: 1.45, marginBottom: 8 }}>
+                        {article.headline}
+                      </div>
+
+                      {/* Row 3: AI summary */}
+                      {article.aiSummary && (
+                        <div style={{ fontSize: 13, color: T.text2, fontStyle: 'italic', lineHeight: 1.5, marginBottom: 10 }}>
+                          ✨ {article.aiSummary}
+                        </div>
+                      )}
+
+                      {/* Row 4: ticker pills + category */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: T.accentGlow, color: T.accent }}>
+                            {article.ticker}
+                          </span>
+                          {article.mentionedTickers && article.mentionedTickers.filter(t => t !== article.ticker).map(t => (
+                            <span key={t} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', color: T.text2 }}>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 7px', borderRadius: 6, background: 'rgba(82,82,91,0.15)', color: T.text3 }}>
+                          {article.category}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* DCA Allocator button */}
         {withShares.length > 0 && (

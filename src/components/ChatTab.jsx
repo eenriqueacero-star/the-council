@@ -4,7 +4,7 @@ import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send, Crown, Ale
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, AXIOM_AVATAR, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
-import { callAgent, getQuotes, getNews, sleep } from '../api.js';
+import { callAgent, getQuotes, getNews, getFredData, getTechnicals, sleep } from '../api.js';
 import { auth, db } from '../firebase.js';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { loadTickerHistory } from '../utils/rulingContext.js';
@@ -118,15 +118,48 @@ export default function ChatTab({ account, acct, posMap, positionsLine, flagApiD
     setChat(p => [...p, { role:'council', runId, ticker:tkr, agents:{}, rounds:[], synth:null }]);
 
     let livePrice = null, rawQuote = null;
-    try {
-      const q = await getQuotes([tkr]);
-      rawQuote  = q[tkr] || null;
-      livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
-    } catch {}
+    const [quotesRes, fredData, techData] = await Promise.all([
+      getQuotes([tkr]).catch(() => ({})),
+      getFredData().catch(() => null),
+      getTechnicals(tkr).catch(() => null),
+    ]);
+    rawQuote  = quotesRes[tkr] || null;
+    livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
 
-    const history = uid ? await loadTickerHistory(uid, tkr, livePrice) : '';
-    const ctx     = await loadAgentContext(tkr, rawQuote);
+    const history  = uid ? await loadTickerHistory(uid, tkr, livePrice) : '';
+    const ctx      = await loadAgentContext(tkr, rawQuote);
     const profiles = uid ? await loadAllAgentProfiles(uid, AGENTS.map(a => a.id)) : {};
+
+    // ATLAS macro context
+    const macroContext = fredData ? `
+
+LIVE MACRO DATA (Federal Reserve FRED):
+- Fed Funds Rate: ${fredData.fed_rate?.current ?? 'N/A'}% (${fredData.fed_rate?.date ?? ''})
+- CPI Inflation: ${fredData.cpi?.current ?? 'N/A'} (${fredData.cpi?.date ?? ''})
+- Unemployment: ${fredData.unemployment?.current ?? 'N/A'}% (${fredData.unemployment?.date ?? ''})
+- Real GDP Growth: ${fredData.gdp_growth?.current ?? 'N/A'}% (${fredData.gdp_growth?.date ?? ''})
+- 10Y Treasury: ${fredData.treasury_10y?.current ?? 'N/A'}% | 2Y Treasury: ${fredData.treasury_2y?.current ?? 'N/A'}%
+- Yield Spread (10Y-2Y): ${fredData.yield_spread?.current ?? 'N/A'}%${fredData.yield_spread?.inverted ? ' ⚠️ INVERTED — recession signal' : ''}
+- VIX: ${fredData.vix?.current ?? 'N/A'} (${fredData.vix?.date ?? ''})
+Use these exact FRED numbers to ground your macro assessment.` : '\n[FRED macro data unavailable for this run.]';
+
+    // REX technicals context
+    const techIndicators = techData?.indicators;
+    const hasTech = !!(techIndicators && Object.keys(techIndicators).length > 0);
+    const techContext = hasTech ? `
+
+LIVE TECHNICAL INDICATORS for ${tkr} (Alpha Vantage):
+- RSI (14): ${techIndicators.rsi?.value?.toFixed(1) ?? 'N/A'}${techIndicators.rsi?.value > 70 ? ' ⚠️ OVERBOUGHT' : techIndicators.rsi?.value < 30 ? ' ⚠️ OVERSOLD' : ' (neutral)'}
+- MACD: ${techIndicators.macd?.macd?.toFixed(3) ?? 'N/A'} | Signal: ${techIndicators.macd?.signal?.toFixed(3) ?? 'N/A'} | Histogram: ${techIndicators.macd?.histogram?.toFixed(3) ?? 'N/A'} ${techIndicators.macd?.bullish ? '(bullish crossover)' : '(bearish crossover)'}
+- Bollinger Bands: Upper ${techIndicators.bollinger?.upper?.toFixed(2) ?? 'N/A'} | Middle ${techIndicators.bollinger?.middle?.toFixed(2) ?? 'N/A'} | Lower ${techIndicators.bollinger?.lower?.toFixed(2) ?? 'N/A'}
+- SMA 50: ${techIndicators.sma50?.value?.toFixed(2) ?? 'N/A'} | SMA 200: ${techIndicators.sma200?.value?.toFixed(2) ?? 'N/A'}
+- Cross Signal: ${techIndicators.crossSignal === 'GOLDEN_CROSS' ? '✅ GOLDEN CROSS (bullish)' : techIndicators.crossSignal === 'DEATH_CROSS' ? '⚠️ DEATH CROSS (bearish)' : 'N/A'}
+Use these exact indicator values to ground your technical assessment.` : '\n[Alpha Vantage technical indicators unavailable — base analysis on price action from LIVE DATA.]';
+
+    // AXIOM macro backdrop
+    const macroBackdrop = fredData
+      ? `Macro backdrop: Fed rate ${fredData.fed_rate?.current ?? 'N/A'}%, CPI ${fredData.cpi?.current ?? 'N/A'}, Unemployment ${fredData.unemployment?.current ?? 'N/A'}%, VIX ${fredData.vix?.current ?? 'N/A'}, Yield spread ${fredData.yield_spread?.current ?? 'N/A'}%${fredData.yield_spread?.inverted ? ' (INVERTED)' : ''}.`
+      : '';
 
     // Refresh the single most-stale agent's research in background (1 call max per run)
     if (uid) {
@@ -224,8 +257,13 @@ export default function ChatTab({ account, acct, posMap, positionsLine, flagApiD
         }
 
         const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
+        const agentSystem = ag.id === 'macro'
+          ? ag.system + macroContext
+          : ag.id === 'technical'
+            ? ag.system + techContext
+            : ag.system;
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
+          const { text: txt } = await callAgent(agentSystem, userMsg, false, 1000, null, null, i);
           const parsed = extractJSON(txt);
           if (!parsed) console.error(`[parse fail] ${ag.name} R${round + 1} raw:`, JSON.stringify(txt));
           roundResults[ag.id] = parsed || { stance: 'CAUTION', score: 5, headline: 'Could not parse', points: [] };
@@ -254,7 +292,7 @@ export default function ChatTab({ account, acct, posMap, positionsLine, flagApiD
       return `${ag.name} (${ag.role}): ${JSON.stringify(r)}`;
     }).join('\n');
 
-    const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final ruling on ${tkr} for ${acct.label}. ${PROTOCOLS}
+    const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final ruling on ${tkr} for ${acct.label}. ${PROTOCOLS}${macroBackdrop ? '\n' + macroBackdrop : ''}
 The council ran 3 deliberation rounds. Synthesize into a decisive verdict. Speak the ruling conversationally (2-4 sentences).
 Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"SKIP","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>"}
 BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this trade — do not enter.`;

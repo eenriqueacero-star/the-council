@@ -88,5 +88,34 @@ export async function getNews(ticker) {
   return data;
 }
 
+// 5-min in-memory FRED cache (macro data changes infrequently)
+let fredCache = null;
+let fredCacheTs = 0;
+
+export async function getFredData() {
+  if (fredCache && Date.now() - fredCacheTs < 300000) return fredCache;
+  try {
+    const headers = await authHeaders();
+    const res = await fetch('/api/get-fred', { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    fredCache = data;
+    fredCacheTs = Date.now();
+    return data;
+  } catch { return null; }
+}
+
+export async function getTechnicals(ticker) {
+  try {
+    const headers = await authHeaders();
+    const res = await fetch('/api/get-technicals', {
+      method: 'POST', headers,
+      body: JSON.stringify({ ticker }),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}
+
 // Stagger helper
 export const sleep = ms => new Promise(r => setTimeout(r, ms));

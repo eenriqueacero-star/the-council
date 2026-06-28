@@ -6,6 +6,8 @@
     "api/get-quotes.js":  { "maxDuration": 30 },
     "api/get-candles.js": { "maxDuration": 30 },
     "api/get-news.js":    { "maxDuration": 15 },
+    "api/get-fred.js":   { "maxDuration": 20 },
+    "api/get-technicals.js": { "maxDuration": 45 },
     "api/send-push.js":   { "maxDuration": 10 },
     "api/scout-cron.js":  { "maxDuration": 300 }
   },

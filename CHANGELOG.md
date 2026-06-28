@@ -4,6 +4,37 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-28 (session 19)
+
+### FRED + Alpha Vantage integration
+
+**New API endpoints:**
+- `api/get-fred.js` — fetches 7 FRED series (FEDFUNDS, CPIAUCSL, UNRATE, A191RL1Q225SBEA, DGS10, DGS2, VIXCLS) in parallel; computes yield spread (10Y–2Y) and inversion flag; Firebase JWT auth
+- `api/get-technicals.js` — fetches RSI(14), MACD, BBANDS(20), SMA50, SMA200 for a given ticker from Alpha Vantage; detects rate limit via Note/Information fields; adds GOLDEN_CROSS/DEATH_CROSS signal
+
+**`vercel.json`:** added `maxDuration` for both new endpoints (20s for FRED, 45s for technicals)
+
+**`src/api.js`:** added `getFredData()` (GET, 5-min in-memory cache) and `getTechnicals(ticker)` (POST)
+
+**`src/components/CouncilTab.jsx`:**
+- Parallel fetch of `fredData` + `techData` alongside quotes at start of `convene()`
+- `macroContext` (ATLAS only): FRED live numbers injected into ATLAS system prompt
+- `techContext` (REX only): Alpha Vantage indicators injected into REX system prompt (only for the analyzed ticker — not batch-fetched)
+- `macroBackdrop`: brief FRED summary injected into AXIOM synthesis prompt
+- Rate limit badge on REX card when technicals unavailable
+
+**`src/components/ChatTab.jsx`:**
+- Same FRED + technicals fetch pattern added to `runCouncilInChat()`
+- `agentSystem` selected per-agent in loop (ATLAS gets macroContext, REX gets techContext, others unchanged)
+- AXIOM `synthSys` includes macroBackdrop when FRED data available
+
+**`src/components/PortfolioTab.jsx` — Macro Pulse section:**
+- Collapsible section above Top Movers; fetches FRED once on load (uses 5-min cache from `getFredData`)
+- 4 metric cards: Fed Rate (gold), CPI (cyan), VIX (red/green based on >20), Yield Spread (red if inverted)
+- Collapsed by default; AnimatePresence height animation on expand
+
+---
+
 ## 2026-06-28 (session 18)
 
 ### Two follow-up fixes

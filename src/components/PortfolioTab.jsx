@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Coins, Loader2, Newspaper } from 'lucide-react';
-import { getQuotes, getCandles, getNews, callAgent } from '../api.js';
+import { getQuotes, getCandles, getNews, callAgent, getFredData } from '../api.js';
 import { theme } from '../utils/theme.js';
 import { PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
@@ -238,6 +238,8 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [newsItems,     setNewsItems]     = useState(null); // null = not fetched yet
   const [newsLoading,   setNewsLoading]   = useState(false);
   const [newsWeekend,   setNewsWeekend]   = useState(false);
+  const [macroPulse,    setMacroPulse]    = useState(null); // null = not fetched
+  const [macroOpen,     setMacroOpen]     = useState(false);
   const timerRef = useRef(null);
 
   const tickers    = acctHoldings.filter(t => posMap[t]);
@@ -254,6 +256,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     timerRef.current = setInterval(fetchQuotes, 60000);
     return () => clearInterval(timerRef.current);
   }, [fetchQuotes, authReady]);
+
+  useEffect(() => {
+    if (!authReady || macroPulse) return;
+    getFredData().then(d => { if (d) setMacroPulse(d); }).catch(() => {});
+  }, [authReady]);
 
   const fetchNews = useCallback(async (holdingsBySize) => {
     if (newsItems !== null || newsLoading || newsWeekend) return;
@@ -558,6 +565,40 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         const pctSz    = isMob ? 11 : 12;
         const priceSz  = isMob ? 10 : 11;
         return (
+          <>
+          {/* Macro Pulse */}
+          {macroPulse && (() => {
+            const spread = macroPulse.yield_spread;
+            const metrics = [
+              { label: 'Fed Rate', value: `${macroPulse.fed_rate?.current ?? '—'}%`, sub: macroPulse.fed_rate?.date, color: '#f5c451' },
+              { label: 'CPI', value: macroPulse.cpi?.current ?? '—', sub: macroPulse.cpi?.date, color: '#38e0d4' },
+              { label: 'VIX', value: macroPulse.vix?.current ?? '—', sub: macroPulse.vix?.current > 20 ? '⚠ elevated' : 'calm', color: macroPulse.vix?.current > 20 ? '#f87171' : '#4ade80' },
+              { label: 'Yield Spread', value: spread?.current != null ? `${spread.current.toFixed(2)}%` : '—', sub: spread?.inverted ? '⚠ INVERTED' : '10Y–2Y', color: spread?.inverted ? '#f87171' : '#38e0d4' },
+            ];
+            return (
+              <div style={{ ...S, marginBottom: 16 }}>
+                <button onClick={() => setMacroOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: macroOpen ? 10 : 0 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Macro Pulse</span>
+                  {macroOpen ? <ChevronUp size={12} color={T.text3} /> : <ChevronDown size={12} color={T.text3} />}
+                </button>
+                <AnimatePresence initial={false}>
+                  {macroOpen && (
+                    <motion.div key="macro-pulse" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                        {metrics.map(m => (
+                          <div key={m.label} style={{ background: T.bgCard, border: `1px solid ${m.color}30`, borderLeft: `3px solid ${m.color}`, borderRadius: 8, padding: '8px 10px' }}>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{m.label}</div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, color: m.color }}>{m.value}</div>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: T.text3, marginTop: 2 }}>{m.sub}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })()}
           <div style={{ marginBottom: 24 }}>
             <div style={{ ...S, paddingBottom: 8 }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Top Movers</span>
@@ -576,6 +617,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               ))}
             </div>
           </div>
+          </>
         );
       })()}
 

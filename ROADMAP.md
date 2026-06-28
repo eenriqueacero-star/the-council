@@ -4,6 +4,18 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 19)
+
+### FRED + Alpha Vantage integration ✓
+- [x] `api/get-fred.js` — 7 FRED series, yield spread computed, Firebase JWT auth
+- [x] `api/get-technicals.js` — RSI/MACD/BBANDS/SMA50/SMA200, rate limit detection, golden/death cross
+- [x] `src/api.js` — `getFredData()` (5-min cache) + `getTechnicals(ticker)`
+- [x] CouncilTab: ATLAS gets macroContext, REX gets techContext, AXIOM gets macroBackdrop, REX rate-limit badge
+- [x] ChatTab: same injection pattern in `runCouncilInChat()`
+- [x] PortfolioTab: Macro Pulse collapsible section (Fed Rate / CPI / VIX / Yield Spread)
+
+---
+
 ## DONE (recent)
 
 ### Three bug fixes ✓

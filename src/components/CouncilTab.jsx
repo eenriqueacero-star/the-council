@@ -5,7 +5,7 @@ import CouncilLoader from './ui/CouncilLoader.jsx';
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, AXIOM_AVATAR, PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
-import { callAgent, getQuotes, getNews, sleep } from '../api.js';
+import { callAgent, getQuotes, getNews, getFredData, getTechnicals, sleep } from '../api.js';
 import { auth, db } from '../firebase.js';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { loadTickerHistory } from '../utils/rulingContext.js';
@@ -48,6 +48,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const [trackShares, setTrackShares] = useState('');
   const [trackSaving, setTrackSaving] = useState(false);
   const [trackSaved, setTrackSaved] = useState(false);
+  const [techAvailable, setTechAvailable] = useState(true); // false when AV rate-limited
   const debugRef = useRef(null); // accumulates debug data during a run
 
   const upperTicker = ticker.trim().toUpperCase();
@@ -126,16 +127,50 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
 
     const uid = auth.currentUser?.uid;
 
-    // 1. Parallel prep — fetch price, history, profiles concurrently; agentContext needs rawQuote so runs after
-    const [quotesRes, history, profiles] = await Promise.all([
+    // 1. Parallel prep — fetch price, history, profiles, FRED macro, and technicals concurrently
+    const [quotesRes, history, profiles, fredData, techData] = await Promise.all([
       getQuotes([upperTicker]).catch(() => ({})),
       uid ? loadTickerHistory(uid, upperTicker, null) : Promise.resolve(''),
       uid ? loadAllAgentProfiles(uid, AGENTS.map(a => a.id)) : Promise.resolve({}),
+      getFredData().catch(() => null),
+      getTechnicals(upperTicker).catch(() => null),
     ]);
 
     const rawQuote = quotesRes[upperTicker] || null;
     const livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
     const ctx = await loadAgentContext(upperTicker, rawQuote);
+
+    // Build ATLAS macro context from FRED data
+    const macroContext = fredData ? `
+
+LIVE MACRO DATA (Federal Reserve FRED):
+- Fed Funds Rate: ${fredData.fed_rate?.current ?? 'N/A'}% (${fredData.fed_rate?.date ?? ''})
+- CPI Inflation: ${fredData.cpi?.current ?? 'N/A'} (${fredData.cpi?.date ?? ''})
+- Unemployment: ${fredData.unemployment?.current ?? 'N/A'}% (${fredData.unemployment?.date ?? ''})
+- Real GDP Growth: ${fredData.gdp_growth?.current ?? 'N/A'}% (${fredData.gdp_growth?.date ?? ''})
+- 10Y Treasury: ${fredData.treasury_10y?.current ?? 'N/A'}% | 2Y Treasury: ${fredData.treasury_2y?.current ?? 'N/A'}%
+- Yield Spread (10Y-2Y): ${fredData.yield_spread?.current ?? 'N/A'}%${fredData.yield_spread?.inverted ? ' ⚠️ INVERTED — recession signal' : ''}
+- VIX: ${fredData.vix?.current ?? 'N/A'} (${fredData.vix?.date ?? ''})
+Use these exact FRED numbers to ground your macro assessment. Do not cite numbers from memory.` : '\n[FRED macro data unavailable for this run.]';
+
+    // Build REX technical context from Alpha Vantage
+    const techIndicators = techData?.indicators;
+    const hasTech = !!(techIndicators && Object.keys(techIndicators).length > 0);
+    setTechAvailable(hasTech);
+    const techContext = hasTech ? `
+
+LIVE TECHNICAL INDICATORS for ${upperTicker} (Alpha Vantage):
+- RSI (14): ${techIndicators.rsi?.value?.toFixed(1) ?? 'N/A'}${techIndicators.rsi?.value > 70 ? ' ⚠️ OVERBOUGHT' : techIndicators.rsi?.value < 30 ? ' ⚠️ OVERSOLD' : ' (neutral)'}
+- MACD: ${techIndicators.macd?.macd?.toFixed(3) ?? 'N/A'} | Signal: ${techIndicators.macd?.signal?.toFixed(3) ?? 'N/A'} | Histogram: ${techIndicators.macd?.histogram?.toFixed(3) ?? 'N/A'} ${techIndicators.macd?.bullish ? '(bullish crossover)' : '(bearish crossover)'}
+- Bollinger Bands: Upper ${techIndicators.bollinger?.upper?.toFixed(2) ?? 'N/A'} | Middle ${techIndicators.bollinger?.middle?.toFixed(2) ?? 'N/A'} | Lower ${techIndicators.bollinger?.lower?.toFixed(2) ?? 'N/A'}
+- SMA 50: ${techIndicators.sma50?.value?.toFixed(2) ?? 'N/A'} | SMA 200: ${techIndicators.sma200?.value?.toFixed(2) ?? 'N/A'}
+- Cross Signal: ${techIndicators.crossSignal === 'GOLDEN_CROSS' ? '✅ GOLDEN CROSS (bullish)' : techIndicators.crossSignal === 'DEATH_CROSS' ? '⚠️ DEATH CROSS (bearish)' : 'N/A'}
+Use these exact indicator values to ground your technical assessment.` : '\n[Alpha Vantage technical indicators unavailable — rate limit or data issue. Base analysis on price action from LIVE DATA.]';
+
+    // AXIOM macro backdrop summary
+    const macroBackdrop = fredData
+      ? `Macro backdrop: Fed rate ${fredData.fed_rate?.current ?? 'N/A'}%, CPI ${fredData.cpi?.current ?? 'N/A'}, Unemployment ${fredData.unemployment?.current ?? 'N/A'}%, VIX ${fredData.vix?.current ?? 'N/A'}, Yield spread ${fredData.yield_spread?.current ?? 'N/A'}%${fredData.yield_spread?.inverted ? ' (INVERTED)' : ''}.`
+      : '';
 
     // 2. Refresh research for the single most-stale agent (background, no await).
     // Limited to 1 compound-beta call per council run to avoid rate limit bursts.
@@ -276,9 +311,16 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
           console.error(`[recon][CouncilTab] agent[0] userMsg first 600 chars:`, userMsg.slice(0, 600));
         }
 
+        // Inject FRED data only into ATLAS; technicals only into REX
+        const agentSystem = ag.id === 'macro'
+          ? ag.system + macroContext
+          : ag.id === 'technical'
+            ? ag.system + techContext
+            : ag.system;
+
         const _t0 = Date.now();
         try {
-          const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
+          const { text: txt } = await callAgent(agentSystem, userMsg, false, 1000, null, null, i);
           const _ms = Date.now() - _t0;
           let result = extractJSON(txt);
           const parseOk = !!result;
@@ -302,7 +344,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
             setSynthesis({ status: 'idle', result: null });
             try {
               const _t1 = Date.now();
-              const { text: txt } = await callAgent(ag.system, userMsg, false, 1000, null, null, i);
+              const { text: txt } = await callAgent(agentSystem, userMsg, false, 1000, null, null, i);
               const _ms = Date.now() - _t1;
               let result = extractJSON(txt);
               const parseOk = !!result;
@@ -357,7 +399,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       return `${ag.name} (${ag.role}): ${JSON.stringify(r)}`;
     }).join('\n');
 
-    const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final investment ruling on ${upperTicker} for ${acct.label}. ${PROTOCOLS}
+    const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final investment ruling on ${upperTicker} for ${acct.label}. ${PROTOCOLS}${macroBackdrop ? '\n' + macroBackdrop : ''}
 The council ran 3 deliberation rounds. Synthesize their evolving positions into a decisive verdict.
 Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"verdict":"BUY"|"WATCH"|"SKIP","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>","headline":"<one bold line>","rationale":"<2-3 sentences summarizing the council consensus and key risks>"}
 BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this trade — do not enter.`;
@@ -550,6 +592,9 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                           {ag.name}
                         </div>
                         <div style={{ ...MONO, fontSize: 9, color: T.text3, marginTop: 2 }}>{ag.role}</div>
+                        {ag.id === 'technical' && !techAvailable && (
+                          <div style={{ ...MONO, fontSize: 8, color: '#B45309', background: 'rgba(245,158,11,0.1)', padding: '1px 5px', borderRadius: 3, marginTop: 2 }}>Technicals unavailable (API limit)</div>
+                        )}
                       </div>
                     </div>
                     {isDone && finalSS && <StanceBadge stance={finalResult.stance} />}

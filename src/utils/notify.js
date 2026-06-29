@@ -15,3 +15,5 @@ export function sendNotification(title, body, options = {}) {
   if (Notification.permission !== 'granted') return;
   new Notification(title, { body, icon: '/icons/icon-192.png', ...options });
 }
+
+export const pushNotify = sendNotification;

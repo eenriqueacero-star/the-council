@@ -20,6 +20,7 @@ import ScoutTab from './components/ScoutTab.jsx';
 import DebugTab from './components/DebugTab.jsx';
 import { getQuotes } from './api.js';
 import { sendNotification, getPermissionState } from './utils/notify.js';
+import { resolveObservations } from './utils/agentLearning.js';
 import { writeDebug } from './utils/debugStore.js';
 import {
   LayoutDashboard, Users, MessageSquare, Telescope,
@@ -127,6 +128,16 @@ export default function App() {
           return merged;
         });
       }, err => { console.error('positions snapshot error:', err); fsLoaded.current = true; });
+
+      // Resolve stale agent observations in the background
+      const getCurrentPrice = async (ticker) => {
+        try {
+          const q = await getQuotes([ticker]);
+          const r = q[ticker];
+          return r?.price > 0 ? r.price : (r?.prevClose || null);
+        } catch { return null; }
+      };
+      resolveObservations(db, user.uid, getCurrentPrice).catch(console.error);
     });
     return () => { authUnsub(); snapUnsub(); };
   }, []);

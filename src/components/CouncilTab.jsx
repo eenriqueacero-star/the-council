@@ -7,7 +7,7 @@ import { AGENTS, AXIOM_AVATAR, PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent, getQuotes, getNews, getFredData, getTechnicals, sleep } from '../api.js';
 import { auth, db } from '../firebase.js';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { loadTickerHistory } from '../utils/rulingContext.js';
 import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
 import { writeDebug } from '../utils/debugStore.js';
@@ -49,6 +49,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const [trackSaving, setTrackSaving] = useState(false);
   const [trackSaved, setTrackSaved] = useState(false);
   const [techAvailable, setTechAvailable] = useState(true); // false when AV rate-limited
+  const [agentStatsMap, setAgentStatsMap] = useState({}); // { agentId: stats } for current ticker
   const debugRef = useRef(null); // accumulates debug data during a run
 
   const upperTicker = ticker.trim().toUpperCase();
@@ -126,6 +127,18 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     debugRef.current = { ticker: ticker.trim().toUpperCase(), ts: Date.now(), liveDataBlock: '', agents: {}, synthesis: null, anyUngrounded: false };
 
     const uid = auth.currentUser?.uid;
+
+    // Fetch agent stats for this ticker (for track record injection into prompts)
+    const statsMap = {};
+    if (uid) {
+      await Promise.all(AGENTS.map(async ag => {
+        try {
+          const snap = await getDoc(doc(db, 'users', uid, 'agent_stats', `${ag.id}_${upperTicker}`));
+          if (snap.exists()) statsMap[ag.id] = snap.data();
+        } catch {}
+      }));
+    }
+    setAgentStatsMap(statsMap);
 
     // 1. Parallel prep — fetch price, history, profiles, FRED macro, and technicals concurrently
     const [quotesRes, history, profiles, fredData, techData] = await Promise.all([
@@ -311,12 +324,18 @@ Use these exact indicator values to ground your technical assessment.` : '\n[Alp
           console.error(`[recon][CouncilTab] agent[0] userMsg first 600 chars:`, userMsg.slice(0, 600));
         }
 
-        // Inject FRED data only into ATLAS; technicals only into REX
-        const agentSystem = ag.id === 'macro'
+        // Build track record context for this agent on this ticker
+        const stats = statsMap[ag.id] || null;
+        const trackRecord = stats
+          ? `\n\nYOUR TRACK RECORD on ${upperTicker}: ${stats.total_calls} calls, ${stats.wins} wins, ${stats.losses} losses (${(stats.win_rate * 100).toFixed(0)}% win rate), avg return ${stats.avg_return}%${stats.streak > 2 ? ` 🔥 ${stats.streak}-win streak` : stats.streak < -2 ? ` ⚠️ ${Math.abs(stats.streak)}-loss streak — recalibrate` : ''}. Factor this into your confidence level.`
+          : `\n\nNo prior calls on ${upperTicker}. This is your first analysis.`;
+
+        // Inject FRED data only into ATLAS; technicals only into REX; track record into all
+        const agentSystem = (ag.id === 'macro'
           ? ag.system + macroContext
           : ag.id === 'technical'
             ? ag.system + techContext
-            : ag.system;
+            : ag.system) + trackRecord;
 
         const _t0 = Date.now();
         try {
@@ -440,6 +459,30 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
         takeProfit: parseFloat(result.takeProfit) || null,
         verdict: result.verdict, conviction: result.conviction,
       }});
+
+      // Save agent observations to Firestore for learning system
+      if (uid && livePrice) {
+        for (const ag of AGENTS) {
+          const agResult = allRounds[2]?.[ag.id] || allRounds[1]?.[ag.id] || allRounds[0]?.[ag.id];
+          if (!agResult) continue;
+          try {
+            await addDoc(collection(db, 'users', uid, 'agent_observations'), {
+              agentId: ag.id,
+              agentName: ag.name,
+              ticker: upperTicker,
+              verdict: agResult.stance,
+              confidence: agResult.score || 7,
+              reasoning: agResult.headline || '',
+              price_at_call: livePrice,
+              timestamp: serverTimestamp(),
+              resolved: false,
+              resolution: null,
+              price_at_resolution: null,
+              return_pct: null,
+            });
+          } catch (e) { console.error('[agentLearning] save obs failed:', e); }
+        }
+      }
     } catch (err) {
       console.error('[synthesis] callAgent threw:', err?.message);
       if (debugRef.current) {
@@ -595,6 +638,12 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
                         {ag.id === 'technical' && !techAvailable && (
                           <div style={{ ...MONO, fontSize: 8, color: '#B45309', background: 'rgba(245,158,11,0.1)', padding: '1px 5px', borderRadius: 3, marginTop: 2 }}>Technicals unavailable (API limit)</div>
                         )}
+                        {agentStatsMap[ag.id] && (() => {
+                          const s = agentStatsMap[ag.id];
+                          const wr = s.win_rate || 0;
+                          const color = wr > 0.6 ? '#22C55E' : wr < 0.4 ? '#EF4444' : '#71717A';
+                          return <div style={{ ...MONO, fontSize: 9, color, marginTop: 2 }}>{(wr * 100).toFixed(0)}% win rate ({s.total_calls} calls)</div>;
+                        })()}
                       </div>
                     </div>
                     {isDone && finalSS && <StanceBadge stance={finalResult.stance} />}

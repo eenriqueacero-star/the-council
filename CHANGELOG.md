@@ -4,6 +4,32 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 20)
+
+### Voice Removal, News Overhaul, Agent Learning System (Layer 0)
+
+**Part 1 — Voice/TTS removed:**
+- Deleted `src/hooks/useVoice.js`
+- `ChatTab.jsx`: removed `useVoice` import + destructure, all `speak()` calls, voice toggle button (Volume2/VolumeX), mic/speech recognition button (Mic/MicOff), speaking indicator (animated dots on last PM message), `srSupported` conditional footer text. Text content of `speak` fields in JSON schemas untouched.
+
+**Part 2 — News Overhaul (24/7 with push notifications):**
+- `PortfolioTab.jsx`: removed `isWeekend()` guard — news fetches on all days including weekends
+- Hourly auto-refresh via `setInterval(fetchNews, 60 * 60 * 1000)` in the news useEffect (keyed on `account`)
+- Manual refresh button (RefreshCw icon) added next to "Market News" header; spins via Framer Motion `animate.rotate` while `isRefreshing` is true
+- Push notifications: after AI enrichment, negative articles mentioning holdings fire `pushNotify()`; duplicate suppression via localStorage hash (last 100 entries)
+- Empty state: replaced text-only with Newspaper icon + "No recent news for your holdings"
+- `notify.js`: exported `pushNotify` alias for `sendNotification`
+
+**Part 3 — Agent Learning System (Layer 0):**
+- Created `src/utils/agentLearning.js`: `resolveObservations(db, userId, getCurrentPrice)` — queries unresolved `agent_observations` older than 7 days, computes WIN/LOSS/NEUTRAL vs price at call, updates observation doc and accumulates/creates `agent_stats` doc (`{agentId}_{ticker}`)
+- `CouncilTab.jsx` + `ChatTab.jsx`: after every council synthesis, saves each agent's final verdict as an `agent_observations` document in Firestore
+- `CouncilTab.jsx`: fetches `agent_stats` per agent for the current ticker before the agent loop; injects track record string into each agent's system prompt ("YOUR TRACK RECORD on NVDA: 15 calls, 10 wins…")
+- `CouncilTab.jsx`: track record badge displayed below agent role on agent cards — green (>60% win rate), red (<40%), zinc (otherwise)
+- `App.jsx`: calls `resolveObservations` in background after Firebase auth resolves; `getCurrentPrice` reuses `getQuotes`
+- Firestore collections: `users/{uid}/agent_observations` and `users/{uid}/agent_stats` — covered by existing wildcard security rule
+
+---
+
 ## 2026-06-28 (session 19)
 
 ### FRED + Alpha Vantage integration

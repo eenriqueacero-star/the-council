@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useReducer } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Volume2, VolumeX, Loader2, Mic, MicOff, Send, Crown, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Loader2, Send, Crown, AlertTriangle } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
 import { AGENTS, AXIOM_AVATAR, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
@@ -10,7 +10,6 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { loadTickerHistory } from '../utils/rulingContext.js';
 import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
 import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from '../utils/agentMemory.js';
-import { useVoice } from '../hooks/useVoice.js';
 import { theme } from '../utils/theme.js';
 import SparkLogo from './SparkLogo.jsx';
 import { writeDebug } from '../utils/debugStore.js';
@@ -49,8 +48,6 @@ export default function ChatTab({ account, acct, posMap, positionsLine, flagApiD
   const lastPortfolioDataRef = useRef('');
   const portfolioFollowUpRef = useRef(0);
   const T = theme(dark);
-
-  const { voiceOn, listening, speaking, srSupported, speak, stopSpeaking, toggleVoice, toggleListen } = useVoice();
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior:'smooth' }); }, [chat]);
 
@@ -321,10 +318,33 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
       verdict: synth.verdict, conviction: synth.conviction ?? null,
     };
 
+    // Save agent observations to Firestore for learning system
+    if (uid && livePrice) {
+      for (const ag of AGENTS) {
+        const agResult = allRounds[2]?.[ag.id] || allRounds[1]?.[ag.id] || allRounds[0]?.[ag.id];
+        if (!agResult) continue;
+        try {
+          await addDoc(collection(db, 'users', uid, 'agent_observations'), {
+            agentId: ag.id,
+            agentName: ag.name,
+            ticker: tkr,
+            verdict: agResult.stance,
+            confidence: agResult.score || 7,
+            reasoning: agResult.headline || '',
+            price_at_call: livePrice,
+            timestamp: serverTimestamp(),
+            resolved: false,
+            resolution: null,
+            price_at_resolution: null,
+            return_pct: null,
+          });
+        } catch (e) { console.error('[agentLearning] save obs failed:', e); }
+      }
+    }
+
     // Update council message with synth result + rulingData (no auto-save — user clicks Track This Trade)
     setChat(p => p.map(m => m.runId === runId ? { ...m, synth, hasUngrounded, ungroundedWarnings, rulingData } : m));
     setChat(p => [...p, { role: 'pm', text: synth.speak, verdict: synth.verdict, conviction: synth.conviction, ticker: tkr }]);
-    speak(synth.speak);
 
     setConvHistory(prev => [
       ...prev,
@@ -468,7 +488,6 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       const tkr = String(router.ticker).toUpperCase();
       const intro = router.speak || `Convening the full council on ${tkr}.`;
       setChat(p => [...p, { role:'pm', text:intro }]);
-      speak(intro);
       setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:intro }]);
       await runCouncilInChat(tkr, acctLine, uid, intro);
       setChatBusy(false);
@@ -580,7 +599,6 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
           const { text: closing } = await callAgent(closingSys, closingCtx, false, 250);
           setChat(p => [...p, { role:'pm', text:closing }]);
           setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:closing }]);
-          speak(closing);
         } catch {}
       }
 
@@ -599,7 +617,6 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       flagApiDown();
     }
     setChat(p => [...p, { role:'pm', text:axiomReply }]);
-    speak(axiomReply);
     setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:axiomReply }]);
     setChatBusy(false);
   }
@@ -623,11 +640,6 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
           <div style={{ maxWidth: '82%' }}>
             <div style={{ ...MONO, fontSize: 9, color: T.accent, marginBottom: 4, letterSpacing: '0.08em' }}>AXIOM</div>
             <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>
-              {speaking && i === chat.length - 1 && voiceOn && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginRight: 6, verticalAlign: 'middle' }}>
-                  {[0, 1, 2].map(d => <span key={d} className="blink" style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: T.accent, animationDelay: `${d * 0.2}s` }} />)}
-                </span>
-              )}
               {m.text}
             </div>
             {vs && (
@@ -726,16 +738,9 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <MessageSquare size={15} style={{ color: T.text3 }} />
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: T.text }}>{acct.label}</span>
-        </div>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={toggleVoice}
-          style={{ fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 20, border: `1px solid ${voiceOn ? T.accent : T.border}`, background: voiceOn ? `${T.accent}12` : 'transparent', color: voiceOn ? T.accent : T.text2, cursor: 'pointer', fontSize: 11 }}>
-          {voiceOn ? <Volume2 size={12} /> : <VolumeX size={12} />}
-          <span style={MONO}>{voiceOn ? 'VOICE' : 'MUTED'}</span>
-        </motion.button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <MessageSquare size={15} style={{ color: T.text3 }} />
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: T.text }}>{acct.label}</span>
       </div>
 
       <div style={{ background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 'min(62vh,580px)' }}>
@@ -761,16 +766,12 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
 
         {/* Input bar */}
         <div style={{ borderTop: `1px solid ${T.border}`, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => toggleListen(t => sendChat(t))} disabled={!srSupported || chatBusy}
-            style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 12, border: `1px solid ${listening ? T.red : T.border}`, background: listening ? T.red : 'transparent', color: listening ? '#fff' : srSupported ? T.text2 : T.text3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: !srSupported || chatBusy ? 0.4 : 1 }}>
-            {srSupported ? <Mic size={16} /> : <MicOff size={16} />}
-          </motion.button>
           <input
             value={chatInput}
             onChange={e => setChatInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendChat()}
             disabled={chatBusy}
-            placeholder={listening ? 'Listening…' : 'Ask AXIOM anything…'}
+            placeholder="Ask AXIOM anything…"
             style={{ fontFamily: 'var(--font-display)', flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12, padding: '10px 14px', fontSize: 14, color: T.text, outline: 'none' }}
           />
           <motion.button whileTap={{ scale: 0.9 }} onClick={() => sendChat()} disabled={chatBusy || !chatInput.trim()}
@@ -787,7 +788,6 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
         ))}
       </div>
       <p style={{ ...MONO, marginTop:8, fontSize:10, color:T.text3 }}>
-        {srSupported ? 'Tap the mic to talk, or type. ' : 'Voice input needs Chrome. '}
         AXIOM reads your message and routes to the right specialist — or convenes the full council for a buy/sell ruling.
       </p>
     </div>

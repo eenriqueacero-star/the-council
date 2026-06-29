@@ -4,6 +4,31 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 20)
+
+### Voice Removal ✓
+- [x] `src/hooks/useVoice.js` deleted
+- [x] ChatTab: `useVoice` import, all `speak()` calls, voice toggle button, mic button, speaking indicator all removed
+- [x] Footer text and input placeholder cleaned up; no voice UI remains
+
+### News Overhaul — 24/7 with Push Notifications ✓
+- [x] `isWeekend()` guard removed — news fetches every day
+- [x] Hourly auto-refresh interval in news useEffect
+- [x] Manual RefreshCw button next to "Market News" header, spins while loading
+- [x] Push notifications for negative articles mentioning holdings (localStorage dedup, last 100)
+- [x] Empty state shows Newspaper icon + "No recent news for your holdings" (no weekend message)
+- [x] `notify.js` exports `pushNotify` alias
+
+### Agent Learning System — Layer 0 ✓
+- [x] `src/utils/agentLearning.js`: `resolveObservations` resolves calls after 7 days (WIN/LOSS/NEUTRAL)
+- [x] `agent_observations` saved to Firestore after every council run (CouncilTab + ChatTab)
+- [x] `agent_stats` accumulated per `{agentId}_{ticker}` (total calls, wins, losses, win rate, avg return, streak)
+- [x] Track record injected into each agent's system prompt at council run time
+- [x] Track record badge on agent cards in CouncilTab (green >60%, red <40%, zinc otherwise)
+- [x] `resolveObservations` runs on app load after auth
+
+---
+
 ## DONE (session 19)
 
 ### FRED + Alpha Vantage integration ✓
@@ -193,6 +218,11 @@ Pre-existing Entered trades (logged before this build) show "SPY N/A". To backfi
 ## LATER
 
 ### Learning System (3-layer)
+
+**Layer 0 — Agent observation tracking ✓** (session 20)
+- [x] `agent_observations` Firestore collection — verdict, price, resolution after 7 days
+- [x] `agent_stats` Firestore collection — win rate, avg return, streak per agent per ticker
+- [x] Track record injected into agent prompts; badge on CouncilTab cards
 
 **Layer 1 — Shared knowledge base**
 - [ ] Firestore doc (`users/{uid}/data/knowledge`) all agents read before deliberating

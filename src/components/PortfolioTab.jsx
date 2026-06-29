@@ -7,6 +7,7 @@ import { PROTOCOLS } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import AnimatedNumber from './ui/AnimatedNumber.jsx';
 import CouncilLoader from './ui/CouncilLoader.jsx';
+import { pushNotify } from '../utils/notify.js';
 
 const LOGO_DOMAINS = {
   NVDA:'nvidia.com',  MU:'micron.com',    AMD:'amd.com',       AAPL:'apple.com',
@@ -58,11 +59,6 @@ function timeAgo(datetime) {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs} hr ago`;
   return `${Math.floor(hrs / 24)}d ago`;
-}
-
-function isWeekend() {
-  const day = new Date().getDay();
-  return day === 0 || day === 6;
 }
 
 const SENTIMENT_COLORS = {
@@ -237,7 +233,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [dcaOpen,       setDcaOpen]       = useState(false);
   const [newsItems,     setNewsItems]     = useState(null); // null = not fetched yet
   const [newsLoading,   setNewsLoading]   = useState(false);
-  const [newsWeekend,   setNewsWeekend]   = useState(false);
+  const [isRefreshing,  setIsRefreshing]  = useState(false);
   const [macroPulse,    setMacroPulse]    = useState(null); // null = not fetched
   const [macroOpen,     setMacroOpen]     = useState(false);
   const timerRef = useRef(null);
@@ -263,9 +259,9 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   }, [authReady]);
 
   const fetchNews = useCallback(async (holdingsBySize) => {
-    if (newsItems !== null || newsLoading || newsWeekend) return;
-    if (isWeekend()) { setNewsWeekend(true); return; }
+    if (newsLoading) return;
     setNewsLoading(true);
+    setIsRefreshing(true);
     try {
       const top5 = holdingsBySize.slice(0, 5);
       const newsPerTicker = await Promise.all(top5.map(t => getNews(t)));
@@ -296,23 +292,45 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       }));
 
       setNewsItems(enriched);
+
+      // Push notifications for negative news mentioning holdings
+      const notified = JSON.parse(localStorage.getItem('council_notified_news') || '[]');
+      for (const article of enriched) {
+        if (article.sentiment === 'negative' && article.mentionedTickers.length > 0) {
+          const hashKey = btoa(article.headline).slice(0, 20);
+          if (!notified.includes(hashKey)) {
+            pushNotify(
+              `⚠️ ${article.mentionedTickers.join(', ')} Alert`,
+              article.aiSummary || article.headline
+            );
+            notified.push(hashKey);
+            if (notified.length > 100) notified.splice(0, notified.length - 100);
+          }
+        }
+      }
+      localStorage.setItem('council_notified_news', JSON.stringify(notified));
     } catch {
       setNewsItems([]);
     } finally {
       setNewsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [newsItems, newsLoading, newsWeekend]);
+  }, [newsLoading]);
+
+  const getBySize = useCallback(() => [...withShares].sort((a, b) => {
+    const qa = quotes[a] || {}, qb = quotes[b] || {};
+    const va = (parseFloat(posMap[a]?.shares) || 0) * (qa.price || 0);
+    const vb = (parseFloat(posMap[b]?.shares) || 0) * (qb.price || 0);
+    return vb - va;
+  }), [withShares, quotes, posMap]);
 
   useEffect(() => {
-    if (!authReady || !withShares.length || newsItems !== null || newsLoading || newsWeekend) return;
-    const bySize = [...withShares].sort((a, b) => {
-      const qa = quotes[a] || {}, qb = quotes[b] || {};
-      const va = (parseFloat(posMap[a]?.shares) || 0) * (qa.price || 0);
-      const vb = (parseFloat(posMap[b]?.shares) || 0) * (qb.price || 0);
-      return vb - va;
-    });
+    if (!authReady || !withShares.length) return;
+    const bySize = getBySize();
     fetchNews(bySize);
-  }, [authReady, withShares.join(','), newsItems, newsLoading, newsWeekend]);
+    const interval = setInterval(() => fetchNews(getBySize()), 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [account, authReady]);
 
   const fetchCandles = useCallback(async () => {
     if (!withShares.length) { setCandlesLoaded(true); return; }
@@ -771,23 +789,31 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         {/* Portfolio News section */}
         {withShares.length > 0 && (
           <div style={{ marginTop: 28 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <Newspaper size={14} style={{ color: T.text3 }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Market News</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Newspaper size={14} style={{ color: T.text3 }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Market News</span>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => { const bySize = getBySize(); fetchNews(bySize); }}
+                disabled={newsLoading}
+                style={{ background: 'none', border: 'none', cursor: newsLoading ? 'not-allowed' : 'pointer', color: T.text3, display: 'flex', alignItems: 'center', padding: 4, opacity: newsLoading ? 0.5 : 1 }}
+              >
+                <motion.div animate={{ rotate: isRefreshing ? 360 : 0 }} transition={{ duration: 0.6, ease: 'linear', repeat: isRefreshing ? Infinity : 0 }}>
+                  <RefreshCw size={13} />
+                </motion.div>
+              </motion.button>
             </div>
 
-            {newsWeekend ? (
-              <div style={{ padding: '20px 16px', textAlign: 'center', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>📅</span>
-                <span style={{ fontSize: 13, color: T.text3 }}>Markets closed — news refreshes Monday</span>
-              </div>
-            ) : newsLoading ? (
+            {newsLoading && !newsItems ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
                 <CouncilLoader size="sm" />
               </div>
             ) : newsItems && newsItems.length === 0 ? (
-              <div style={{ padding: '20px 16px', textAlign: 'center', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, fontSize: 13, color: T.text3 }}>
-                No recent news for your holdings
+              <div style={{ padding: '20px 16px', textAlign: 'center', background: T.bgCard, border: `1px solid ${T.border}`, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <Newspaper size={16} style={{ color: T.text3 }} />
+                <span style={{ fontSize: 13, color: T.text3 }}>No recent news for your holdings</span>
               </div>
             ) : newsItems && newsItems.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

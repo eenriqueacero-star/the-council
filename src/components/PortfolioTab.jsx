@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Plus, Trash2, Edit2, Check, X, RefreshCw, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Coins, Loader2, Newspaper } from 'lucide-react';
 import { getQuotes, getCandles, getNews, callAgent, getFredData } from '../api.js';
@@ -75,7 +76,13 @@ function DCASheet({ acct, acctHoldings, positionsLine, flagApiDown, dark, onClos
   const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
   const [dcaAmount, setDcaAmount] = useState('');
   const [dca, setDca] = useState({ status: 'idle', result: null });
+  const [visible, setVisible] = useState(true);
   const ACCENT = '#F59E0B';
+
+  function handleClose() {
+    setVisible(false);
+    setTimeout(onClose, 300);
+  }
 
   async function allocateDCA() {
     if (dca.status === 'running') return;
@@ -98,15 +105,14 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
 
   const sheetStyle = isMobile ? {
-    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
+    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10000,
     background: dark ? 'rgba(24,24,27,0.98)' : 'rgba(250,250,250,0.98)',
     borderRadius: '16px 16px 0 0', backdropFilter: 'blur(24px)',
-    padding: '0 0 env(safe-area-inset-bottom, 0px)',
     maxHeight: '82vh', overflowY: 'auto',
     boxShadow: '0 -8px 40px rgba(0,0,0,0.4)',
     border: `1px solid ${T.border}`,
   } : {
-    position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, zIndex: 200,
+    position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, zIndex: 10000,
     background: dark ? 'rgba(24,24,27,0.98)' : 'rgba(250,250,250,0.98)',
     backdropFilter: 'blur(24px)', overflowY: 'auto',
     boxShadow: '-8px 0 40px rgba(0,0,0,0.3)',
@@ -117,30 +123,34 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
   const animateAnim = isMobile ? { y: 0 } : { x: 0 };
   const exitAnim    = isMobile ? { y: '100%' } : { x: '100%' };
 
-  return (
-    <>
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 199 }}
-      />
-      <motion.div
-        initial={initialAnim} animate={animateAnim} exit={exitAnim}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        drag={isMobile ? 'y' : false}
-        dragConstraints={{ top: 0 }}
-        dragElastic={0.1}
-        onDragEnd={(_, info) => { if (info.offset.y > 100) onClose(); }}
-        style={sheetStyle}
-      >
+  return createPortal(
+    <AnimatePresence>
+      {visible && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            key="dca-backdrop"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={handleClose}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999 }}
+          />
+          <motion.div
+            key="dca-sheet"
+            initial={initialAnim} animate={animateAnim} exit={exitAnim}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            drag={isMobile ? 'y' : false}
+            dragConstraints={{ top: 0 }}
+            dragElastic={0.1}
+            onDragEnd={(_, info) => { if (info.offset.y > 100) handleClose(); }}
+            style={sheetStyle}
+          >
         {/* Drag handle (mobile) */}
         {isMobile && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
             <div style={{ width: 40, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.2)' }} />
           </div>
         )}
-        <div style={{ padding: '16px 20px 28px', fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" }}>
+        <div style={{ padding: `16px 20px calc(28px + env(safe-area-inset-bottom, 0px))`, fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Coins size={16} style={{ color: ACCENT }} />
@@ -148,7 +158,7 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
                 SMART DCA · {acct.label.toUpperCase()}
               </span>
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: 4, display: 'flex' }}><X size={18} /></button>
+            <button onClick={handleClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.text3, padding: 4, display: 'flex' }}><X size={18} /></button>
           </div>
           <p style={{ fontSize: 13, color: T.text2, lineHeight: 1.55, marginBottom: 16 }}>
             Concentrates your DCA into the 1–2 best "buy the dip" setups. Skips anything tripping the sell protocol.
@@ -208,8 +218,11 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
             </div>
           )}
         </div>
-      </motion.div>
-    </>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 }
 
@@ -913,22 +926,20 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       </div>
 
       {/* DCA Bottom Sheet / Side Panel */}
-      <AnimatePresence>
-        {dcaOpen && (
-          <DCASheet
-            acct={acct}
-            acctHoldings={acctHoldings}
-            positionsLine={Object.keys(posMap).map(t => {
-              const p = posMap[t] || {};
-              const costNum = parseFloat(String(p.cost || '').replace(/[^0-9.]/g, ''));
-              return p.shares ? `${t} ${p.shares}sh${costNum > 0 ? ` @ $${costNum.toFixed(2)} avg` : ''}` : t;
-            }).join(', ')}
-            flagApiDown={flagApiDown}
-            dark={dark}
-            onClose={() => setDcaOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      {dcaOpen && (
+        <DCASheet
+          acct={acct}
+          acctHoldings={acctHoldings}
+          positionsLine={Object.keys(posMap).map(t => {
+            const p = posMap[t] || {};
+            const costNum = parseFloat(String(p.cost || '').replace(/[^0-9.]/g, ''));
+            return p.shares ? `${t} ${p.shares}sh${costNum > 0 ? ` @ $${costNum.toFixed(2)} avg` : ''}` : t;
+          }).join(', ')}
+          flagApiDown={flagApiDown}
+          dark={dark}
+          onClose={() => setDcaOpen(false)}
+        />
+      )}
     </div>
   );
 }

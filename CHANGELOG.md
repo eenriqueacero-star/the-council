@@ -4,6 +4,25 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 24)
+
+### Fix — Chat broken, quick-action buttons broken, DCA sheet broken
+
+**Bug 1 & 2 — Chat + buttons crash (ReferenceError):**
+`sendChat()` in `ChatTab.jsx` called `stopSpeaking()` which was deleted along with `useVoice.js` during voice removal (session 20). This threw a `ReferenceError` on every send, crashing all chat messages and all quick-action buttons (which call `sendChat()`).
+- `ChatTab.jsx` line 358: removed `stopSpeaking()` call; `setChatInput(''); stopSpeaking()` → `setChatInput('');`
+
+**Bug 3 — DCA sheet invisible on desktop / bottom-clipped on mobile:**
+Root cause: Framer Motion's tab transition applies `transform: translateY(...)` to the tab content wrapper. CSS spec: any element with a CSS transform creates a new containing block for `position: fixed` descendants, so the DCA sheet was being positioned relative to the tab container instead of the viewport. On desktop this put the sheet off-screen; on mobile it was partially clipped.
+- `PortfolioTab.jsx`: added `import { createPortal } from 'react-dom'`
+- `DCASheet` now renders via `createPortal(…, document.body)` — escapes all transform ancestors
+- Added internal `visible` state + `handleClose()` so Framer Motion exit animations still play (sets `visible=false`, waits 300 ms, then calls parent `onClose`)
+- Removed outer `AnimatePresence` wrapper in parent (animation now managed internally by `DCASheet`)
+- `zIndex` raised to `10000`/`9999` to ensure sheet/backdrop always render above all other elements
+- Mobile: moved safe-area bottom padding inside scrollable content: `calc(28px + env(safe-area-inset-bottom, 0px))` so bottom items are fully visible when scrolled to end
+
+---
+
 ## 2026-06-29 (session 23)
 
 ### Fix — Stock chart only showing 2 data points

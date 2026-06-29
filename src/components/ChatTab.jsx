@@ -355,7 +355,7 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
   async function sendChat(raw) {
     const text = (typeof raw === 'string' ? raw : chatInput).trim();
     if (!text || chatBusy) return;
-    setChatInput(''); stopSpeaking();
+    setChatInput('');
 
     setChat(p => [...p, { role:'user', text }]);
     setConvHistory(prev => [...prev, { role:'user', content: text }]);

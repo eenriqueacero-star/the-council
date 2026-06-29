@@ -18,7 +18,7 @@ const LOGO_DOMAINS = {
   SOFI:'sofi.com',    NFLX:'netflix.com',  INTC:'intel.com',    AVGO:'broadcom.com',
 };
 
-const RANGES = ['1D','1W','1M','3M','1Y','ALL'];
+const RANGES = ['1D','1W','1M','3M','6M','1Y','ALL'];
 
 function TickerLogo({ ticker, dark, size = 36 }) {
   const [err, setErr] = useState(false);
@@ -219,7 +219,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [quotes,        setQuotes]        = useState({});
   const [candles,       setCandles]       = useState([]);
   const [candlesLoaded, setCandlesLoaded] = useState(false);
-  const [range,         setRange]         = useState('1D');
+  const [range,         setRange]         = useState('1M');
   const [expanded,      setExpanded]      = useState(null);
   const [chartKey,      setChartKey]      = useState(0);
   const [scrubIdx,      setScrubIdx]      = useState(null);
@@ -363,13 +363,17 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const dayChange    = totalValue - prevValue;
   const dayChangePct = prevValue > 0 ? (dayChange / prevValue) * 100 : 0;
   const buyingPower  = parseFloat(acct?.capital) || 0;
-  const isUp         = dayChange >= 0;
-  const lineColor    = dayChange > 0 ? T.green : dayChange < 0 ? T.red : T.text3;
 
   useEffect(() => { onDayChange?.(dayChange); }, [dayChange]);
 
-  const chartPoints  = candles.map(c => c.c);
-  const displayValue = (scrubIdx !== null && chartPoints[scrubIdx]) ? chartPoints[scrubIdx] : totalValue;
+  const chartPoints     = candles.map(c => c.c);
+  const rangeStartValue = candles.length > 1 ? candles[0].c : prevValue;
+  const displayValue    = (scrubIdx !== null && chartPoints[scrubIdx] != null) ? chartPoints[scrubIdx] : totalValue;
+  // For header: compare display point to the start of the selected range
+  const headerBase      = candles.length > 1 ? rangeStartValue : prevValue;
+  const headerChange    = displayValue - headerBase;
+  const headerChangePct = headerBase > 0 ? (headerChange / headerBase) * 100 : 0;
+  const lineColor       = headerChange > 0 ? T.green : headerChange < 0 ? T.red : T.text3;
 
   // SVG chart
   const W = 400, H = 160, PAD_L = 52, PAD_B = 28, PAD_T = 12, PAD_R = 8;
@@ -427,9 +431,10 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     }));
 
     // X-axis: 3 date labels
+    // Timestamps from get-candles are already in ms (server does ts * 1000)
     const fmtDate = (ts) => {
       if (!ts) return '';
-      const d = new Date(ts * 1000);
+      const d = new Date(ts);
       return range === '1D'
         ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
         : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -511,15 +516,19 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               />
             </div>
             <motion.div
-              key={dayChange > 0 ? 'up' : dayChange < 0 ? 'down' : 'flat'}
+              key={headerChange > 0 ? 'up' : headerChange < 0 ? 'down' : 'flat'}
               initial={prefersReduced ? false : { opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}
             >
               <span style={{ fontSize: 15, fontWeight: 600, color: lineColor, fontFamily: 'var(--font-display)' }}>
-                {dayChange >= 0 ? '+' : ''}{dayChange.toFixed(2)} ({fmtPct(dayChangePct)})
+                {headerChange >= 0 ? '+' : ''}{headerChange.toFixed(2)} ({fmtPct(headerChangePct)})
               </span>
-              <span style={{ fontSize: 13, color: T.text3 }}>Today</span>
+              <span style={{ fontSize: 13, color: T.text3 }}>
+                {scrubIdx !== null
+                  ? new Date(candles[scrubIdx]?.t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: range === '1D' ? '2-digit' : undefined, minute: range === '1D' ? '2-digit' : undefined })
+                  : range === '1D' ? 'Today' : range}
+              </span>
             </motion.div>
             {buyingPower > 0 && <div style={{ fontSize: 13, color: T.text2, marginTop: 4 }}>${buyingPower.toLocaleString()} cash</div>}
           </div>

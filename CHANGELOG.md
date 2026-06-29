@@ -4,6 +4,32 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 23)
+
+### Fix — Stock chart only showing 2 data points
+
+**Root cause:** Default range was `'1D'` with 5-minute resolution. Finnhub returns `s: "no_data"` when markets are closed (weekends, after-hours), so `candles` was always `[]`. The chart fallback `effectivePoints = [prevClose, currentValue]` produced exactly 2 synthetic data points.
+
+**Secondary bug:** `fmtDate` was doing `new Date(ts * 1000)` but timestamps from `api/get-candles.js` are already converted to ms on the server (`ts * 1000`). The double-multiply was creating X-axis labels with year ~55000+.
+
+**`api/get-candles.js`:**
+- Added `'6M'` range (resolution `'D'`, 180 days back)
+- Fixed `'1W'` resolution from `'60'` → `'15'` (15-min bars, per spec)
+- Valid ranges now: `1D, 1W, 1M, 3M, 6M, 1Y, ALL`
+
+**`src/components/PortfolioTab.jsx`:**
+- Default range changed from `'1D'` → `'1M'` (daily bars, ~22 trading days, always has data)
+- Added `'6M'` to `RANGES` constant
+- Fixed `fmtDate`: `new Date(ts * 1000)` → `new Date(ts)` (timestamps already in ms)
+- Removed hard-coded `isUp` variable (was using removed `dayChange` reference)
+- Added `rangeStartValue` (first candle's portfolio value) and `headerChange`/`headerChangePct` computed from selected-range start
+- `lineColor` now reflects range change instead of day-only change
+- P&L header line now shows range change: e.g. "+$1,234 (5.2%) 1M" instead of always "Today"
+- When scrubbing, P&L label shows the hovered date instead of range label
+- `dayChange` and `dayChangePct` kept for `onDayChange` callback (bottom nav badge)
+
+---
+
 ## 2026-06-29 (session 22)
 
 ### Fix — Consolidate cron endpoints under Vercel Hobby 12-function limit

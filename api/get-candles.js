@@ -26,18 +26,19 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Invalid ticker: ${t}` });
     }
   }
-  const VALID_RANGES = new Set(['1D','1W','1M','3M','1Y','ALL']);
+  const VALID_RANGES = new Set(['1D','1W','1M','3M','6M','1Y','ALL']);
   if (!VALID_RANGES.has(range)) return res.status(400).json({ error: `Invalid range: ${range}` });
 
   const now = Math.floor(Date.now() / 1000);
   let resolution, from;
   switch (range) {
-    case '1D': resolution = '5';  from = now - 86400; break;
-    case '1W': resolution = '60'; from = now - 7 * 86400; break;
-    case '1M': resolution = 'D';  from = now - 30 * 86400; break;
-    case '3M': resolution = 'D';  from = now - 90 * 86400; break;
-    case '1Y': resolution = 'W';  from = now - 365 * 86400; break;
-    default:   resolution = 'M';  from = now - 5 * 365 * 86400; break;
+    case '1D':  resolution = '5';  from = now - 86400;           break;
+    case '1W':  resolution = '15'; from = now - 7 * 86400;       break;
+    case '1M':  resolution = 'D';  from = now - 30 * 86400;      break;
+    case '3M':  resolution = 'D';  from = now - 90 * 86400;      break;
+    case '6M':  resolution = 'D';  from = now - 180 * 86400;     break;
+    case '1Y':  resolution = 'W';  from = now - 365 * 86400;     break;
+    default:    resolution = 'M';  from = now - 5 * 365 * 86400; break;
   }
 
   const results = {};

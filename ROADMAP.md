@@ -4,6 +4,32 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 21)
+
+### Layer 1 — Agent Background Scans ✓
+- [x] `src/utils/agentFeed.js` — `writeToFeed()` client-side utility
+- [x] `api/lib/firebaseAdmin.js` — firebase-admin init via `FIREBASE_SERVICE_ACCOUNT` env var
+- [x] `api/lib/recon.js` — `fetchPrices`, `fetchNews`, `fetchEarnings`, `fetchTechnicals`, `fetchMacro`
+- [x] `api/cron/rex.js` — RSI, MACD, golden/death cross, Bollinger Band scans (every 4h)
+- [x] `api/cron/nova.js` — earnings proximity + negative news cluster alerts (daily 10am ET)
+- [x] `api/cron/sage.js` — position concentration + portfolio drawdown alerts (daily 11am ET)
+- [x] `api/cron/atlas.js` — VIX, yield curve, oil, fed rate, CPI macro alerts (9am + 5pm ET)
+- [x] `api/cron/vega.js` — sharp drops, news clusters, confirmed downtrend alerts (every 4h)
+- [x] `api/cron/zen.js` — sub-threshold positions + size imbalance alerts (daily 12pm ET)
+- [x] `.github/workflows/agent-crons.yml` — GitHub Actions cron triggers for all 6 agents
+- [x] `CRON_SECRET` Bearer auth on all endpoints
+- [x] `firebase-admin` added to `package.json`
+- [x] `vercel.json` maxDuration entries for all 6 cron endpoints
+- [x] Edwin setup: needs `FIREBASE_SERVICE_ACCOUNT`, `CRON_SECRET`, `CRON_USER_IDS` in Vercel; `CRON_SECRET` + `VERCEL_APP_URL` in GitHub secrets
+
+### NEXT AFTER LAYER 1: Layer 2 — Council Feed UI
+- [ ] New "Feed" tab: renders `users/{uid}/agent_feed` in real time (Firestore `onSnapshot`)
+- [ ] Feed items show agent avatar, severity badge, headline, detail (expandable), ticker pill
+- [ ] Alert severity items appear as priority notifications with red badge
+- [ ] Mark-as-read on tap; unread count badge on tab icon
+
+---
+
 ## DONE (session 20)
 
 ### Voice Removal ✓

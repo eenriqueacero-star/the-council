@@ -1,0 +1,60 @@
+name: Agent Background Scans
+
+on:
+  schedule:
+    # REX — every 4 hours
+    - cron: '0 */4 * * *'
+    # NOVA — daily 10am ET (14:00 UTC)
+    - cron: '0 14 * * *'
+    # SAGE — daily 11am ET (15:00 UTC)
+    - cron: '0 15 * * *'
+    # ATLAS — 9am ET + 5pm ET (13:00, 21:00 UTC)
+    - cron: '0 13,21 * * *'
+    # VEGA — every 4 hours offset from REX
+    - cron: '0 2,6,10,14,18,22 * * *'
+    # ZEN — daily 12pm ET (16:00 UTC)
+    - cron: '0 16 * * *'
+  workflow_dispatch: # manual trigger for testing
+
+jobs:
+  run-agents:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine which agents to run
+        id: agents
+        run: |
+          HOUR=$(date -u +%-H)
+          AGENTS=""
+
+          # REX: every 4h (0,4,8,12,16,20)
+          if (( HOUR % 4 == 0 )); then AGENTS="$AGENTS rex"; fi
+
+          # NOVA: 14:00 UTC
+          if (( HOUR == 14 )); then AGENTS="$AGENTS nova"; fi
+
+          # SAGE: 15:00 UTC
+          if (( HOUR == 15 )); then AGENTS="$AGENTS sage"; fi
+
+          # ATLAS: 13:00, 21:00 UTC
+          if (( HOUR == 13 || HOUR == 21 )); then AGENTS="$AGENTS atlas"; fi
+
+          # VEGA: 2,6,10,14,18,22 UTC
+          if (( HOUR == 2 || HOUR == 6 || HOUR == 10 || HOUR == 14 || HOUR == 18 || HOUR == 22 )); then AGENTS="$AGENTS vega"; fi
+
+          # ZEN: 16:00 UTC
+          if (( HOUR == 16 )); then AGENTS="$AGENTS zen"; fi
+
+          echo "agents=$AGENTS" >> "$GITHUB_OUTPUT"
+
+      - name: Call agent endpoints
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ secrets.VERCEL_APP_URL }}
+        run: |
+          for AGENT in ${{ steps.agents.outputs.agents }}; do
+            echo "Triggering $AGENT..."
+            curl -sf -X POST "$BASE_URL/api/cron/$AGENT" \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H "Content-Type: application/json" \
+              --max-time 55 || echo "WARNING: $AGENT failed or timed out"
+          done

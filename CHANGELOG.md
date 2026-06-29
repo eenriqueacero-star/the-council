@@ -4,6 +4,33 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 21)
+
+### Layer 1 — Agent Background Scans (Vercel Cron Jobs)
+
+**Part 1 — Firestore agent_feed collection:**
+- Created `src/utils/agentFeed.js`: `writeToFeed({ userId, agentId, ticker, headline, detail, severity, source })` — writes to `users/{userId}/agent_feed/{auto-id}` using client Firebase SDK. Fields: agentId, ticker, headline, detail, severity, source, read (false), createdAt (serverTimestamp), timestamp (serverTimestamp).
+
+**Part 2 — Shared recon + Firebase Admin:**
+- Created `api/lib/firebaseAdmin.js`: firebase-admin init via `FIREBASE_SERVICE_ACCOUNT` env var (JSON string). Comment at top reminds Edwin to generate service account key from Firebase Console. Exports `db` (admin Firestore instance).
+- Created `api/lib/recon.js`: shared serverless helpers — `fetchPrices(tickers)`, `fetchNews(tickers)`, `fetchEarnings(tickers)`, `fetchTechnicals(ticker)`, `fetchMacro()`. Direct calls to Finnhub, Alpha Vantage, and FRED APIs. Includes `guessSentiment()` helper for news NLP.
+- Added `firebase-admin: ^12.0.0` to `package.json`.
+
+**Part 3 — 6 cron endpoint files (all CRON_SECRET protected via `Authorization: Bearer`):**
+- `api/cron/rex.js`: RSI overbought/oversold (>70, <30), MACD crossover detection, golden/death cross, Bollinger Band breaks. Calls `fetchTechnicals` + `fetchPrices`. Severities: warning (RSI), info (MACD, BB), alert (cross signals).
+- `api/cron/nova.js`: Earnings within 3 days (alert) and 14 days (warning), negative news clusters ≥2 articles (warning). Uses `fetchEarnings` + `fetchNews`.
+- `api/cron/sage.js`: Position concentration ≥25% (warning) and ≥35% (alert), portfolio single-day drop ≥3% (alert). Uses `fetchPrices` + Firestore holdings with share counts.
+- `api/cron/atlas.js`: VIX ≥25 (warning), VIX ≥30 (alert), VIX spike ≥15% (alert), yield curve inversion (warning), yield spread <0.2% (warning), oil ≥5% move (alert), fed rate change ≥0.25% (warning), CPI change ≥0.2 (warning). Macro events broadcast to all users (global, not per-ticker).
+- `api/cron/vega.js`: Single-session drop ≥5% (alert), negative news clusters ≥3 articles (warning), price below both SMA50 and SMA200 (alert, only fetches technicals when changePct < 0 to avoid AV waste).
+- `api/cron/zen.js`: Position value < $50 (info), largest/smallest position ratio ≥5x (info).
+
+**Part 4 — GitHub Actions cron triggers:**
+- Created `.github/workflows/agent-crons.yml`: all 6 agent schedules registered. Single job computes which agents should run at the current UTC hour and calls each endpoint via `curl -sf ... -H "Authorization: Bearer $CRON_SECRET"`. Manual `workflow_dispatch` for testing. Requires GitHub secrets: `CRON_SECRET`, `VERCEL_APP_URL`.
+
+**vercel.json updated:** Added `maxDuration` entries for all 6 cron endpoints (rex/vega: 120s, others: 60s).
+
+---
+
 ## 2026-06-29 (session 20)
 
 ### Voice Removal, News Overhaul, Agent Learning System (Layer 0)

@@ -9,13 +9,8 @@
     "api/get-fred.js":   { "maxDuration": 20 },
     "api/get-technicals.js": { "maxDuration": 45 },
     "api/send-push.js":   { "maxDuration": 10 },
-    "api/scout-cron.js":  { "maxDuration": 300 },
-    "api/cron/rex.js":    { "maxDuration": 120 },
-    "api/cron/nova.js":   { "maxDuration": 60  },
-    "api/cron/sage.js":   { "maxDuration": 60  },
-    "api/cron/atlas.js":  { "maxDuration": 60  },
-    "api/cron/vega.js":   { "maxDuration": 120 },
-    "api/cron/zen.js":    { "maxDuration": 60  }
+    "api/scout-cron.js":   { "maxDuration": 300 },
+    "api/cron/agents.js":  { "maxDuration": 120 }
   },
   "crons": [
     { "path": "/api/scout-cron", "schedule": "0 13 * * 1-5" }

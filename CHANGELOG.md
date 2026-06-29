@@ -4,6 +4,22 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 22)
+
+### Fix — Consolidate cron endpoints under Vercel Hobby 12-function limit
+
+**Problem:** 6 individual `api/cron/*.js` files pushed total function count to 14, exceeding Vercel Hobby's 12-function limit.
+
+**Fix:**
+- Deleted `api/cron/rex.js`, `nova.js`, `sage.js`, `atlas.js`, `vega.js`, `zen.js` (6 files)
+- Created `api/cron/agents.js`: single handler accepting `?agent=rex|nova|sage|atlas|vega|zen` query param. All 6 agent scan logics preserved identically, moved into per-agent async functions (`runRex`, `runNova`, `runSage`, `runAtlas`, `runVega`, `runZen`). Returns 400 on missing/invalid `?agent` param.
+- `vercel.json`: replaced 6 individual `maxDuration` entries with one `api/cron/agents.js: { maxDuration: 120 }`
+- `.github/workflows/agent-crons.yml`: curl calls updated to `$BASE_URL/api/cron/agents?agent=$AGENT` — schedules and secrets unchanged
+
+**Result:** 9 total serverless functions (was 14). Comfortably under the 12-function Hobby limit.
+
+---
+
 ## 2026-06-29 (session 21)
 
 ### Layer 1 — Agent Background Scans (Vercel Cron Jobs)

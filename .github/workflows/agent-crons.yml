@@ -53,7 +53,7 @@ jobs:
         run: |
           for AGENT in ${{ steps.agents.outputs.agents }}; do
             echo "Triggering $AGENT..."
-            curl -sf -X POST "$BASE_URL/api/cron/$AGENT" \
+            curl -sf -X POST "$BASE_URL/api/cron/agents?agent=$AGENT" \
               -H "Authorization: Bearer $CRON_SECRET" \
               -H "Content-Type: application/json" \
               --max-time 55 || echo "WARNING: $AGENT failed or timed out"

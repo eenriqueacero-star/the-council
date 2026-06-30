@@ -4,6 +4,28 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 25)
+
+### Fix — Stock chart STILL showing 2 data points (root cause found)
+
+**Root cause:** `fetchCandles` used `Math.min` across all tickers' data lengths to determine how many candle points to use:
+```js
+const minLen = Math.min(...withShares.map(t => data[t]?.length || 0).filter(l => l > 0));
+```
+Any newer or illiquid ticker in the portfolio (e.g. `NBIS`, `APLD`, `FLY`) that only has 2 days of candle history on Finnhub's free tier would set `minLen = 2`, truncating the ENTIRE portfolio curve to 2 points regardless of how much data the major tickers had. NVDA might have 22 daily candles; one outlier ticker kills everything.
+
+**Secondary issue:** `primary = withShares[0]` — if that first ticker happened to have no Finnhub data (intermittent failure), the whole fetch bailed even though other tickers had valid data.
+
+**Fix (`src/components/PortfolioTab.jsx` — `fetchCandles`):**
+- `primary` now selected as the ticker with the **most** data points (via `reduce`), not blindly `withShares[0]`
+- Removed `minLen` / `Math.min` entirely — the curve is always as long as the primary ticker's full history
+- For tickers shorter than primary, their price is **clamped to their last available candle** (`tData[Math.min(idx, tData.length - 1)]`) rather than truncating the curve
+- Fallback: tickers with zero candle data use `quotes[t]?.price` (current quote) as a constant proxy
+
+**Result:** 1M now shows ~22 data points; short-history tickers contribute their best available price rather than collapsing the whole chart.
+
+---
+
 ## 2026-06-29 (session 24)
 
 ### Fix — Chat broken, quick-action buttons broken, DCA sheet broken

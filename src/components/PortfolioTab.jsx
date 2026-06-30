@@ -349,14 +349,26 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     if (!withShares.length) { setCandlesLoaded(true); return; }
     setCandlesLoaded(false);
     try {
-      const data    = await getCandles(withShares, range);
-      const primary = withShares[0];
-      const base    = data[primary];
+      const data = await getCandles(withShares, range);
+      // Use the ticker with the most data points to drive the timeline — prevents
+      // a newer/illiquid ticker (e.g. NBIS with 2 days) from truncating the whole curve.
+      const primary = withShares.reduce(
+        (best, t) => (data[t]?.length || 0) > (data[best]?.length || 0) ? t : best,
+        withShares[0]
+      );
+      const base = data[primary];
       if (!base?.length) { setCandles([]); setCandlesLoaded(true); return; }
-      const minLen = Math.min(...withShares.map(t => data[t]?.length || 0).filter(l => l > 0));
-      const curve  = base.slice(0, minLen).map((pt, idx) => {
+      const curve = base.map((pt, idx) => {
         let val = 0;
-        withShares.forEach(t => { val += (parseFloat(posMap[t]?.shares) || 0) * (data[t]?.[idx]?.c || quotes[t]?.price || 0); });
+        withShares.forEach(t => {
+          const sh  = parseFloat(posMap[t]?.shares) || 0;
+          const tData = data[t];
+          // For tickers shorter than primary, clamp to their last known candle
+          const price = tData?.length
+            ? (tData[Math.min(idx, tData.length - 1)]?.c || 0)
+            : (quotes[t]?.price || 0);
+          val += sh * price;
+        });
         return { t: pt.t, c: val };
       });
       setCandles(curve);

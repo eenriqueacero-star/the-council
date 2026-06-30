@@ -148,6 +148,18 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (2026-06-30)
+
+### Chart data source: Finnhub → Twelve Data ✓
+- [x] `api/get-candles.js` rewired to Twelve Data `/time_series` endpoint
+- [x] Resolution mapping updated for all 7 ranges
+- [x] `prepost=true` + `timezone=America/New_York` for extended hours
+- [x] 200ms inter-ticker delay to respect 8 calls/min free tier
+- [x] Permanent `[get-candles]` logging added
+- [x] `TWELVE_DATA_KEY` env var required in Vercel (Edwin must add)
+
+---
+
 ## IN PROGRESS
 
 ### Alpha Tracker vs SPY ⚡

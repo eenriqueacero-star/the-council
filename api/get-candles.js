@@ -13,6 +13,20 @@ async function verifyAuth(req) {
   } catch { return false; }
 }
 
+const RANGE_CONFIG = {
+  '1D':  { interval: '5min', outputsize: 78  },
+  '1W':  { interval: '1day', outputsize: 5   },
+  '1M':  { interval: '1day', outputsize: 22  },
+  '3M':  { interval: '1day', outputsize: 65  },
+  '6M':  { interval: '1day', outputsize: 130 },
+  '1Y':  { interval: '1day', outputsize: 252 },
+  'ALL': { interval: '1week', outputsize: 260 },
+};
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await verifyAuth(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -29,29 +43,48 @@ export default async function handler(req, res) {
   const VALID_RANGES = new Set(['1D','1W','1M','3M','6M','1Y','ALL']);
   if (!VALID_RANGES.has(range)) return res.status(400).json({ error: `Invalid range: ${range}` });
 
-  const now = Math.floor(Date.now() / 1000);
-  let resolution, from;
-  switch (range) {
-    case '1D':  resolution = '5';  from = now - 20 * 3600;        break; // 20h back covers full 4AM–8PM ET extended session
-    case '1W':  resolution = 'D';  from = now - 7 * 86400;        break;
-    case '1M':  resolution = 'D';  from = now - 30 * 86400;       break;
-    case '3M':  resolution = 'D';  from = now - 90 * 86400;       break;
-    case '6M':  resolution = 'D';  from = now - 180 * 86400;      break;
-    case '1Y':  resolution = 'D';  from = now - 365 * 86400;      break;
-    default:    resolution = 'W';  from = now - 5 * 365 * 86400;  break;
+  if (!process.env.TWELVE_DATA_KEY) {
+    console.error('[get-candles] ERROR: TWELVE_DATA_KEY env var is not set — all tickers will return []');
   }
 
+  const { interval, outputsize } = RANGE_CONFIG[range];
   const results = {};
-  await Promise.all(tickers.map(async t => {
-    try {
-      const url = `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(t)}&resolution=${resolution}&from=${from}&to=${now}&token=${process.env.FINNHUB_KEY}`;
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`Finnhub ${r.status}`);
-      const data = await r.json();
-      if (data.s !== 'ok' || !data.t?.length) { results[t] = []; return; }
-      results[t] = data.t.map((ts, i) => ({ t: ts, o: data.o[i], h: data.h[i], l: data.l[i], c: data.c[i] }));
-    } catch { results[t] = []; }
-  }));
 
+  for (let i = 0; i < tickers.length; i++) {
+    const t = tickers[i];
+    if (i > 0) await sleep(200); // stay under 8 calls/min free tier limit
+    try {
+      const apiKey = process.env.TWELVE_DATA_KEY || '';
+      const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(t)}&interval=${interval}&outputsize=${outputsize}&prepost=true&timezone=America%2FNew_York&apikey=${apiKey}`;
+      const safeUrl = url.replace(apiKey || 'MISSING', 'REDACTED');
+      console.error('[get-candles] Fetching', t, 'interval:', interval, 'outputsize:', outputsize, 'url:', safeUrl);
+
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`Twelve Data HTTP ${r.status}`);
+      const data = await r.json();
+
+      console.error('[get-candles]', t, 'status:', data.status, 'values:', data.values?.length ?? 'n/a', 'error:', data.message || 'none');
+
+      if (data.status === 'error' || !Array.isArray(data.values) || !data.values.length) {
+        results[t] = [];
+        continue;
+      }
+      // values are newest-first; reverse for chronological chart display
+      const candles = data.values.slice().reverse().map(v => ({
+        t: Math.floor(new Date(v.datetime.replace(' ', 'T')).getTime() / 1000),
+        o: parseFloat(v.open),
+        h: parseFloat(v.high),
+        l: parseFloat(v.low),
+        c: parseFloat(v.close),
+        v: parseInt(v.volume) || 0,
+      }));
+      results[t] = candles;
+    } catch (err) {
+      console.error('[get-candles]', t, 'fetch error:', err.message);
+      results[t] = [];
+    }
+  }
+
+  console.error('[get-candles] Response:', Object.entries(results).map(([k, v]) => `${k}:${v.length}`).join(', '));
   return res.status(200).json(results);
 }

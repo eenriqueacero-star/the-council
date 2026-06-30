@@ -4,6 +4,55 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 2)
+
+### Fix — Chart candles: add Vercel-visible logging + datetime parsing fix
+
+Chart still showed 2 points after the Twelve Data switch. Two issues:
+
+1. **Logs were invisible on Vercel Hobby:** `console.log` is not reliably surfaced in Vercel's runtime log viewer on the Hobby plan. Switched all `[get-candles]` output to `console.error` so logs appear in the Functions tab.
+
+2. **Twelve Data datetime format is non-standard ISO:** For 5-min intraday bars, Twelve Data returns `"2026-06-27 09:30:00"` (space separator). `new Date("2026-06-27 09:30:00")` is not valid ISO 8601 and can return `Invalid Date` in some Node.js versions, causing all timestamps to be `NaN` and the candle array to be malformed. Fixed with `.replace(' ', 'T')` → `"2026-06-27T09:30:00"` before parsing.
+
+**Logging added (`api/get-candles.js`):**
+- Startup warning if `TWELVE_DATA_KEY` env var is not set (most likely root cause of 2-point chart)
+- Before each Twelve Data fetch: logs ticker, interval, outputsize, and full URL with API key redacted
+- After parse: logs `data.status`, `data.values` count, and `data.message` (error text from Twelve Data)
+- Before final return: logs all tickers and their candle counts (e.g. `NVDA:22, AAPL:22`)
+
+**Root cause most likely:** `TWELVE_DATA_KEY` not yet added to Vercel environment variables. When the key is missing, Twelve Data returns `{ status: "error", message: "..." }` → code sets `results[t] = []` → frontend falls back to 2-point synthetic line.
+
+---
+
+## 2026-06-30
+
+### Fix — Chart data source: Finnhub → Twelve Data
+
+Finnhub's `/stock/candle` endpoint consistently returns empty arrays on the free tier for historical data after 5+ fix attempts. Switched `api/get-candles.js` to Twelve Data's `/time_series` endpoint (800 calls/day free tier, reliable candle history).
+
+**Changes (`api/get-candles.js`):**
+- Replaced Finnhub `/stock/candle` with Twelve Data `/time_series`
+- API key: `TWELVE_DATA_KEY` Vercel env var (Edwin must add after signing up at twelvedata.com)
+- Resolution mapping updated:
+  | Range | interval | outputsize |
+  |-------|----------|------------|
+  | 1D    | 5min     | 78         |
+  | 1W    | 1day     | 5          |
+  | 1M    | 1day     | 22         |
+  | 3M    | 1day     | 65         |
+  | 6M    | 1day     | 130        |
+  | 1Y    | 1day     | 252        |
+  | ALL   | 1week    | 260        |
+- Always passes `prepost=true` (extended hours) and `timezone=America/New_York`
+- Response transformation: values are strings → `parseFloat`/`parseInt`; array is newest-first → reversed for chronological chart display
+- Sequential ticker fetches with 200ms delay between each to stay under the 8 calls/min free tier limit
+- Added permanent logging: `[get-candles] <ticker> range: <range> interval: <interval> points: <n>`
+- Frontend response format unchanged (unix-second timestamps, o/h/l/c fields) — no frontend changes needed
+
+**No other Finnhub usage was changed** — `get-quotes.js`, news, earnings, and all other endpoints are untouched.
+
+---
+
 ## 2026-06-29 (session 29)
 
 ### Fix — get-candles: 1W and 1M returned empty arrays

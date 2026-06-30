@@ -4,6 +4,26 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 2)
+
+### Fix — Chart candles: add Vercel-visible logging + datetime parsing fix
+
+Chart still showed 2 points after the Twelve Data switch. Two issues:
+
+1. **Logs were invisible on Vercel Hobby:** `console.log` is not reliably surfaced in Vercel's runtime log viewer on the Hobby plan. Switched all `[get-candles]` output to `console.error` so logs appear in the Functions tab.
+
+2. **Twelve Data datetime format is non-standard ISO:** For 5-min intraday bars, Twelve Data returns `"2026-06-27 09:30:00"` (space separator). `new Date("2026-06-27 09:30:00")` is not valid ISO 8601 and can return `Invalid Date` in some Node.js versions, causing all timestamps to be `NaN` and the candle array to be malformed. Fixed with `.replace(' ', 'T')` → `"2026-06-27T09:30:00"` before parsing.
+
+**Logging added (`api/get-candles.js`):**
+- Startup warning if `TWELVE_DATA_KEY` env var is not set (most likely root cause of 2-point chart)
+- Before each Twelve Data fetch: logs ticker, interval, outputsize, and full URL with API key redacted
+- After parse: logs `data.status`, `data.values` count, and `data.message` (error text from Twelve Data)
+- Before final return: logs all tickers and their candle counts (e.g. `NVDA:22, AAPL:22`)
+
+**Root cause most likely:** `TWELVE_DATA_KEY` not yet added to Vercel environment variables. When the key is missing, Twelve Data returns `{ status: "error", message: "..." }` → code sets `results[t] = []` → frontend falls back to 2-point synthetic line.
+
+---
+
 ## 2026-06-30
 
 ### Fix — Chart data source: Finnhub → Twelve Data

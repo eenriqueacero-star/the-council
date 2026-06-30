@@ -43,6 +43,10 @@ export default async function handler(req, res) {
   const VALID_RANGES = new Set(['1D','1W','1M','3M','6M','1Y','ALL']);
   if (!VALID_RANGES.has(range)) return res.status(400).json({ error: `Invalid range: ${range}` });
 
+  if (!process.env.TWELVE_DATA_KEY) {
+    console.error('[get-candles] ERROR: TWELVE_DATA_KEY env var is not set — all tickers will return []');
+  }
+
   const { interval, outputsize } = RANGE_CONFIG[range];
   const results = {};
 
@@ -50,31 +54,37 @@ export default async function handler(req, res) {
     const t = tickers[i];
     if (i > 0) await sleep(200); // stay under 8 calls/min free tier limit
     try {
-      const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(t)}&interval=${interval}&outputsize=${outputsize}&prepost=true&timezone=America%2FNew_York&apikey=${process.env.TWELVE_DATA_KEY}`;
+      const apiKey = process.env.TWELVE_DATA_KEY || '';
+      const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(t)}&interval=${interval}&outputsize=${outputsize}&prepost=true&timezone=America%2FNew_York&apikey=${apiKey}`;
+      const safeUrl = url.replace(apiKey || 'MISSING', 'REDACTED');
+      console.error('[get-candles] Fetching', t, 'interval:', interval, 'outputsize:', outputsize, 'url:', safeUrl);
+
       const r = await fetch(url);
-      if (!r.ok) throw new Error(`Twelve Data ${r.status}`);
+      if (!r.ok) throw new Error(`Twelve Data HTTP ${r.status}`);
       const data = await r.json();
+
+      console.error('[get-candles]', t, 'status:', data.status, 'values:', data.values?.length ?? 'n/a', 'error:', data.message || 'none');
+
       if (data.status === 'error' || !Array.isArray(data.values) || !data.values.length) {
-        console.log('[get-candles]', t, 'range:', range, 'interval:', interval, 'points: 0 (no data)');
         results[t] = [];
         continue;
       }
       // values are newest-first; reverse for chronological chart display
-      const candles = data.values.reverse().map(v => ({
-        t: Math.floor(new Date(v.datetime).getTime() / 1000),
+      const candles = data.values.slice().reverse().map(v => ({
+        t: Math.floor(new Date(v.datetime.replace(' ', 'T')).getTime() / 1000),
         o: parseFloat(v.open),
         h: parseFloat(v.high),
         l: parseFloat(v.low),
         c: parseFloat(v.close),
         v: parseInt(v.volume) || 0,
       }));
-      console.log('[get-candles]', t, 'range:', range, 'interval:', interval, 'points:', candles.length);
       results[t] = candles;
     } catch (err) {
-      console.log('[get-candles]', t, 'range:', range, 'error:', err.message);
+      console.error('[get-candles]', t, 'fetch error:', err.message);
       results[t] = [];
     }
   }
 
+  console.error('[get-candles] Response:', Object.entries(results).map(([k, v]) => `${k}:${v.length}`).join(', '));
   return res.status(200).json(results);
 }

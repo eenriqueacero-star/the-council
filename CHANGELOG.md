@@ -4,6 +4,38 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 3)
+
+### Fix — Chart data source: Twelve Data → Yahoo Finance (yahoo-finance2)
+
+Twelve Data free tier is 8 calls/minute — with 9 tickers that's an instant 429. Switched to `yahoo-finance2` (no API key, no hard rate limits, covers all tickers including small caps like CRDO, ALAB, NBIS, APLD).
+
+**`api/get-candles.js` — complete rewrite:**
+- Replaced Twelve Data HTTP fetch with `yahoo-finance2` v3 (`new YahooFinance()`)
+- Uses `.chart()` for all 7 ranges — `.historical()` is deprecated in v3
+- All tickers fetched in parallel via `Promise.all` (no sequential delays needed)
+- No API key required; `TWELVE_DATA_KEY` no longer used in code
+- Resolution mapping:
+  | Range | interval | period1 |
+  |-------|----------|---------|
+  | 1D    | 5m       | now − 20h (covers 4 AM–8 PM ET extended session) |
+  | 1W    | 1d       | now − 7d |
+  | 1M    | 1d       | now − 30d |
+  | 3M    | 1d       | now − 90d |
+  | 6M    | 1d       | now − 180d |
+  | 1Y    | 1d       | now − 365d |
+  | ALL   | 1wk      | now − 5y |
+- Bars with null `close` filtered out (extended-hours stale ticks)
+- `console.error` logging preserved for Vercel visibility
+
+**`src/components/PortfolioTab.jsx` — per-range candle cache:**
+- `candleCacheRef` (`useRef({})`) stores built portfolio curves keyed by range
+- Switching range pills serves from cache instantly — no network call
+- Cache cleared on two events: holdings set changes (`useEffect` on `withShares.join(',')`) and explicit refresh button press
+- Refresh button clears cache before calling `fetchCandles()` so data is always fresh on manual reload
+
+---
+
 ## 2026-06-30 (session 2)
 
 ### Fix — Chart candles: add Vercel-visible logging + datetime parsing fix

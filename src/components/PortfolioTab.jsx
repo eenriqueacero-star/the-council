@@ -250,6 +250,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [macroPulse,    setMacroPulse]    = useState(null); // null = not fetched
   const [macroOpen,     setMacroOpen]     = useState(false);
   const timerRef = useRef(null);
+  const candleCacheRef = useRef({}); // keyed by range; cleared when holdings change
 
   const tickers    = acctHoldings.filter(t => posMap[t]);
   const withShares = tickers.filter(t => parseFloat(posMap[t]?.shares) > 0);
@@ -345,8 +346,18 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     return () => clearInterval(interval);
   }, [account, authReady]);
 
+  // Clear candle cache whenever the set of held tickers changes
+  useEffect(() => { candleCacheRef.current = {}; }, [withShares.join(',')]);
+
   const fetchCandles = useCallback(async () => {
     if (!withShares.length) { setCandlesLoaded(true); return; }
+    // Serve from cache on range switches; skip network call if data already loaded
+    if (candleCacheRef.current[range]) {
+      setCandles(candleCacheRef.current[range]);
+      setChartKey(k => k + 1);
+      setCandlesLoaded(true);
+      return;
+    }
     setCandlesLoaded(false);
     try {
       const data = await getCandles(withShares, range);
@@ -371,6 +382,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         });
         return { t: pt.t, c: val };
       });
+      candleCacheRef.current[range] = curve;
       setCandles(curve);
       setChartKey(k => k + 1);
     } catch { setCandles([]); } finally { setCandlesLoaded(true); }
@@ -692,7 +704,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               transition: 'all 0.18s ease',
             }}>{r}</motion.button>
           ))}
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => { fetchQuotes(); fetchCandles(); }}
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => { candleCacheRef.current = {}; fetchQuotes(); fetchCandles(); }}
             style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: T.text3, display: 'flex', padding: 6 }}>
             <RefreshCw size={13} />
           </motion.button>

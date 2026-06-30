@@ -150,13 +150,12 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ## DONE (2026-06-30)
 
-### Chart data source: Finnhub → Twelve Data ✓
-- [x] `api/get-candles.js` rewired to Twelve Data `/time_series` endpoint
-- [x] Resolution mapping updated for all 7 ranges
-- [x] `prepost=true` + `timezone=America/New_York` for extended hours
-- [x] 200ms inter-ticker delay to respect 8 calls/min free tier
-- [x] Permanent `[get-candles]` logging added
-- [x] `TWELVE_DATA_KEY` env var required in Vercel (Edwin must add)
+### Chart data source: Finnhub → Twelve Data → Yahoo Finance ✓
+- [x] `api/get-candles.js` rewired to `yahoo-finance2` v3 (no API key, no rate limits)
+- [x] Uses `.chart()` for all 7 ranges (`.historical()` deprecated in v3)
+- [x] All tickers fetched in parallel via `Promise.all`
+- [x] Per-range candle cache in PortfolioTab (`candleCacheRef`) — range switches served instantly
+- [x] Cache invalidated on holdings change and on manual refresh
 
 ---
 

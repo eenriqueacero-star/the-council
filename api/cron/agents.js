@@ -9,6 +9,10 @@
 import { db } from '../lib/firebaseAdmin.js';
 import { fetchPrices, fetchNews, fetchEarnings, fetchTechnicals, fetchMacro } from '../lib/recon.js';
 import { FieldValue } from 'firebase-admin/firestore';
+import {
+  getAgentFullMemory, getStaleStances,
+  updateStance, updateGlobalOutlook,
+} from '../lib/agentMemory.js';
 
 // ---------------------------------------------------------------------------
 // Auth + shared helpers
@@ -67,6 +71,21 @@ async function runRex(userId) {
 
   const prices = await fetchPrices(tickers);
   let written = 0;
+  const tickerStances = []; // collect for global outlook derivation
+
+  // Check for stale stances and notify
+  const staleItems = await getStaleStances(userId);
+  for (const s of staleItems.filter(s => s.agentId === 'rex' && s.ticker !== '_GLOBAL')) {
+    const days = s.updatedAt?.toDate ? Math.round((Date.now() - s.updatedAt.toDate().getTime()) / 86400000) : 30;
+    if (days >= 32) {
+      await writeFeed(userId, {
+        agentId: 'rex', ticker: s.ticker, severity: 'info', source: 'cron_rex_stale',
+        headline: `REX's ${s.ticker} stance is ${days} days old — refreshing analysis`,
+        detail:   `Previous stance: ${s.stance} (${s.conviction}/10). "${s.reasoning?.slice(0, 100)}"`,
+      });
+      written++;
+    }
+  }
 
   for (const ticker of tickers) {
     const tech  = await fetchTechnicals(ticker);
@@ -135,7 +154,77 @@ async function runRex(userId) {
       await writeFeed(userId, { agentId: 'rex', ticker, source: 'cron_rex_technicals', ...ev });
       written++;
     }
+
+    // Derive stance from technical indicators
+    if (tech.rsi != null || tech.sma200 != null) {
+      let bullishSignals = 0;
+      let bearishSignals = 0;
+      const signals = [];
+
+      if (tech.rsi != null) {
+        if (tech.rsi < 60 && tech.rsi > 30) { bullishSignals++; signals.push(`RSI ${tech.rsi.toFixed(0)}`); }
+        else if (tech.rsi > 70) { bearishSignals++; signals.push(`RSI overbought ${tech.rsi.toFixed(0)}`); }
+        else if (tech.rsi < 30) { bearishSignals++; signals.push(`RSI oversold ${tech.rsi.toFixed(0)}`); }
+      }
+      if (tech.macdBullish === true)  { bullishSignals++; signals.push('MACD bullish'); }
+      if (tech.macdBullish === false) { bearishSignals++; signals.push('MACD bearish'); }
+      if (tech.goldenCross) { bullishSignals += 2; signals.push('golden cross'); }
+      if (tech.deathCross)  { bearishSignals += 2; signals.push('death cross'); }
+      if (price && tech.sma200) {
+        if (price > tech.sma200) { bullishSignals++; signals.push(`above SMA200`); }
+        else                     { bearishSignals++; signals.push(`below SMA200`); }
+      }
+
+      const totalSignals = bullishSignals + bearishSignals;
+      let stance, conviction;
+      if (bullishSignals > bearishSignals) {
+        stance = 'bullish';
+        conviction = Math.min(10, Math.round(2 + (bullishSignals / Math.max(totalSignals, 1)) * 7));
+      } else if (bearishSignals > bullishSignals) {
+        stance = 'bearish';
+        conviction = Math.min(10, Math.round(2 + (bearishSignals / Math.max(totalSignals, 1)) * 7));
+      } else {
+        stance = 'neutral';
+        conviction = 4;
+      }
+
+      const reasoning = `${signals.join(', ') || 'mixed signals'}. Price: $${price?.toFixed(2) || 'N/A'}.`;
+      tickerStances.push({ ticker, stance });
+
+      try {
+        const flip = await updateStance(userId, 'rex', ticker, { stance, conviction, reasoning });
+        if (flip.flipped) {
+          await writeFeed(userId, {
+            agentId: 'rex', ticker, severity: 'alert', source: 'cron_rex_flip',
+            headline: `REX flipped ${flip.to.toUpperCase()} on ${ticker} after ${flip.daysSincePrevious} days ${flip.from}`,
+            detail:   `Technical picture reversed. Now ${stance} (${conviction}/10). ${reasoning}`,
+          });
+          written++;
+        }
+      } catch (e) { console.error('[rex] updateStance error:', e.message); }
+    }
   }
+
+  // Global outlook — overall technical picture across all holdings
+  const bullCount = tickerStances.filter(s => s.stance === 'bullish').length;
+  const bearCount = tickerStances.filter(s => s.stance === 'bearish').length;
+  const total = tickerStances.length;
+  if (total > 0) {
+    let outlook, conviction, reasoning;
+    const bullPct = bullCount / total;
+    if (bullPct >= 0.6) {
+      outlook = 'bullish'; conviction = Math.round(5 + bullPct * 4);
+      reasoning = `${bullCount}/${total} holdings showing bullish technical structure.`;
+    } else if (bearCount / total >= 0.5) {
+      outlook = 'bearish'; conviction = Math.round(5 + (bearCount / total) * 4);
+      reasoning = `${bearCount}/${total} holdings showing bearish technical signals.`;
+    } else {
+      outlook = 'neutral'; conviction = 4;
+      reasoning = `Mixed technical picture: ${bullCount} bullish, ${bearCount} bearish, ${total - bullCount - bearCount} neutral.`;
+    }
+    try { await updateGlobalOutlook(userId, 'rex', { outlook, conviction, reasoning }); } catch {}
+  }
+
   return written;
 }
 
@@ -153,6 +242,24 @@ async function runNova(userId) {
   ]);
 
   let written = 0;
+
+  // Stale stance check
+  const staleItems = await getStaleStances(userId);
+  for (const s of staleItems.filter(s => s.agentId === 'nova' && s.ticker !== '_GLOBAL')) {
+    const days = s.updatedAt?.toDate ? Math.round((Date.now() - s.updatedAt.toDate().getTime()) / 86400000) : 30;
+    if (days >= 32) {
+      await writeFeed(userId, {
+        agentId: 'nova', ticker: s.ticker, severity: 'info', source: 'cron_nova_stale',
+        headline: `NOVA's catalyst view on ${s.ticker} is ${days} days old — checking for updates`,
+        detail:   `Previous: ${s.stance} (${s.conviction}/10). "${s.reasoning?.slice(0, 100)}"`,
+      });
+      written++;
+    }
+  }
+
+  // Build lookup: ticker → earnings info
+  const earningsMap = {};
+  for (const e of earningsList) { earningsMap[e.ticker] = e; }
 
   for (const e of earningsList) {
     let severity, detail;
@@ -176,8 +283,11 @@ async function runNova(userId) {
     written++;
   }
 
+  // Per-ticker stance derivation
+  let bullCount = 0, bearCount = 0;
   for (const ticker of tickers) {
     const negatives = (newsMap[ticker] || []).filter(a => a.sentiment === 'negative');
+    const positives = (newsMap[ticker] || []).filter(a => a.sentiment === 'positive');
     if (negatives.length >= 2) {
       const headlines = negatives.slice(0, 3).map(a => `"${a.headline}"`).join('; ');
       await writeFeed(userId, {
@@ -190,7 +300,60 @@ async function runNova(userId) {
       });
       written++;
     }
+
+    // Derive stance
+    const e = earningsMap[ticker];
+    const hasNearEarnings = e && e.daysAway <= 14;
+    const hasNegNews = negatives.length >= 2;
+    const hasPosNews = positives.length >= negatives.length + 1;
+
+    let stance, conviction, reasoning;
+    if (hasNegNews) {
+      stance = 'bearish'; conviction = 5 + Math.min(3, negatives.length - 1);
+      reasoning = `${negatives.length} negative articles in 24h.${hasNearEarnings ? ` Earnings in ${e.daysAway}d adds risk.` : ''}`;
+      bearCount++;
+    } else if (hasNearEarnings && hasPosNews) {
+      stance = 'bullish'; conviction = 6;
+      reasoning = `Earnings catalyst in ${e.daysAway}d with positive news sentiment.`;
+      bullCount++;
+    } else if (hasNearEarnings) {
+      stance = 'neutral'; conviction = 5;
+      reasoning = `Earnings in ${e.daysAway}d — monitoring for directional catalyst.`;
+    } else {
+      stance = 'neutral'; conviction = 4;
+      reasoning = `No imminent earnings or strong news signals.`;
+    }
+
+    try {
+      const flip = await updateStance(userId, 'nova', ticker, { stance, conviction, reasoning });
+      if (flip.flipped) {
+        await writeFeed(userId, {
+          agentId: 'nova', ticker, severity: 'alert', source: 'cron_nova_flip',
+          headline: `NOVA flipped ${flip.to.toUpperCase()} on ${ticker} after ${flip.daysSincePrevious} days ${flip.from}`,
+          detail:   `Catalyst picture reversed. Now ${stance} (${conviction}/10). ${reasoning}`,
+        });
+        written++;
+      }
+    } catch (e2) { console.error('[nova] updateStance error:', e2.message); }
   }
+
+  // Global outlook
+  const total = tickers.length;
+  if (total > 0) {
+    let outlook, conviction, reasoning;
+    if (bullCount / total >= 0.5) {
+      outlook = 'bullish'; conviction = 6;
+      reasoning = `${bullCount}/${total} holdings have upcoming catalysts with positive sentiment.`;
+    } else if (bearCount / total >= 0.4) {
+      outlook = 'bearish'; conviction = 6;
+      reasoning = `${bearCount}/${total} holdings showing negative news signals.`;
+    } else {
+      outlook = 'neutral'; conviction = 4;
+      reasoning = `Mixed catalyst picture across holdings.`;
+    }
+    try { await updateGlobalOutlook(userId, 'nova', { outlook, conviction, reasoning }); } catch {}
+  }
+
   return written;
 }
 
@@ -223,6 +386,7 @@ async function runSage(userId) {
   if (totalValue === 0) return 0;
 
   let written = 0;
+  let highRiskCount = 0;
 
   for (const ticker of tickers) {
     if (!values[ticker]) continue;
@@ -242,6 +406,33 @@ async function runSage(userId) {
       });
       written++;
     }
+
+    // Stance: risk-level of this position
+    const pctN = (values[ticker].val / totalValue) * 100;
+    let stance, conviction, reasoning;
+    if (pctN >= 35) {
+      stance = 'bearish'; conviction = 8;
+      reasoning = `${ticker} is ${pctN.toFixed(0)}% of portfolio — critical concentration risk.`;
+      highRiskCount++;
+    } else if (pctN >= 25) {
+      stance = 'neutral'; conviction = 6;
+      reasoning = `${ticker} is ${pctN.toFixed(0)}% of portfolio — watch concentration.`;
+    } else {
+      stance = 'bullish'; conviction = 5;
+      reasoning = `${ticker} at ${pctN.toFixed(0)}% — within acceptable risk range.`;
+    }
+
+    try {
+      const flip = await updateStance(userId, 'sage', ticker, { stance, conviction, reasoning });
+      if (flip.flipped) {
+        await writeFeed(userId, {
+          agentId: 'sage', ticker, severity: 'alert', source: 'cron_sage_flip',
+          headline: `SAGE risk assessment flipped ${flip.to.toUpperCase()} on ${ticker} after ${flip.daysSincePrevious} days`,
+          detail:   `Concentration risk changed. Now ${stance} (${conviction}/10). ${reasoning}`,
+        });
+        written++;
+      }
+    } catch (e) { console.error('[sage] updateStance error:', e.message); }
   }
 
   const portfolioDayPct = (totalDayChange / (totalValue - totalDayChange)) * 100;
@@ -253,6 +444,15 @@ async function runSage(userId) {
     });
     written++;
   }
+
+  // Global outlook
+  const portfolioHealth = portfolioDayPct <= -3
+    ? { outlook: 'bearish', conviction: 7, reasoning: `Portfolio dropped ${Math.abs(portfolioDayPct).toFixed(1)}% today. ${highRiskCount} concentrated positions.` }
+    : highRiskCount > 0
+      ? { outlook: 'cautious', conviction: 6, reasoning: `${highRiskCount} position${highRiskCount > 1 ? 's' : ''} at critical concentration. Portfolio otherwise stable.` }
+      : { outlook: 'neutral', conviction: 5, reasoning: `Portfolio concentration within limits. No major drawdown today.` };
+  try { await updateGlobalOutlook(userId, 'sage', portfolioHealth); } catch {}
+
   return written;
 }
 
@@ -334,13 +534,91 @@ async function runAtlas(userIds) {
     }
   }
 
-  if (!events.length) return 0;
+  // Derive global macro outlook from signals
+  const macroSignals = [];
+  let macroStance = 'neutral';
+  let macroConviction = 4;
+
+  if (vix != null) {
+    if (vix >= 30) {
+      macroStance = 'bearish';
+      macroConviction = Math.min(10, 5 + Math.round((vix - 30) / 5));
+      macroSignals.push(`VIX ${vix.toFixed(1)} — fear elevated`);
+    } else if (vix >= 25) {
+      if (macroStance === 'neutral') macroStance = 'cautious';
+      macroConviction = Math.max(macroConviction, 5);
+      macroSignals.push(`VIX ${vix.toFixed(1)} — elevated volatility`);
+    } else if (vix < 18) {
+      if (macroStance === 'neutral') macroStance = 'bullish';
+      macroConviction = Math.max(macroConviction, 6);
+      macroSignals.push(`VIX ${vix.toFixed(1)} — calm market`);
+    }
+  }
+
+  if (macro.yieldSpread != null) {
+    if (macro.yieldInverted) {
+      macroStance = 'bearish';
+      macroConviction = Math.max(macroConviction, 7);
+      macroSignals.push(`yield curve inverted (${macro.yieldSpread.toFixed(2)}%)`);
+    } else if (macro.yieldSpread < 0.2) {
+      if (macroStance === 'neutral' || macroStance === 'bullish') macroStance = 'cautious';
+      macroConviction = Math.max(macroConviction, 5);
+      macroSignals.push(`yield spread flat (${macro.yieldSpread.toFixed(2)}%)`);
+    }
+  }
+
+  if (oilChangePct != null && oilChangePct >= 5) {
+    if (macroStance === 'neutral' || macroStance === 'bullish') macroStance = 'cautious';
+    macroConviction = Math.max(macroConviction, 5);
+    macroSignals.push(`oil spike +${oilChangePct.toFixed(1)}%`);
+  }
+
+  if (macro.fedRate?.current != null && macro.fedRate?.previous != null) {
+    const delta = +(macro.fedRate.current - macro.fedRate.previous).toFixed(2);
+    if (delta >= 0.25) {
+      if (macroStance === 'neutral' || macroStance === 'bullish') macroStance = 'cautious';
+      macroConviction = Math.max(macroConviction, 5);
+      macroSignals.push(`Fed hiked to ${macro.fedRate.current.toFixed(2)}%`);
+    } else if (delta <= -0.25) {
+      if (macroStance === 'neutral') { macroStance = 'bullish'; macroConviction = Math.max(macroConviction, 6); }
+      macroSignals.push(`Fed cut to ${macro.fedRate.current.toFixed(2)}%`);
+    }
+  }
+
+  if (macro.cpi?.current != null && macro.cpi?.previous != null) {
+    const cpiDelta = +(macro.cpi.current - macro.cpi.previous).toFixed(1);
+    if (cpiDelta >= 0.3) {
+      if (macroStance === 'neutral' || macroStance === 'bullish') macroStance = 'cautious';
+      macroSignals.push(`CPI rising to ${macro.cpi.current.toFixed(1)}`);
+    } else if (cpiDelta <= -0.3) {
+      if (macroStance === 'neutral') { macroStance = 'bullish'; macroConviction = Math.max(macroConviction, 6); }
+      macroSignals.push(`CPI falling to ${macro.cpi.current.toFixed(1)}`);
+    }
+  }
+
+  const macroReasoning = macroSignals.length
+    ? macroSignals.join('; ') + '.'
+    : 'No significant macro threshold crossings today.';
+
   let written = 0;
   for (const userId of userIds) {
     for (const ev of events) {
       await writeFeed(userId, { agentId: 'atlas', ...ev });
       written++;
     }
+    try {
+      const flip = await updateGlobalOutlook(userId, 'atlas', {
+        outlook: macroStance, conviction: macroConviction, reasoning: macroReasoning,
+      });
+      if (flip.flipped) {
+        await writeFeed(userId, {
+          agentId: 'atlas', ticker: 'MACRO', severity: 'alert', source: 'cron_atlas_flip',
+          headline: `ATLAS flipped macro outlook to ${macroStance.toUpperCase()} from ${flip.from.toUpperCase()}`,
+          detail:   `Global macro stance reversed. Now ${macroStance} (${macroConviction}/10). ${macroReasoning}`,
+        });
+        written++;
+      }
+    } catch (e) { console.error('[atlas] updateGlobalOutlook error:', e.message); }
   }
   return written;
 }
@@ -356,8 +634,23 @@ async function runVega(userId) {
   const [prices, newsMap] = await Promise.all([fetchPrices(tickers), fetchNews(tickers)]);
   let written = 0;
 
+  // Stale stance check
+  const staleItems = await getStaleStances(userId);
+  for (const s of staleItems.filter(s => s.agentId === 'vega' && s.ticker !== '_GLOBAL')) {
+    const days = s.updatedAt?.toDate ? Math.round((Date.now() - s.updatedAt.toDate().getTime()) / 86400000) : 30;
+    if (days >= 32) {
+      await writeFeed(userId, {
+        agentId: 'vega', ticker: s.ticker, severity: 'info', source: 'cron_vega_stale',
+        headline: `VEGA's bear thesis on ${s.ticker} is ${days} days old — re-evaluating`,
+        detail:   `Previous: ${s.stance} (${s.conviction}/10). "${s.reasoning?.slice(0, 100)}"`,
+      });
+      written++;
+    }
+  }
+
+  let bearCount = 0;
   for (const ticker of tickers) {
-    const q      = prices[ticker];
+    const q = prices[ticker];
     if (!q) continue;
     const events = [];
 
@@ -375,8 +668,9 @@ async function runVega(userId) {
         detail:   `Bear signal: multiple negative articles in last 24h. Sample: ${sampleHeadlines}. Cluster of bad news can precede further weakness — check if fundamentals are impaired.` });
     }
 
+    let tech = null;
     if (q.changePct < 0) {
-      const tech = await fetchTechnicals(ticker);
+      tech = await fetchTechnicals(ticker);
       if (tech?.sma50 && tech?.sma200 && q.price < tech.sma50 && q.price < tech.sma200) {
         events.push({ severity: 'alert', source: 'cron_vega_downtrend',
           headline: `${ticker} trading below both SMA50 and SMA200 — confirmed downtrend`,
@@ -388,7 +682,61 @@ async function runVega(userId) {
       await writeFeed(userId, { agentId: 'vega', ticker, ...ev });
       written++;
     }
+
+    // Derive stance
+    const isBearDrop  = q.changePct <= -5;
+    const isDowntrend = !!(tech?.sma50 && tech?.sma200 && q.price < tech.sma50 && q.price < tech.sma200);
+    const isNegNews   = negatives.length >= 3;
+
+    let stance, conviction, reasoning;
+    if (isBearDrop || isDowntrend) {
+      stance = 'bearish';
+      conviction = (isBearDrop && isDowntrend) ? 8 : 7;
+      reasoning = [
+        isBearDrop  ? `Down ${Math.abs(q.changePct).toFixed(1)}% today` : null,
+        isDowntrend ? `Below SMA50 ($${tech.sma50.toFixed(2)}) and SMA200 ($${tech.sma200.toFixed(2)})` : null,
+        isNegNews   ? `${negatives.length} negative articles` : null,
+      ].filter(Boolean).join('. ') + '.';
+      bearCount++;
+    } else if (isNegNews) {
+      stance = 'neutral'; conviction = 5;
+      reasoning = `${negatives.length} negative news articles but no technical breakdown yet.`;
+    } else {
+      stance = 'neutral'; conviction = 3;
+      reasoning = `No significant bear signals today. Price: $${q.price.toFixed(2)}.`;
+    }
+
+    try {
+      const flip = await updateStance(userId, 'vega', ticker, { stance, conviction, reasoning });
+      if (flip.flipped) {
+        await writeFeed(userId, {
+          agentId: 'vega', ticker, severity: 'alert', source: 'cron_vega_flip',
+          headline: `VEGA flipped ${flip.to.toUpperCase()} on ${ticker} after ${flip.daysSincePrevious} days ${flip.from}`,
+          detail:   `Bear thesis reversed. Now ${stance} (${conviction}/10). ${reasoning}`,
+        });
+        written++;
+      }
+    } catch (e2) { console.error('[vega] updateStance error:', e2.message); }
   }
+
+  // Global outlook
+  const total = tickers.length;
+  if (total > 0) {
+    const bearPct = bearCount / total;
+    let outlook, conviction, reasoning;
+    if (bearPct >= 0.5) {
+      outlook = 'bearish'; conviction = 7;
+      reasoning = `${bearCount}/${total} holdings showing bear signals (downtrend or sharp drop).`;
+    } else if (bearPct >= 0.25) {
+      outlook = 'cautious'; conviction = 5;
+      reasoning = `${bearCount}/${total} holdings flagged — elevated downside risk.`;
+    } else {
+      outlook = 'neutral'; conviction = 4;
+      reasoning = `No widespread bear signals across holdings today.`;
+    }
+    try { await updateGlobalOutlook(userId, 'vega', { outlook, conviction, reasoning }); } catch {}
+  }
+
   return written;
 }
 
@@ -413,7 +761,29 @@ async function runZen(userId) {
   const sorted = Object.entries(positionValues).sort(([, a], [, b]) => b - a);
   if (!sorted.length) return 0;
 
+  const totalVal       = Object.values(positionValues).reduce((a, b) => a + b, 0);
+  const largestTicker  = sorted[0][0];
+  const largestVal     = sorted[0][1];
+  const smallestTicker = sorted[sorted.length - 1][0];
+  const smallestVal    = sorted[sorted.length - 1][1];
+  const sizeRatio      = smallestVal > 0 ? largestVal / smallestVal : 0;
+
   let written = 0;
+  let undersizedCount = 0;
+
+  // Stale stance check
+  const staleItems = await getStaleStances(userId);
+  for (const s of staleItems.filter(s => s.agentId === 'zen' && s.ticker !== '_GLOBAL')) {
+    const days = s.updatedAt?.toDate ? Math.round((Date.now() - s.updatedAt.toDate().getTime()) / 86400000) : 30;
+    if (days >= 32) {
+      await writeFeed(userId, {
+        agentId: 'zen', ticker: s.ticker, severity: 'info', source: 'cron_zen_stale',
+        headline: `ZEN's sizing assessment for ${s.ticker} is ${days} days old — refreshing`,
+        detail:   `Previous: ${s.stance} (${s.conviction}/10). "${s.reasoning?.slice(0, 100)}"`,
+      });
+      written++;
+    }
+  }
 
   for (const [ticker, val] of Object.entries(positionValues)) {
     if (val < 50) {
@@ -423,13 +793,12 @@ async function runZen(userId) {
         detail:   `${ticker} is worth $${val.toFixed(0)} — too small to meaningfully affect portfolio performance. Either add to bring it above $100+, or close it and redeploy into higher-conviction names.`,
       });
       written++;
+      undersizedCount++;
     }
   }
 
-  const [largestTicker, largestVal] = sorted[0];
-  const [smallestTicker, smallestVal] = sorted[sorted.length - 1];
-  if (largestVal && smallestVal > 0 && largestVal / smallestVal >= 5) {
-    const ratio = (largestVal / smallestVal).toFixed(0);
+  if (sizeRatio >= 5) {
+    const ratio = sizeRatio.toFixed(0);
     await writeFeed(userId, {
       agentId: 'zen', ticker: largestTicker, severity: 'info', source: 'cron_zen_imbalance',
       headline: `Largest position (${largestTicker}) is ${ratio}x smallest (${smallestTicker}) — rebalance worth considering`,
@@ -437,6 +806,54 @@ async function runZen(userId) {
     });
     written++;
   }
+
+  // Per-ticker stances
+  for (const [ticker, val] of Object.entries(positionValues)) {
+    const pct = totalVal > 0 ? (val / totalVal) * 100 : 0;
+    let stance, conviction, reasoning;
+    if (val < 50) {
+      stance = 'bearish'; conviction = 7;
+      reasoning = `Position $${val.toFixed(0)} is below minimum threshold. Close or add to this position.`;
+    } else if (sizeRatio >= 5 && val === largestVal) {
+      stance = 'neutral'; conviction = 5;
+      reasoning = `Largest position at ${pct.toFixed(0)}% — ${sizeRatio.toFixed(0)}x imbalance vs smallest holding.`;
+    } else {
+      stance = 'bullish'; conviction = 5;
+      reasoning = `Position $${val.toFixed(0)} (${pct.toFixed(0)}% of portfolio) — adequately sized.`;
+    }
+    try {
+      const flip = await updateStance(userId, 'zen', ticker, { stance, conviction, reasoning });
+      if (flip.flipped) {
+        await writeFeed(userId, {
+          agentId: 'zen', ticker, severity: 'alert', source: 'cron_zen_flip',
+          headline: `ZEN sizing assessment flipped ${flip.to.toUpperCase()} on ${ticker} after ${flip.daysSincePrevious} days`,
+          detail:   `Sizing posture changed. Now ${stance} (${conviction}/10). ${reasoning}`,
+        });
+        written++;
+      }
+    } catch (e) { console.error('[zen] updateStance error:', e.message); }
+  }
+
+  // Global outlook
+  const total = Object.keys(positionValues).length;
+  if (total > 0) {
+    let outlook, conviction, reasoning;
+    if (undersizedCount >= 2 || sizeRatio >= 5) {
+      outlook = 'cautious'; conviction = 6;
+      const parts = [];
+      if (undersizedCount > 0) parts.push(`${undersizedCount} undersized position${undersizedCount !== 1 ? 's' : ''}`);
+      if (sizeRatio >= 5) parts.push(`${sizeRatio.toFixed(0)}x size imbalance (${largestTicker} vs ${smallestTicker})`);
+      reasoning = parts.join(' and ') + ' — portfolio sizing needs attention.';
+    } else if (undersizedCount === 1) {
+      outlook = 'neutral'; conviction = 5;
+      reasoning = `One undersized position — minor cleanup needed. Otherwise balanced.`;
+    } else {
+      outlook = 'bullish'; conviction = 6;
+      reasoning = `All positions adequately sized. Portfolio structure clean.`;
+    }
+    try { await updateGlobalOutlook(userId, 'zen', { outlook, conviction, reasoning }); } catch {}
+  }
+
   return written;
 }
 

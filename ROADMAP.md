@@ -30,6 +30,18 @@ Current state of planned work. Update statuses here at the end of every session.
 - [x] Agent + severity filter chips; staggered card entrance animation
 - [x] Unread count badge on Council tab in BottomNav (red dot with count, persists across tabs)
 
+### Layer 3 — Agent Memory + Persistent Stances ✓
+- [x] `api/lib/agentMemory.js` — server-side Admin SDK: `updateStance`, `updateGlobalOutlook`, `getStance`, `getAllStances`, `getAllGlobalOutlooks`, `getStaleStances`, `getAgentFullMemory`, `buildMemorySummary`
+- [x] `src/utils/stanceMemory.js` — client-side: `loadTickerStances`, `loadGlobalOutlooks`, `buildMemoryBlock`
+- [x] Firestore schema: `users/{uid}/agent_memory/{agentId}__{TICKER}` — stance, conviction, reasoning, history[], staleAfter (+30 days)
+- [x] REX cron: stance derived from technical signals per ticker + global outlook; flip → HIGH alert; stale check
+- [x] NOVA cron: stance from news/earnings catalysts per ticker + global outlook; flip → HIGH alert; stale check
+- [x] SAGE cron: stance from concentration risk per ticker + global health outlook; flip → HIGH alert; stale check
+- [x] ATLAS cron: global macro outlook from VIX/yield/oil/Fed/CPI signals; macro flip → HIGH alert (no per-ticker stances)
+- [x] VEGA cron: bearish stance on confirmed downtrends/sharp drops; global outlook from bear share; stale check
+- [x] ZEN cron: sizing stances per ticker (bearish = undersized, bullish = well-sized); global from imbalance; stale check
+- [x] CouncilTab: `loadTickerStances` + `loadGlobalOutlooks` in parallel prep; `buildMemoryBlock` injected per agent per round
+
 ---
 
 ## DONE (session 20)

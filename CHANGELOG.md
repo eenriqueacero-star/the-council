@@ -4,6 +4,38 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 8 — Layer 3: Agent Memory + Persistent Stances)
+
+### Feature — Persistent Agent Stance Memory
+
+Each of the 6 cron agents now maintains a persistent stance on every holding and a global market outlook, stored in Firestore and injected into manual Council runs.
+
+**New file: `api/lib/agentMemory.js`** — Server-side (Admin SDK) utilities:
+- `getStance / getAllStances / getAllGlobalOutlooks / getAgentFullMemory / getStaleStances` — read helpers
+- `updateStance(userId, agentId, ticker, {stance, conviction, reasoning})` — upserts a stance doc, pushes prior stance to `history[]` (capped at 20) when the stance direction changes, detects bullish↔bearish flips, returns `{ flipped, from, to, daysSincePrevious }`; resets `staleAfter` to +30 days
+- `updateGlobalOutlook(userId, agentId, {outlook, conviction, reasoning})` — shorthand calling `updateStance` with ticker `_GLOBAL`
+- Schema: `users/{userId}/agent_memory/{agentId}__{TICKER}` — fields: agentId, ticker, stance, conviction, reasoning, history[], createdAt, updatedAt, staleAfter
+
+**New file: `src/utils/stanceMemory.js`** — Client-side (Firestore JS SDK) utilities:
+- `loadTickerStances(uid, ticker)` — parallel getDoc for all 6 agents on a ticker
+- `loadGlobalOutlooks(uid)` — all 6 agents' global market outlooks
+- `buildMemoryBlock(agentDomainId, ticker, tickerStances, globalOutlooks)` — returns formatted string for LLM prompt injection: "## COUNCIL MEMORY" with agent's own prior stance, other agents' stances on same ticker, and all agents' global outlooks
+
+**`api/cron/agents.js`** — All 6 agents updated with stance memory:
+- **REX**: derives stance from RSI/MACD/SMA cross/price-vs-SMA200 signals; tracks bullish/bearish signal count; calls `updateStance` per ticker; flip → HIGH alert; after all tickers, derives global outlook (bullish if ≥60% bullish); stale check (≥32 days) writes info feed
+- **NOVA**: derives stance from negative news clusters (bearish) + near earnings + positive news (bullish); flip → HIGH alert; global outlook from bull/bear distribution; stale check
+- **SAGE**: derives stance from position concentration pct (≥35% → bearish, 25-35% → neutral, <25% → bullish); flip → HIGH alert; global outlook from portfolio health (drawdown + concentration); stale check
+- **ATLAS**: derives global macro outlook from VIX level (≥30 bearish, ≥25 cautious, <18 bullish), yield inversion (bearish), oil spike, Fed hike/cut, CPI trend; calls `updateGlobalOutlook` per user inside the existing userIds loop; macro stance flip → HIGH alert. Atlas has no per-ticker stances (macro only)
+- **VEGA**: derives stance per ticker (bearish if drop >5% OR price below both SMAs; neutral otherwise); flip → HIGH alert; global outlook from share of bearish holdings (≥50% → bearish, ≥25% → cautious); stale check
+- **ZEN**: derives sizing stance (bearish if position <$50, neutral if largest in a ≥5x imbalance, bullish if adequately sized); flip → HIGH alert; global outlook from undersized count + imbalance; stale check
+
+**`src/components/CouncilTab.jsx`** — Memory injected into every manual Council run:
+- Added `import { loadTickerStances, loadGlobalOutlooks, buildMemoryBlock } from '../utils/stanceMemory.js'`
+- Added `tickerStances` and `globalOutlooks` to the parallel Promise.all prep block (alongside profiles, FRED, technicals)
+- Per agent per round: `buildMemoryBlock(ag.id, upperTicker, tickerStances, globalOutlooks)` inserted between profileCtx and roundPromptSuffix in `userMsg`; each agent sees its own prior stance, peers' current stances on the ticker, and all global outlooks
+
+---
+
 ## 2026-06-30 (session 7 — Layer 2: Council Feed)
 
 ### Feature — Agent Feed (Live Stream inside Council Tab)

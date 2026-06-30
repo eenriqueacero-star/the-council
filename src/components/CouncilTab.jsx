@@ -13,6 +13,7 @@ import { loadTickerHistory } from '../utils/rulingContext.js';
 import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
 import { writeDebug } from '../utils/debugStore.js';
 import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from '../utils/agentMemory.js';
+import { loadTickerStances, loadGlobalOutlooks, buildMemoryBlock } from '../utils/stanceMemory.js';
 import { theme } from '../utils/theme.js';
 
 const PS = {
@@ -142,12 +143,14 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
     setAgentStatsMap(statsMap);
 
     // 1. Parallel prep — fetch price, history, profiles, FRED macro, and technicals concurrently
-    const [quotesRes, history, profiles, fredData, techData] = await Promise.all([
+    const [quotesRes, history, profiles, fredData, techData, tickerStances, globalOutlooks] = await Promise.all([
       getQuotes([upperTicker]).catch(() => ({})),
       uid ? loadTickerHistory(uid, upperTicker, null) : Promise.resolve(''),
       uid ? loadAllAgentProfiles(uid, AGENTS.map(a => a.id)) : Promise.resolve({}),
       getFredData().catch(() => null),
       getTechnicals(upperTicker).catch(() => null),
+      uid ? loadTickerStances(uid, upperTicker).catch(() => ({})) : Promise.resolve({}),
+      uid ? loadGlobalOutlooks(uid).catch(() => ({})) : Promise.resolve({}),
     ]);
 
     const rawQuote = quotesRes[upperTicker] || null;
@@ -317,7 +320,8 @@ Use these exact indicator values to ground your technical assessment.` : '\n[Alp
           roundPromptSuffix = `\n\nCOUNCIL ROUNDS 1-2 SUMMARY:\n${priorRoundsContext}\n\nEARLIER IN ROUND 3:\n${currentRoundSoFar || 'None yet.'}\n\nFinal position. Add "finalNote" if changing stance. Return JSON.`;
         }
 
-        const userMsg = baseContent + extra + profileCtx + roundPromptSuffix + ' Return ONLY the JSON.';
+        const memoryBlock = buildMemoryBlock(ag.id, upperTicker, tickerStances, globalOutlooks);
+        const userMsg = baseContent + extra + profileCtx + memoryBlock + roundPromptSuffix + ' Return ONLY the JSON.';
 
         // Log first agent of round 1 to confirm LIVE DATA reaches the prompt
         if (round === 0 && i === 0) {

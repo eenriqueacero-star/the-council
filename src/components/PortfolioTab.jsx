@@ -456,10 +456,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     }));
 
     // X-axis: 3 date labels
-    // Timestamps from get-candles are already in ms (server does ts * 1000)
+    // Candle timestamps are Unix seconds from Finnhub — multiply by 1000 for Date()
     const fmtDate = (ts) => {
-      if (!ts) return '';
-      const d = new Date(ts);
+      if (!ts || isNaN(ts)) return '';
+      const d = new Date(ts * 1000);
+      if (isNaN(d.getTime())) return '';
       return range === '1D'
         ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
         : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -550,9 +551,15 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
                 {headerChange >= 0 ? '+' : ''}{headerChange.toFixed(2)} ({fmtPct(headerChangePct)})
               </span>
               <span style={{ fontSize: 13, color: T.text3 }}>
-                {scrubIdx !== null
-                  ? new Date(candles[scrubIdx]?.t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: range === '1D' ? '2-digit' : undefined, minute: range === '1D' ? '2-digit' : undefined })
-                  : range === '1D' ? 'Today' : range}
+                {(() => {
+                  const ts = scrubIdx !== null ? candles[scrubIdx]?.t : null;
+                  if (!ts || isNaN(ts)) return range === '1D' ? 'Today' : range;
+                  const d = new Date(ts * 1000);
+                  if (isNaN(d.getTime())) return range === '1D' ? 'Today' : range;
+                  return range === '1D'
+                    ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+                    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                })()}
               </span>
             </motion.div>
             {buyingPower > 0 && <div style={{ fontSize: 13, color: T.text2, marginTop: 4 }}>${buyingPower.toLocaleString()} cash</div>}

@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       if (!r.ok) throw new Error(`Finnhub ${r.status}`);
       const data = await r.json();
       if (data.s !== 'ok' || !data.t?.length) { results[t] = []; return; }
-      results[t] = data.t.map((ts, i) => ({ t: ts * 1000, o: data.o[i], h: data.h[i], l: data.l[i], c: data.c[i] }));
+      results[t] = data.t.map((ts, i) => ({ t: ts, o: data.o[i], h: data.h[i], l: data.l[i], c: data.c[i] }));
     } catch { results[t] = []; }
   }));
 

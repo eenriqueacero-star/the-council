@@ -4,6 +4,24 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 26)
+
+### Fix — Chart crosshair tooltip shows "Invalid Date"
+
+**Root causes (two, both fixed):**
+
+1. **Seconds/milliseconds mismatch:** `api/get-candles.js` was converting Finnhub's Unix-second timestamps to milliseconds (`ts * 1000`) before sending them to the frontend, but `fmtDate` and the P&L header tooltip were calling `new Date(ts)` directly. The conversion should happen at display time, not storage time. Removed `* 1000` from the API so `candles[i].t` is now raw Unix seconds; all frontend formatters now do `new Date(ts * 1000)` explicitly.
+
+2. **`undefined` timestamp when candles is empty:** When Finnhub returns no data (market closed, new ticker with no history), `candles = []` and the chart uses the synthetic 2-point fallback `[prevValue, totalValue]`. The user can still scrub this chart, which sets `scrubIdx = 0`. `candles[0]?.t` is `undefined` → `new Date(undefined)` = "Invalid Date". Fixed by guarding all timestamp formatters: if `ts` is falsy or `isNaN`, fall back to the static label (`'Today'` for 1D, range name otherwise).
+
+**`api/get-candles.js`:** Removed `* 1000` from candle mapping — timestamps are now Unix seconds.
+
+**`src/components/PortfolioTab.jsx`:**
+- `fmtDate`: updated to `new Date(ts * 1000)` with `isNaN` guard; double-validates with `isNaN(d.getTime())`
+- P&L header tooltip: replaced inline `new Date(candles[scrubIdx]?.t)` with an IIFE that guards against `undefined`/`NaN` timestamps and falls back to `range` label; also fixed 1D tooltip to use `toLocaleString` (not `toLocaleDateString` with time options, which behaves inconsistently across browsers)
+
+---
+
 ## 2026-06-29 (session 25)
 
 ### Fix — Stock chart STILL showing 2 data points (root cause found)

@@ -427,15 +427,45 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       </div>
     );
     if (!chartPoints.length && !candlesLoaded) return <div className="skeleton" style={{ height: H, borderRadius: 8 }} />;
-    const effectivePoints = chartPoints.length ? chartPoints : (prevValue > 0 ? [prevValue, totalValue || prevValue] : []);
-    const effectiveTimes  = candles.length ? candles.map(c => c.t) : null;
+    let effectivePoints = chartPoints.length ? chartPoints : (prevValue > 0 ? [prevValue, totalValue || prevValue] : []);
+    let effectiveTimes  = candles.length ? candles.map(c => c.t) : null;
+    const isSynthetic   = !chartPoints.length;
+
+    // Append live portfolio value when quotes are fresher than the last candle (extended hours, after-hours)
+    if (!isSynthetic && totalValue > 0 && effectiveTimes?.length) {
+      const nowSecs = Math.floor(Date.now() / 1000);
+      if (nowSecs - effectiveTimes[effectiveTimes.length - 1] > 300) {
+        effectivePoints = [...effectivePoints, totalValue];
+        effectiveTimes  = [...effectiveTimes, nowSecs];
+      }
+    }
+
     if (!effectivePoints.length) return (
       <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: T.text3 }}>No chart data</span>
       </div>
     );
 
-    const isSynthetic = !chartPoints.length;
+    // Extended-hours segment detection for 1D (EDT = UTC-4; regular = 13:30–20:00 UTC)
+    const sessionOf = ts => {
+      const h = new Date(ts * 1000).getUTCHours() + new Date(ts * 1000).getUTCMinutes() / 60;
+      if (h >= 13.5 && h < 20) return 'reg';
+      return 'ext';
+    };
+    const hasExtHours = range === '1D' && !isSynthetic && !!effectiveTimes?.length;
+    let regularStart = 0, regularEnd = (effectivePoints.length - 1);
+    if (hasExtHours) {
+      const fr = effectiveTimes.findIndex(ts => sessionOf(ts) === 'reg');
+      const lr = effectiveTimes.map((ts, i) => ({ ts, i })).filter(({ ts }) => sessionOf(ts) === 'reg').pop()?.i;
+      if (fr !== -1) regularStart = fr;
+      if (lr != null) regularEnd  = lr;
+    }
+
+    // Scrub-reactive session (for ambient hue): which session is the scrubbed point in?
+    const scrubSession = (() => {
+      if (range !== '1D' || scrubIdx === null || !effectiveTimes?.[scrubIdx]) return null;
+      return sessionOf(effectiveTimes[scrubIdx]) === 'reg' ? 'open' : 'ext';
+    })();
     const min = Math.min(...effectivePoints), max = Math.max(...effectivePoints);
     const rng = max - min || max * 0.01 || 1;
     const padMin = min - rng * 0.08, padMax = max + rng * 0.08;
@@ -476,17 +506,55 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       setScrubIdx(Math.max(0, Math.min(effectivePoints.length - 1, idx)));
     };
 
+    // Ambient session hue — scrub overrides real-time session on 1D
+    const ambientSession = (() => {
+      if (scrubSession === 'ext') return 'ext1D';
+      if (scrubSession === 'open') return 'open';
+      return marketState; // 'open' | 'premarket' | 'afterhours' | anything→closed
+    })();
+    const SESS_HUE = {
+      open:       '#22c55e',
+      premarket:  '#60a5fa',
+      afterhours: '#f59e0b',
+      ext1D:      '#60a5fa',
+      default:    '#7c3aed',
+    };
+    const ambientColor = SESS_HUE[ambientSession] || SESS_HUE.default;
+    const glowId = `gf${chartKey}`;
+
     return (
       <div key={chartKey} style={{ position: 'relative', height: H, userSelect: 'none' }}
         onMouseMove={handleMove} onTouchMove={handleMove}
         onMouseLeave={() => setScrubIdx(null)} onTouchEnd={() => setScrubIdx(null)}>
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H}>
+
+        {/* Ambient session glow behind chart */}
+        <motion.div
+          key={ambientSession}
+          initial={{ opacity: 0 }}
+          animate={ambientSession === 'open'
+            ? { opacity: [0.18, 0.28, 0.18] }
+            : { opacity: 0.18 }}
+          transition={ambientSession === 'open'
+            ? { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 2, ease: 'easeInOut' }}
+          style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 8,
+            background: `radial-gradient(ellipse 80% 60% at 50% 70%, ${ambientColor}55 0%, transparent 75%)`,
+          }}
+        />
+
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H}
+          style={{ filter: `drop-shadow(0 0 ${ambientSession === 'open' ? 5 : 3}px ${ambientColor}66)` }}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%"   stopColor={lineColor} stopOpacity="0.22" />
-              <stop offset="75%"  stopColor={lineColor} stopOpacity="0.06" />
+              <stop offset="60%"  stopColor={ambientColor} stopOpacity="0.06" />
               <stop offset="100%" stopColor={lineColor} stopOpacity="0"    />
             </linearGradient>
+            <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
           </defs>
           {/* Y-axis grid lines + labels */}
           {yLabels.map(({ v, y }, i) => (
@@ -503,9 +571,35 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               {fmtDate(effectiveTimes[idx])}
             </text>
           ))}
-          {/* Chart area + line */}
+          {/* Gradient fill */}
           <path d={areaPath} fill={`url(#${gradId})`} />
-          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          {/* Chart line — segmented for 1D extended hours, with soft glow filter */}
+          {hasExtHours ? (
+            <g filter={`url(#${glowId})`}>
+              {regularStart > 0 && (
+                <path d={catmullRomPath(xs.slice(0, regularStart + 1), ys.slice(0, regularStart + 1))}
+                  fill="none" stroke={lineColor} strokeWidth="1.5" strokeOpacity="0.4" strokeDasharray="5 3" strokeLinecap="round" />
+              )}
+              <path d={catmullRomPath(xs.slice(regularStart, regularEnd + 1), ys.slice(regularStart, regularEnd + 1))}
+                fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              {regularEnd < effectivePoints.length - 1 && (
+                <path d={catmullRomPath(xs.slice(regularEnd), ys.slice(regularEnd))}
+                  fill="none" stroke={lineColor} strokeWidth="1.5" strokeOpacity="0.4" strokeDasharray="5 3" strokeLinecap="round" />
+              )}
+              {/* Session open/close boundary markers */}
+              {regularStart > 0 && xs[regularStart] != null && (
+                <line x1={xs[regularStart].toFixed(1)} y1={PAD_T} x2={xs[regularStart].toFixed(1)} y2={PAD_T + CH}
+                  stroke={T.text3} strokeWidth="0.6" strokeDasharray="3 3" strokeOpacity="0.35" />
+              )}
+              {regularEnd < effectivePoints.length - 1 && xs[regularEnd] != null && (
+                <line x1={xs[regularEnd].toFixed(1)} y1={PAD_T} x2={xs[regularEnd].toFixed(1)} y2={PAD_T + CH}
+                  stroke={T.text3} strokeWidth="0.6" strokeDasharray="3 3" strokeOpacity="0.35" />
+              )}
+            </g>
+          ) : (
+            <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              filter={`url(#${glowId})`} />
+          )}
           {scrubX !== null && (
             <>
               <line x1={scrubX.toFixed(1)} y1={PAD_T} x2={scrubX.toFixed(1)} y2={PAD_T + CH} stroke={T.text3} strokeWidth="1" strokeDasharray="4 3" />
@@ -566,12 +660,16 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingTop: 6 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div className={marketState === 'open' ? 'live-dot' : ''} style={{ width: 7, height: 7, borderRadius: '50%', background: marketState === 'open' ? T.green : T.text3 }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: T.text3, letterSpacing: '0.08em' }}>
-                {marketState === 'open' ? 'LIVE' : marketState === 'premarket' ? 'PRE' : marketState === 'afterhours' ? 'AH' : 'CLOSED'}
-              </span>
-            </div>
+            {(() => {
+              const sc = marketState === 'open' ? T.green : marketState === 'premarket' ? '#60A5FA' : marketState === 'afterhours' ? '#F59E0B' : T.red;
+              const sl = marketState === 'open' ? 'MARKET OPEN' : marketState === 'premarket' ? 'PRE-MARKET' : marketState === 'afterhours' ? 'AFTER-HOURS' : 'CLOSED';
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div className={marketState === 'open' ? 'live-dot' : ''} style={{ width: 7, height: 7, borderRadius: '50%', background: sc }} />
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: sc, letterSpacing: '0.08em', fontWeight: 600 }}>{sl}</span>
+                </div>
+              );
+            })()}
             {saveStatus !== 'idle' && (
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: saveStatus === 'error' ? T.red : saveStatus === 'saved' ? T.green : T.text3 }}>
                 {saveStatus === 'saving' ? 'SAVING…' : saveStatus === 'saved' ? 'SAVED ✓' : 'FAILED'}

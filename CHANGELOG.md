@@ -4,6 +4,46 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 28)
+
+### Feature — Chart: Robinhood-matched intervals + extended hours + ambient session hue
+
+**Part 1 — Correct intervals (`api/get-candles.js`):**
+| Range | Resolution | Window |
+|---|---|---|
+| 1D | 5-min bars | 20h back (captures 4AM–8PM ET extended session) |
+| 1W | 15-min bars | 7 days |
+| 1M | 60-min bars | 30 days |
+| 3M | Daily | 90 days |
+| 6M | Daily | 180 days |
+| 1Y | Daily | 365 days |
+| ALL | Weekly | 5 years |
+
+**Part 2 — Extended hours live price (`renderChart`):**
+- After fetching candles, if `Date.now()` is more than 5 minutes newer than the last candle timestamp, the current `totalValue` (from live `/quote` data already in state) is appended as a final data point at the current timestamp. This extends the chart naturally into after-hours without any extra API calls.
+- 1D `from` is now `now - 20 * 3600`, wide enough to capture pre-market from 4:00 AM ET.
+
+**Part 3 — Session badge (enhanced):**
+- Replaced LIVE/PRE/AH/CLOSED abbreviations with full labels: `MARKET OPEN` (green), `PRE-MARKET` (blue), `AFTER-HOURS` (amber), `CLOSED` (red)
+- Each label is colored to match its session
+
+**Part 4 — 1D extended hours visual segmentation:**
+- `sessionOf(ts)` helper classifies each timestamp as `'reg'` (13:30–20:00 UTC = 9:30 AM–4:00 PM EDT) or `'ext'`
+- Pre-market segment: dashed `strokeDasharray="5 3"`, 40% opacity
+- Regular session segment: solid, full width, full opacity
+- After-hours segment: dashed, 40% opacity
+- Subtle vertical divider lines at the 9:30 AM and 4:00 PM session boundaries
+
+**Ambient session hue (session 28 enhancement):**
+- Radial gradient glow div sits behind the SVG; color shifts by session (`#22c55e` open, `#60a5fa` premarket, `#f59e0b` after-hours, `#7c3aed` closed); 2s Framer Motion crossfade between sessions
+- Market Open: gradient pulses 0.18↔0.28 opacity on a 3s Infinity loop (subtle heartbeat)
+- SVG `drop-shadow` filter on the whole chart shifts color and intensity by session
+- Gradient fill middle stop tinted with `ambientColor` (blends session hue into the P&L green/red)
+- SVG `feGaussianBlur` glow filter applied to chart line paths
+- **Scrub-reactive (1D):** when user drags into a pre-market or after-hours zone, `scrubSession` overrides `marketState`, shifting the ambient color to blue; releasing scrub transitions back to real-time session color
+
+---
+
 ## 2026-06-29 (session 27)
 
 ### Fix — 1W chart shows 2 points (Finnhub free-tier intraday limit)

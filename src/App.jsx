@@ -279,7 +279,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ fontFamily: 'var(--font-display)', background: T.bg, minHeight: '100%', color: T.text, transition: 'background 0.4s ease, color 0.4s ease', paddingTop: 'env(safe-area-inset-top)' }}>
+    <div style={{ fontFamily: 'var(--font-display)', background: T.bg, height: '100%', color: T.text, transition: 'background 0.4s ease, color 0.4s ease', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* Desktop side rail — icon only, 72px */}
       <aside className="hidden lg:flex" style={{
@@ -340,12 +340,13 @@ export default function App() {
       {/* Top bar (desktop) */}
       <TopBar dark={dark} setDark={setDark} account={account} setAccount={setAccount} running={running} />
 
-      {/* Main content */}
-      <div className="lg:ml-[72px]" style={{ position: 'relative', zIndex: 1 }}>
-        {/* Mobile header */}
+      {/* Main content — flex column so mobile header is fixed-height and content scrolls below */}
+      <div className="lg:ml-[72px]" style={{ position: 'relative', zIndex: 1, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Mobile header — flex-shrink:0 keeps it always visible above the scroll area */}
         <div className="lg:hidden" style={{
+          flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 20px', position: 'sticky', top: 'env(safe-area-inset-top, 0px)', zIndex: 40,
+          padding: '14px 20px', zIndex: 40,
           background: dark ? 'rgba(9,9,11,0.92)' : 'rgba(250,250,250,0.92)',
           backdropFilter: 'blur(20px)',
           borderBottom: `1px solid ${T.border}`,
@@ -370,37 +371,40 @@ export default function App() {
           </div>
         </div>
 
-        {/* Desktop top bar offset */}
-        <div className="hidden lg:block" style={{ height: 56 }} />
+        {/* Scrollable content area — flex:1 fills remaining height, overflow-y scrolls */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'none' }}>
+          {/* Desktop top bar offset (hidden on mobile) */}
+          <div className="hidden lg:block" style={{ height: 56 }} />
 
-        {mktState !== 'open' && (
-          <div style={{ padding: '0 var(--space-page)', maxWidth: 760, margin: '0 auto' }}>
-            <MarketBanner state={mktState} msToOpen={msToOpen} />
-          </div>
-        )}
+          {mktState !== 'open' && (
+            <div style={{ padding: '0 var(--space-page)', maxWidth: 760, margin: '0 auto' }}>
+              <MarketBanner state={mktState} msToOpen={msToOpen} />
+            </div>
+          )}
 
-        {apiDown && (
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} style={{
-            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)',
-            borderRadius: 10, padding: '10px 16px', margin: '12px var(--space-page) 0',
-            fontSize: 13, color: '#EF4444', maxWidth: 760, marginLeft: 'auto', marginRight: 'auto',
-          }}>
-            API connection issue. Council responses may be delayed.
-          </motion.div>
-        )}
+          {apiDown && (
+            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} style={{
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)',
+              borderRadius: 10, padding: '10px 16px', margin: '12px var(--space-page) 0',
+              fontSize: 13, color: '#EF4444', maxWidth: 760, marginLeft: 'auto', marginRight: 'auto',
+            }}>
+              API connection issue. Council responses may be delayed.
+            </motion.div>
+          )}
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            variants={PAGE_VARIANTS}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            style={{ paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
-          >
-            {renderTab()}
-          </motion.div>
-        </AnimatePresence>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={tab}
+              variants={PAGE_VARIANTS}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              style={{ paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
+            >
+              {renderTab()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
 
       <BottomNav tab={tab} setTab={setTab} dark={dark} />

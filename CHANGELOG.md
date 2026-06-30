@@ -4,6 +4,32 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 6 — iOS PWA fix)
+
+### Fix — iOS True Full-Screen PWA + Safe Area
+
+**Goal:** Eliminate all white/gray gaps on iPhone (notch, home indicator, safe area strips) when installed as a PWA.
+
+**`src/index.css`** — Rewrote html/body/#root layout to flex-column pattern:
+- `html { height: 100%; background-color: #18181b; }` — fills background behind notch
+- `body { height: 100%; overflow: hidden; background-color: #18181b; -webkit-text-size-adjust: 100%; }` — solid bg, no overflow
+- `#root { height: 100dvh; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); overflow: hidden; }` — root is flex column (NOT scroll container); `padding-top` handles notch/Dynamic Island
+
+**`public/manifest.json`:**
+- `background_color` + `theme_color` updated to `#18181b` (was `#070a0c`)
+- Added `"orientation": "portrait"`
+
+**`src/App.jsx`** — Four changes for proper flex-column layout:
+- Outermost div: `height: 100%, display: flex, flexDirection: column, overflow: hidden` (removed `minHeight: 100%` and `paddingTop: env(safe-area-inset-top)` — now handled by #root CSS)
+- `lg:ml-[72px]` main content div: `flex: 1, minHeight: 0, display: flex, flexDirection: column, overflow: hidden`
+- Mobile header div: removed `position: sticky` and `top: env(safe-area-inset-top)` — now a `flexShrink: 0` flex child, always visible outside scroll container
+- New inner scroll container wrapping all tab content: `flex: 1, minHeight: 0, overflowY: auto, WebkitOverflowScrolling: touch`; tab motion.div gets `paddingBottom: calc(72px + env(safe-area-inset-bottom, 0px))`
+
+**`src/components/BottomNav.jsx`:**
+- Dark mode background: `#09090B` → `#18181b` to match html/body/#root, so the safe-area strip below the home indicator is the same color as the nav
+
+---
+
 ## 2026-06-30 (session 6)
 
 ### Feature — Chart Interaction Upgrade (Robinhood-level)

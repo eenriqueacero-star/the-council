@@ -18,27 +18,30 @@
 /* ── Base ── */
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 
-/* Prevent iOS overscroll bounce without shrinking the viewport */
 html {
   height: 100%;
-  overscroll-behavior: none;
+  background-color: #18181b;
 }
 body {
   height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #18181b;
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
   font-family: var(--font-display);
-  background-color: #18181b; /* prevents white flash and fills system bar areas */
 }
-/* #root is the single scroll container — dvh accounts for iOS browser chrome */
+/* #root is a fixed-height flex column — content div inside is the scroll container */
 #root {
-  height: 100vh;
   height: 100dvh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: none;
+  display: flex;
+  flex-direction: column;
   background-color: #18181b;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: 0;
+  overflow: hidden;
 }
 input, textarea, select { font-size: max(16px, 1em) !important; font-family: var(--font-body); }
 

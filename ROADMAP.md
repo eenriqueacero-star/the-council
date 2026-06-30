@@ -4,6 +4,18 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 10)
+
+### Layer 5 — 3D Council Chamber ✓
+- [x] `src/components/3d/CouncilChamber.jsx` — full scene: hex table, 6 agent geometric avatars, AXIOM core, energy channels, conflict lightning, consensus ring, data rain, power auras, verdict slam, camera
+- [x] `src/components/3d/CouncilScene.jsx` — Canvas wrapper (lazy-import entry point)
+- [x] `src/components/3d/index.js` — re-exports
+- [x] `CouncilTab.jsx` — `<CouncilScene>` hero above ticker input, `speaking` derived from `agentState`, `sceneStances` state persists ticker stances for 3D scene
+- [x] Lazy-loaded: Three.js bundle only lands when Council tab first mounts; code-split to `CouncilScene-*.js` chunk (~927 kB / 251 kB gzip)
+- [x] Parts 4 (mini charts) and 9 (ticker ribbon) deferred — require additional data sources
+
+---
+
 ## DONE (session 9)
 
 ### Layer 4 — Weekly Automated Council ✓

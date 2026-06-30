@@ -1,20 +1,41 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
+import CouncilChamber from './CouncilChamber.jsx'
 
-const Canvas = lazy(() => import('@react-three/fiber').then(m => ({ default: m.Canvas })));
+// Canvas wrapper — lazy-import this whole file from CouncilTab for code splitting.
+// Three.js + fiber only land in the bundle when Council tab first mounts.
+export default function CouncilScene({ agentState, synthesis, speaking, tickerStances, agentStats, height = '44vh' }) {
+  const [interactive, setInteractive] = useState(false)
 
-export default function CouncilScene({ agents, speaking, verdict }) {
   return (
-    <Suspense fallback={<div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading 3D scene...</div>}>
+    <div style={{ position: 'relative', height, borderRadius: 16, overflow: 'hidden', background: '#020408', flexShrink: 0 }}>
       <Canvas
-        camera={{ position: [0, 5, 12], fov: 50 }}
-        style={{ height: 400, borderRadius: 12, background: '#09090B' }}
+        camera={{ position: [0, 4.5, 13], fov: 50 }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+        dpr={[1, 2]}
+        style={{ width: '100%', height: '100%' }}
       >
-        <ambientLight intensity={0.3} />
-        <pointLight position={[0, 10, 0]} intensity={1} />
-        {/* Future: Agent 3D models will go here */}
-        {/* Future: Council table geometry */}
-        {/* Future: Speaking animation system */}
+        <Suspense fallback={null}>
+          <CouncilChamber
+            agentState={agentState}
+            synthesis={synthesis}
+            speaking={speaking}
+            tickerStances={tickerStances}
+            agentStats={agentStats}
+            onInteraction={() => setInteractive(true)}
+          />
+        </Suspense>
       </Canvas>
-    </Suspense>
-  );
+      {interactive && (
+        <div style={{
+          position: 'absolute', bottom: 8, right: 10,
+          fontFamily: 'monospace', fontSize: 9, color: 'rgba(255,255,255,0.35)',
+          background: 'rgba(0,0,0,0.5)', padding: '2px 7px', borderRadius: 4,
+          pointerEvents: 'none',
+        }}>
+          interactive · auto-resets 10s
+        </div>
+      )}
+    </div>
+  )
 }

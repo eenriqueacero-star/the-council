@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, lazy, Suspense } from 'react';
 import AgentFeed from './AgentFeed.jsx';
 import CouncilReports from './CouncilReports.jsx';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -16,6 +16,9 @@ import { writeDebug } from '../utils/debugStore.js';
 import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from '../utils/agentMemory.js';
 import { loadTickerStances, loadGlobalOutlooks, buildMemoryBlock } from '../utils/stanceMemory.js';
 import { theme } from '../utils/theme.js';
+
+// Lazy-load 3D scene — Three.js only lands in the bundle when Council tab first mounts
+const CouncilScene = lazy(() => import('./3d/CouncilScene.jsx'));
 
 const PS = {
   PASS:       { bg:'rgba(34,197,94,0.1)',   fg:'#22C55E', label:'PASS'    },  // individual agent gate
@@ -54,6 +57,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const [techAvailable, setTechAvailable] = useState(true); // false when AV rate-limited
   const [feedOrReports, setFeedOrReports] = useState('feed');
   const [agentStatsMap, setAgentStatsMap] = useState({}); // { agentId: stats } for current ticker
+  const [sceneStances, setSceneStances] = useState({}); // persisted tickerStances for 3D scene
   const debugRef = useRef(null); // accumulates debug data during a run
 
   const upperTicker = ticker.trim().toUpperCase();
@@ -154,6 +158,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
       uid ? loadTickerStances(uid, upperTicker).catch(() => ({})) : Promise.resolve({}),
       uid ? loadGlobalOutlooks(uid).catch(() => ({})) : Promise.resolve({}),
     ]);
+    setSceneStances(tickerStances || {});
 
     const rawQuote = quotesRes[upperTicker] || null;
     const livePrice = rawQuote?.price > 0 ? rawQuote.price : rawQuote?.prevClose || null;
@@ -512,8 +517,29 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
 
   const showCouncil = active !== null || synthesis.status !== 'idle';
 
+  const speaking = Object.entries(agentState).find(
+    ([, st]) => st.r1?.status === 'running' || st.r2?.status === 'running' || st.r3?.status === 'running'
+  )?.[0] ?? (synthesis.status === 'running' ? 'synthesis' : null);
+
   return (
     <div style={{ marginTop: 8 }}>
+      {/* 3D Council Chamber — lazy-loaded so Three.js stays out of the initial bundle */}
+      <Suspense fallback={
+        <div style={{ height: '44vh', borderRadius: 16, background: '#020408', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+          <span style={{ ...MONO, fontSize: 11, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.15em' }}>LOADING CHAMBER…</span>
+        </div>
+      }>
+        <div style={{ marginBottom: 20 }}>
+          <CouncilScene
+            agentState={agentState}
+            synthesis={synthesis}
+            speaking={speaking}
+            tickerStances={sceneStances}
+            agentStats={agentStatsMap}
+          />
+        </div>
+      </Suspense>
+
       <label style={{ ...MONO, display: 'block', fontSize: 11, color: T.text3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 10 }}>Convene the Council</label>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>

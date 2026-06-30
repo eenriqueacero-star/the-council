@@ -4,6 +4,41 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 10 — Layer 5: 3D Council Chamber)
+
+### Feature — React Three Fiber Council Chamber
+
+Live 3D scene rendered as the hero at the top of the Council tab. Lazy-loaded so Three.js stays out of the initial bundle (lands only when Council tab first mounts).
+
+**New files:**
+- `src/components/3d/CouncilChamber.jsx` — all 3D scene content (~540 lines)
+- `src/components/3d/CouncilScene.jsx` — Canvas wrapper (rewritten; lazy-import entry point)
+- `src/components/3d/index.js` — re-exports both
+
+**Scene parts implemented:**
+- **Part 1 — Layout:** Hex table (6-sided cylinder) + 6 floating geometric agent avatars around it (icosahedron, octahedron, torus, dodecahedron, tetrahedron, torusKnot) + AXIOM sphere at elevated center with 3 counter-rotating torus rings
+- **Part 2 — Energy channels:** Quadratic Bezier curves from each agent seat to AXIOM (cyan), plus 3 cross-link diagonal channels (purple)
+- **Part 3 — Conflict lightning:** 80ms interval regenerates jagged polyline arcs between disagreeing agents (bullish vs bearish stance pairs from Layer 3 memory); blended color from both agents
+- **Part 5 — Verdict slam:** 4-phase animation on `synthesis.status === 'done'`: dim (500ms) → charge (1000ms) → slam (1700ms) → settle (1600ms) → null. Expanding shockwave torus + Html overlay with verdict/headline
+- **Part 6 — Consensus ring:** 6 torus arc segments (one per agent), lit by agent color, brightness driven by agent round state (running/done/idle)
+- **Part 7 — Data rain:** 110 instanced `<boxGeometry>` particles falling through the scene; color shifts to the speaking agent's accent when active
+- **Part 8 — Agent power auras:** `emissiveIntensity` scaled by Firestore `win_rate` from `agentStatsMap` — high win rate → brighter aura
+- **Part 10 — Camera:** `<OrbitControls>` from drei with cinematic auto-rotate (1 revolution per 60s); interactive takeover on user drag; 10s inactivity timer resets to auto-rotate; `maxPolarAngle` prevents going below the table
+- **Part 11 — Performance:** `<AdaptiveDpr pixelSizes={[0.75, 1.5, 2]}>` + scene fog; instanced mesh for data rain
+
+**`src/components/CouncilTab.jsx` changes:**
+- `sceneStances` state: `tickerStances` persisted to state after `convene()` Promise.all so the 3D scene always shows the most recent stance data
+- `speaking` derived from `agentState`: the currently running agent ID, or `'synthesis'` when AXIOM deliberates, or `null`
+- `<CouncilScene>` rendered at top of return (above ticker input) inside `<Suspense>` with dark loading placeholder
+- `agentStatsMap` (already in state) passed to scene as `agentStats`
+
+**Deferred (not implemented):**
+- Part 4: Mini stock charts floating near each agent (needs per-agent chart data)
+- Part 9: Live ticker ribbon around table edge (needs all-holdings price polling)
+- Part 11 quality toggle: explicit High/Low switch UI
+
+---
+
 ## 2026-06-30 (session 9 — Layer 4: Weekly Automated Council)
 
 ### Feature — Weekly Council on All Holdings

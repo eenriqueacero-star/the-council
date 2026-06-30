@@ -396,7 +396,7 @@ export default function App() {
             initial="initial"
             animate="animate"
             exit="exit"
-            style={{ paddingBottom: 96 }}
+            style={{ paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
           >
             {renderTab()}
           </motion.div>

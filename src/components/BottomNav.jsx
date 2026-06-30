@@ -13,13 +13,12 @@ const MORE_IDS = new Set(['alpha','updates','settings','debug']);
 
 export default function BottomNav({ tab, setTab, dark }) {
   return (
-    <nav className="flex lg:hidden glass" style={{
+    <nav className="flex lg:hidden" style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-      height: 80,
-      alignItems: 'flex-start',
+      alignItems: 'center',
       paddingTop: 10,
       paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      background: dark ? 'rgba(9,9,11,0.92)' : 'rgba(250,250,250,0.92)',
+      background: dark ? '#09090B' : '#FAFAFA',
       borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
     }}>
       {TABS.map(({ id, label, Icon }) => {

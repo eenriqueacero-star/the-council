@@ -4,6 +4,25 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 5)
+
+### Fix — iOS safe-area follow-up: white bottom bar + viewport shrink
+
+**Issue 1 — Viewport felt smaller (`src/index.css`):**
+`position: fixed` on `html` and `body` was compressing the viewport. Replaced with:
+- `html { height: 100%; overscroll-behavior: none; }`
+- `body { height: 100%; overflow: hidden; overscroll-behavior: none; background-color: #18181b; }`
+- `#root { height: 100vh; height: 100dvh; overflow-y: auto; }` — `100dvh` (dynamic viewport height) correctly accounts for iOS browser chrome appearing/disappearing; `100vh` is the fallback for older iOS.
+
+**Issue 2 — White bar at bottom (`src/components/BottomNav.jsx`, `src/App.jsx`):**
+- BottomNav had `height: 80` fixed + `paddingBottom: env(safe-area-inset-bottom)`. On iPhone (34px home-indicator inset), this left only ~36px for button content — too small and visually broken.
+- Fixed by removing `height: 80` entirely; nav now sizes to content naturally (paddingTop 10 + buttons ~52px + safe-area padding).
+- Background changed from `rgba(9,9,11,0.92)` (8% transparent) to solid `#09090B` — semi-transparency was letting the body background show through in the safe-area strip, causing the white bar.
+- Removed `glass` class from nav (backdrop-filter has no effect on a solid background).
+- Tab content `paddingBottom` updated from fixed `96px` → `calc(72px + env(safe-area-inset-bottom, 0px))` so content clears the dynamic nav height plus the home indicator.
+
+---
+
 ## 2026-06-30 (session 4)
 
 ### Fix — iOS mobile: disable pinch-zoom + bounce, fix white status-bar gap

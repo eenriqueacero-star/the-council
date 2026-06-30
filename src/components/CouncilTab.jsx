@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import AgentFeed from './AgentFeed.jsx';
+import CouncilReports from './CouncilReports.jsx';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, ChevronRight, Loader2, AlertTriangle, Crown, Wallet } from 'lucide-react';
 import CouncilLoader from './ui/CouncilLoader.jsx';
@@ -51,6 +52,7 @@ export default function CouncilTab({ account, acct, positionsLine, flagApiDown, 
   const [trackSaving, setTrackSaving] = useState(false);
   const [trackSaved, setTrackSaved] = useState(false);
   const [techAvailable, setTechAvailable] = useState(true); // false when AV rate-limited
+  const [feedOrReports, setFeedOrReports] = useState('feed');
   const [agentStatsMap, setAgentStatsMap] = useState({}); // { agentId: stats } for current ticker
   const debugRef = useRef(null); // accumulates debug data during a run
 
@@ -863,8 +865,31 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
         </motion.div>
       )}
 
-      {/* Agent Feed — live stream from background scans */}
-      <AgentFeed dark={dark} />
+      {/* Feed / Reports toggle */}
+      <div style={{ marginTop: 44, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 0 }}>
+        {['feed', 'reports'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setFeedOrReports(tab)}
+            style={{
+              ...MONO, fontSize: 11, fontWeight: feedOrReports === tab ? 700 : 400,
+              padding: '5px 14px', borderRadius: 8, cursor: 'pointer',
+              background: feedOrReports === tab ? `${T.accent}1a` : 'none',
+              border: `1px solid ${feedOrReports === tab ? `${T.accent}55` : T.border}`,
+              color: feedOrReports === tab ? T.accent : T.text2,
+              textTransform: 'capitalize',
+            }}
+          >
+            {tab === 'feed' ? 'Agent Feed' : 'Weekly Reports'}
+          </button>
+        ))}
+      </div>
+
+      {feedOrReports === 'feed' ? (
+        <AgentFeed dark={dark} />
+      ) : (
+        <CouncilReports dark={dark} />
+      )}
     </div>
   );
 }

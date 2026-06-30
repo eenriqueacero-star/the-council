@@ -14,6 +14,8 @@ on:
     - cron: '0 2,6,10,14,18,22 * * *'
     # ZEN — daily 12pm ET (16:00 UTC)
     - cron: '0 16 * * *'
+    # WEEKLY COUNCIL — Monday 8am ET (12:00 UTC)
+    - cron: '0 12 * * 1'
   workflow_dispatch: # manual trigger for testing
 
 jobs:
@@ -24,6 +26,7 @@ jobs:
         id: agents
         run: |
           HOUR=$(date -u +%-H)
+          DOW=$(date -u +%u)
           AGENTS=""
 
           # REX: every 4h (0,4,8,12,16,20)
@@ -44,6 +47,9 @@ jobs:
           # ZEN: 16:00 UTC
           if (( HOUR == 16 )); then AGENTS="$AGENTS zen"; fi
 
+          # WEEKLY COUNCIL: Monday 12:00 UTC (8am ET)
+          if (( DOW == 1 && HOUR == 12 )); then AGENTS="$AGENTS weekly-council"; fi
+
           echo "agents=$AGENTS" >> "$GITHUB_OUTPUT"
 
       - name: Call agent endpoints
@@ -53,8 +59,14 @@ jobs:
         run: |
           for AGENT in ${{ steps.agents.outputs.agents }}; do
             echo "Triggering $AGENT..."
+            # Weekly council needs longer timeout (~5 min); other agents use 55s
+            if [ "$AGENT" = "weekly-council" ]; then
+              MAX_TIME=290
+            else
+              MAX_TIME=55
+            fi
             curl -sf -X POST "$BASE_URL/api/cron/agents?agent=$AGENT" \
               -H "Authorization: Bearer $CRON_SECRET" \
               -H "Content-Type: application/json" \
-              --max-time 55 || echo "WARNING: $AGENT failed or timed out"
+              --max-time $MAX_TIME || echo "WARNING: $AGENT failed or timed out"
           done

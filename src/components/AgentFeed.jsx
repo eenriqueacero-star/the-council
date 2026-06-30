@@ -6,13 +6,14 @@ import {
   writeBatch, doc, updateDoc,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase.js';
-import { AGENTS } from '../constants/agents.js';
+import { AGENTS, AXIOM_AVATAR } from '../constants/agents.js';
 import { MONO, DISP } from '../constants/styles.js';
 import { theme } from '../utils/theme.js';
 
 // keyed by lowercase agent name: 'rex' → { name, color, avatar }
 const AGENT_INFO = {};
 AGENTS.forEach(a => { AGENT_INFO[a.name.toLowerCase()] = { name: a.name, color: a.color, avatar: a.avatar }; });
+AGENT_INFO['axiom'] = { name: 'AXIOM', color: '#F59E0B', avatar: AXIOM_AVATAR };
 
 const SEV = {
   alert:   { label: 'HIGH', color: '#EF4444' },
@@ -20,7 +21,7 @@ const SEV = {
   info:    { label: 'LOW',  color: null },
 };
 
-const AGENT_FILTERS = ['All', 'REX', 'NOVA', 'SAGE', 'ATLAS', 'VEGA', 'ZEN'];
+const AGENT_FILTERS = ['All', 'REX', 'NOVA', 'SAGE', 'ATLAS', 'VEGA', 'ZEN', 'AXIOM'];
 const SEV_FILTERS   = [{ label: 'All', value: 'all' }, { label: 'High', value: 'alert' }, { label: 'Med', value: 'warning' }];
 
 function relTime(ts) {

@@ -4,6 +4,49 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 9 — Layer 4: Weekly Automated Council)
+
+### Feature — Weekly Council on All Holdings
+
+Every Monday at 8am ET, the full 6-agent council runs automatically on every holding across all 3 portfolios (Edwin/Dad/Bro) and stores a structured report in Firestore for each user.
+
+**`api/cron/agents.js`** — Added `runWeeklyCouncil(userIds)` handler:
+- Gathers unique tickers across all portfolios; runs each only once (shared ticker caching for NVDA, NBIS, MU, AMD, SNDK, CRDO, APPL, ALAB held across Edwin/Dad/Bro)
+- Parallel pre-fetch: prices, news, earnings, macro (FRED), agent global outlooks
+- Per ticker (sequential): fetchTechnicals + getAllStances → 6 agents (500ms delays, HOLD/ADD/TRIM/EXIT verdicts) → AXIOM synthesis → update agent memory stances
+- 429 handling: 10s wait + one retry per call
+- Per-user: builds report from cached results, saves to `users/{uid}/council_reports/{auto-id}` with portfolioLabel, createdAt, holdings[], results{}, overallSummary
+- Feed notification: `agentId: 'axiom'`, severity `'alert'` (if any EXIT verdicts) or `'warning'`, headline with verdict tally
+- `WEEKLY_AGENT_DEFS` array maps short cron IDs (rex, nova…) to role/focus for single-round weekly prompts
+
+**`.github/workflows/agent-crons.yml`** — Added Monday 12:00 UTC schedule + `DOW` detection:
+- New cron: `0 12 * * 1`
+- `weekly-council` uses `--max-time 290`; all other agents stay at `55`
+
+**`vercel.json`** — Increased `api/cron/agents.js` maxDuration from 120 to 300
+
+**New file: `src/components/CouncilReports.jsx`** — Weekly report viewer:
+- `onSnapshot` on `users/{uid}/council_reports`, ordered by `createdAt` desc, limit 10
+- Report list cards: AXIOM avatar, portfolio label, date, verdict count chips (N HOLD / N TRIM / N EXIT), truncated summary
+- Tap opens `ReportDetailSheet` — Framer Motion spring bottom sheet (stiffness 380, damping 34)
+- Per-ticker `TickerRow`: expandable row showing AXIOM synthesis first, then 6 `AgentTakeCard` items
+- `AgentTakeCard`: agent avatar, name in agent color, stance text, `ConvictionBar`, `VerdictBadge`, reasoning
+- Verdict palette: HOLD (green #22C55E), ADD (blue #3B82F6), TRIM (amber #F59E0B), EXIT (red #EF4444)
+- Empty state: FileText icon + "Reports are generated every Monday at 8am ET."
+
+**`src/components/AgentFeed.jsx`** — AXIOM added:
+- Import `AXIOM_AVATAR` from `constants/agents.js`
+- `AGENT_INFO['axiom'] = { name: 'AXIOM', color: '#F59E0B', avatar: AXIOM_AVATAR }` after AGENTS.forEach loop
+- `AGENT_FILTERS` extended to include `'AXIOM'`
+
+**`src/components/CouncilTab.jsx`** — Feed|Reports toggle:
+- Import `CouncilReports` from `./CouncilReports.jsx`
+- `feedOrReports` state (default `'feed'`)
+- Toggle buttons ("Agent Feed" | "Weekly Reports") rendered above the feed section
+- Conditionally renders `<AgentFeed>` or `<CouncilReports>` based on selection
+
+---
+
 ## 2026-06-30 (session 8 — Layer 3: Agent Memory + Persistent Stances)
 
 ### Feature — Persistent Agent Stance Memory

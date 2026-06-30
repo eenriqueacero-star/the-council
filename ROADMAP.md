@@ -4,6 +4,24 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 9)
+
+### Layer 4 — Weekly Automated Council ✓
+- [x] `runWeeklyCouncil(userIds)` in `api/cron/agents.js` — full 6-agent council on all holdings across 3 portfolios
+- [x] Shared ticker caching — agent takes computed once per unique ticker, reused for Dad/Bro who share Edwin's holdings
+- [x] 500ms delays between agent calls; 429 → 10s wait + retry once; sequential tickers; parallel pre-fetch of prices/news/macro
+- [x] HOLD/ADD/TRIM/EXIT verdicts (distinct from manual council BUY/WATCH/SKIP)
+- [x] Firestore: `users/{uid}/council_reports/{auto-id}` — portfolioLabel, createdAt, holdings[], results{}, overallSummary
+- [x] Feed notification: `agentId: 'axiom'`, severity `alert` (EXIT present) or `warning`
+- [x] Agent memory updated from weekly council (stances + global outlooks written after each run)
+- [x] GitHub Actions cron: Monday 12:00 UTC (8am ET), `--max-time 290` for weekly-council
+- [x] `vercel.json` maxDuration 300 for `api/cron/agents.js`
+- [x] `src/components/CouncilReports.jsx` — report list + tap-to-detail bottom sheet with per-ticker expandable agent takes
+- [x] `AgentFeed.jsx` — AXIOM added to AGENT_INFO + AGENT_FILTERS
+- [x] `CouncilTab.jsx` — Feed|Reports toggle; renders AgentFeed or CouncilReports conditionally
+
+---
+
 ## DONE (session 21)
 
 ### Layer 1 — Agent Background Scans ✓

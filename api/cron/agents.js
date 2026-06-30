@@ -12,7 +12,57 @@ import { FieldValue } from 'firebase-admin/firestore';
 import {
   getAgentFullMemory, getStaleStances,
   updateStance, updateGlobalOutlook,
+  getAllStances, getAllGlobalOutlooks,
 } from '../lib/agentMemory.js';
+
+// ---------------------------------------------------------------------------
+// Weekly council helpers
+// ---------------------------------------------------------------------------
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function callGroq(systemPrompt, userMsg, keyIndex = 0, model = 'openai/gpt-oss-120b') {
+  const keys = [
+    process.env.GROQ_API_KEY,  process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3, process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5,
+  ].filter(Boolean);
+  if (!keys.length) throw new Error('No GROQ_API_KEY configured');
+  const key = keys[keyIndex % keys.length];
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMsg }],
+      max_tokens: 600,
+      temperature: 0.5,
+    }),
+  });
+  if (res.status === 429) throw new Error('ERR-429');
+  if (!res.ok) throw new Error(`Groq error: ${res.status}`);
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+function extractSimpleJSON(text) {
+  if (!text) return null;
+  try { return JSON.parse(text.replace(/```json?\n?/gi, '').replace(/```/g, '').trim()); } catch {}
+  const s = text.indexOf('{'), e = text.lastIndexOf('}');
+  if (s >= 0 && e > s) { try { return JSON.parse(text.slice(s, e + 1)); } catch {} }
+  return null;
+}
+
+const WEEKLY_AGENT_DEFS = [
+  { id: 'rex',   name: 'REX',   role: 'Technical Analyst',   focus: 'price action, RSI, MACD, moving averages, Bollinger Bands, trend direction' },
+  { id: 'nova',  name: 'NOVA',  role: 'Catalyst Scout',       focus: 'upcoming earnings, news catalysts, sector events, sentiment shifts' },
+  { id: 'sage',  name: 'SAGE',  role: 'Risk Manager',         focus: 'concentration risk, drawdown potential, portfolio balance, stop-loss levels' },
+  { id: 'atlas', name: 'ATLAS', role: 'Macro Strategist',     focus: 'macro environment, interest rates, VIX, sector rotation, yield curve' },
+  { id: 'vega',  name: 'VEGA',  role: "Devil's Advocate",     focus: 'downside risks, bear cases, what the bulls are ignoring, failure scenarios' },
+  { id: 'zen',   name: 'ZEN',   role: 'Position Sizer',       focus: 'position efficiency, when to size up or down, rebalancing and exit optimization' },
+];
+
+const PORTFOLIO_LABELS = ['Edwin', 'Dad', 'Bro'];
 
 // ---------------------------------------------------------------------------
 // Auth + shared helpers
@@ -858,10 +908,206 @@ async function runZen(userId) {
 }
 
 // ---------------------------------------------------------------------------
+// WEEKLY COUNCIL — runs all 6 agents on every holding, Monday 8am ET
+// ---------------------------------------------------------------------------
+
+async function runWeeklyCouncil(userIds) {
+  if (!userIds.length) return 0;
+  const primaryUserId = userIds[0];
+
+  // 1. Gather holdings per user
+  const userHoldings = {};
+  for (const userId of userIds) {
+    userHoldings[userId] = await getFullHoldings(userId);
+  }
+
+  // 2. Unique tickers across all portfolios
+  const uniqueTickers = [...new Set(Object.values(userHoldings).flatMap(h => Object.keys(h)))];
+  if (!uniqueTickers.length) return 0;
+  console.error(`[weekly-council] ${uniqueTickers.length} unique tickers across ${userIds.length} portfolios`);
+
+  // 3. Bulk pre-fetch (parallel, once for all tickers)
+  const [prices, newsMap, earningsList, macro, globalOutlooks] = await Promise.all([
+    fetchPrices(uniqueTickers),
+    fetchNews(uniqueTickers),
+    fetchEarnings(uniqueTickers),
+    fetchMacro(),
+    getAllGlobalOutlooks(primaryUserId),
+  ]);
+
+  const macroLine = macro
+    ? `VIX ${macro.vix?.current?.toFixed(1) ?? 'N/A'}${(macro.vix?.current ?? 0) >= 25 ? ' (elevated)' : ''}, Yield ${macro.yieldSpread?.toFixed(2) ?? 'N/A'}%${macro.yieldInverted ? ' INVERTED' : ''}, Fed ${macro.fedRate?.current?.toFixed(2) ?? 'N/A'}%`
+    : 'Macro unavailable';
+
+  const globalOutlookLine = Object.entries(globalOutlooks)
+    .map(([id, o]) => `${id.toUpperCase()}: ${o.stance} ${o.conviction}/10`)
+    .join(' | ');
+
+  // 4. Agent + AXIOM cache keyed by ticker (shared across all portfolios for same stock)
+  const agentTakesCache = {};
+  const axiomCache = {};
+
+  for (const ticker of uniqueTickers) {
+    console.error(`[weekly-council] Processing ${ticker}…`);
+
+    // Per-ticker: technicals (may be rate-limited) + memory stances
+    const [tech, tickerStances] = await Promise.all([
+      fetchTechnicals(ticker).catch(() => null),
+      getAllStances(primaryUserId, ticker),
+    ]);
+
+    const q = prices[ticker];
+    const tickerEarnings = earningsList.find(e => e.ticker === ticker) || null;
+    const tickerNews = newsMap[ticker] || [];
+
+    const priceStr = q?.price
+      ? `$${q.price.toFixed(2)}${q.changePct != null ? ` (${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(1)}% today)` : ''}`
+      : 'N/A';
+    const earningsStr = tickerEarnings
+      ? `Earnings: ${tickerEarnings.date} (in ${tickerEarnings.daysAway} days${tickerEarnings.estimated ? ', est.' : ''})`
+      : 'No upcoming earnings within 90 days';
+    const techStr = tech ? [
+      tech.rsi != null ? `RSI ${tech.rsi.toFixed(0)}${tech.rsi > 70 ? ' (overbought)' : tech.rsi < 30 ? ' (oversold)' : ''}` : null,
+      tech.macdBullish != null ? `MACD ${tech.macdBullish ? 'bullish' : 'bearish'} crossover` : null,
+      tech.sma50 && tech.sma200 ? `SMA50 $${tech.sma50.toFixed(2)} | SMA200 $${tech.sma200.toFixed(2)}` : null,
+      tech.goldenCross ? 'GOLDEN CROSS ✓' : tech.deathCross ? 'DEATH CROSS ⚠' : null,
+    ].filter(Boolean).join(' · ') : 'Technicals unavailable';
+    const newsStr = tickerNews.length
+      ? tickerNews.slice(0, 5).map(a => `[${a.date}] ${a.headline} (${a.source})`).join('\n')
+      : 'No recent news';
+
+    const priorStr = Object.entries(tickerStances)
+      .map(([id, s]) => `${id.toUpperCase()}: ${s.stance} (${s.conviction}/10) — "${s.reasoning?.slice(0, 80) ?? ''}"`)
+      .join('\n');
+
+    const reconBlock = [
+      `TICKER: ${ticker} | Price: ${priceStr}`,
+      `Technicals: ${techStr}`,
+      earningsStr,
+      `Macro: ${macroLine}`,
+      `Recent news:\n${newsStr}`,
+      priorStr   ? `\nPrior stances on ${ticker}:\n${priorStr}` : '',
+      globalOutlookLine ? `Global outlooks: ${globalOutlookLine}` : '',
+    ].filter(Boolean).join('\n');
+
+    // 4a. Run all 6 agents
+    const agentTakes = [];
+    for (let i = 0; i < WEEKLY_AGENT_DEFS.length; i++) {
+      const ag = WEEKLY_AGENT_DEFS[i];
+      const sys = `You are ${ag.name}, ${ag.role}. Focus on: ${ag.focus}.
+
+WEEKLY COUNCIL — assessing an EXISTING portfolio position (not a new trade).
+Verdicts: HOLD (keep as-is) | ADD (increase position) | TRIM (reduce exposure) | EXIT (close entirely — thesis broken).
+Return ONLY valid JSON, no markdown:
+{"agent":"${ag.name}","stance":"bullish|bearish|neutral","conviction":1-10,"verdict":"HOLD|ADD|TRIM|EXIT","reasoning":"2-3 sentences"}`;
+
+      const msg = `WEEKLY COUNCIL ASSESSMENT\n\n${reconBlock}\n\nAs ${ag.name}, give your verdict on ${ticker} as an existing holding.`;
+
+      let take = null;
+      try {
+        take = extractSimpleJSON(await callGroq(sys, msg, i));
+      } catch (e) {
+        if (e.message?.includes('429')) {
+          console.error(`[weekly-council] 429 on ${ticker}/${ag.name}, retrying after 10s…`);
+          await sleep(10000);
+          try { take = extractSimpleJSON(await callGroq(sys, msg, i)); } catch {}
+        }
+      }
+      const resolved = take || { agent: ag.name, stance: 'neutral', conviction: 5, verdict: 'HOLD', reasoning: 'Agent unavailable this week.' };
+      agentTakes.push(resolved);
+      console.error(`[weekly-council]   ${ticker}/${ag.name} → ${resolved.verdict}`);
+      await sleep(500);
+    }
+
+    agentTakesCache[ticker] = agentTakes;
+
+    // 4b. AXIOM synthesis
+    const axiomSys = `You are AXIOM, weekly council orchestrator. Synthesize 6 specialist assessments of an existing position.
+Final verdicts: HOLD (no action) | ADD (increase) | TRIM (reduce) | EXIT (close — thesis broken).
+Return ONLY valid JSON:
+{"ticker":"${ticker}","finalVerdict":"HOLD|ADD|TRIM|EXIT","confidence":1-10,"summary":"2-3 sentence consensus","dissent":"AGENT (stance X/10): concern — or empty string if unanimous"}`;
+
+    const axiomMsg = `${ticker} weekly council:\n${agentTakes.map(t => `${t.agent}: ${t.stance} (${t.conviction}/10) → ${t.verdict} — "${t.reasoning}"`).join('\n')}\n\nDeliver the final weekly verdict.`;
+
+    try {
+      await sleep(500);
+      const parsed = extractSimpleJSON(await callGroq(axiomSys, axiomMsg, WEEKLY_AGENT_DEFS.length));
+      axiomCache[ticker] = parsed || { ticker, finalVerdict: 'HOLD', confidence: 5, summary: 'Synthesis unavailable.', dissent: '' };
+    } catch {
+      axiomCache[ticker] = { ticker, finalVerdict: 'HOLD', confidence: 5, summary: 'AXIOM synthesis failed — defaulting HOLD.', dissent: '' };
+    }
+
+    // 4c. Update agent memory with weekly council stances
+    for (const take of agentTakes) {
+      const agDef = WEEKLY_AGENT_DEFS.find(a => a.name === take.agent);
+      if (!agDef) continue;
+      for (const userId of userIds) {
+        try { await updateStance(userId, agDef.id, ticker, { stance: take.stance, conviction: take.conviction, reasoning: take.reasoning }); } catch {}
+      }
+    }
+
+    console.error(`[weekly-council] ${ticker} ✓ → ${axiomCache[ticker].finalVerdict}`);
+  }
+
+  // 5. Build and save per-user reports + feed items
+  let totalWritten = 0;
+  for (let ui = 0; ui < userIds.length; ui++) {
+    const userId = userIds[ui];
+    const userTickers = Object.keys(userHoldings[userId]);
+
+    const results = {};
+    for (const ticker of userTickers) {
+      if (axiomCache[ticker]) {
+        results[ticker] = { ...axiomCache[ticker], agentTakes: agentTakesCache[ticker] || [] };
+      }
+    }
+
+    // Verdict summary counts
+    const vc = { HOLD: 0, ADD: 0, TRIM: 0, EXIT: 0 };
+    for (const r of Object.values(results)) vc[r.finalVerdict] = (vc[r.finalVerdict] || 0) + 1;
+    const trimTickers = userTickers.filter(t => results[t]?.finalVerdict === 'TRIM');
+    const exitTickers  = userTickers.filter(t => results[t]?.finalVerdict === 'EXIT');
+    const vcParts = ['HOLD','ADD','TRIM','EXIT'].filter(k => vc[k] > 0).map(k => `${vc[k]} ${k}`);
+    const overallSummary = `Weekly council: ${vcParts.join(', ')}.`
+      + (trimTickers.length ? ` TRIM flagged: ${trimTickers.join(', ')}.` : '')
+      + (exitTickers.length  ? ` EXIT signals: ${exitTickers.join(', ')}.`  : '')
+      + (!trimTickers.length && !exitTickers.length ? ' Portfolio in good shape — no major actions needed.' : '');
+
+    const portfolioLabel = PORTFOLIO_LABELS[ui] || `Portfolio ${ui + 1}`;
+
+    try {
+      await db.collection(`users/${userId}/council_reports`).add({
+        portfolioLabel,
+        createdAt: FieldValue.serverTimestamp(),
+        holdings: userTickers,
+        results,
+        overallSummary,
+      });
+    } catch (e) { console.error(`[weekly-council] Report save failed ${userId}:`, e.message); }
+
+    // Feed notification
+    try {
+      await writeFeed(userId, {
+        agentId: 'axiom',
+        ticker: null,
+        tickers: userTickers,
+        severity: exitTickers.length > 0 ? 'alert' : 'warning',
+        source: 'weekly_council',
+        headline: `Weekly Council Complete — ${vcParts.join(', ')}`,
+        detail: overallSummary,
+      });
+      totalWritten++;
+    } catch (e) { console.error(`[weekly-council] Feed write failed ${userId}:`, e.message); }
+  }
+
+  return totalWritten;
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 
-const AGENTS = new Set(['rex', 'nova', 'sage', 'atlas', 'vega', 'zen']);
+const AGENTS = new Set(['rex', 'nova', 'sage', 'atlas', 'vega', 'zen', 'weekly-council']);
 
 export default async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
@@ -874,15 +1120,17 @@ export default async function handler(req, res) {
   const userIds = getUsers();
   if (!userIds.length) return res.status(200).json({ ok: true, agent, skipped: 'no CRON_USER_IDS configured' });
 
-  console.log(`[cron/agents] Starting ${agent.toUpperCase()} scan for ${userIds.length} user(s)`);
+  console.log(`[cron/agents] Starting ${agent.toUpperCase()} for ${userIds.length} user(s)`);
 
   let total  = 0;
   const errors = [];
 
   try {
-    if (agent === 'atlas') {
-      // Atlas is global (macro), run once for all users together
-      total = await runAtlas(userIds);
+    if (agent === 'atlas' || agent === 'weekly-council') {
+      // These run once for all users together
+      total = agent === 'atlas'
+        ? await runAtlas(userIds)
+        : await runWeeklyCouncil(userIds);
     } else {
       for (const userId of userIds) {
         try {
@@ -904,6 +1152,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, agent, error: e.message });
   }
 
-  console.log(`[cron/agents] ${agent.toUpperCase()} done. ${total} feed items written. Errors: ${errors.length}`);
+  console.log(`[cron/agents] ${agent.toUpperCase()} done. ${total} items written. Errors: ${errors.length}`);
   res.status(200).json({ ok: true, agent, written: total, errors });
 }

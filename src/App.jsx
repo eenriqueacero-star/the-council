@@ -279,7 +279,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ fontFamily: 'var(--font-display)', background: T.bg, minHeight: '100vh', color: T.text, transition: 'background 0.4s ease, color 0.4s ease' }}>
+    <div style={{ fontFamily: 'var(--font-display)', background: T.bg, minHeight: '100%', color: T.text, transition: 'background 0.4s ease, color 0.4s ease', paddingTop: 'env(safe-area-inset-top)' }}>
 
       {/* Desktop side rail — icon only, 72px */}
       <aside className="hidden lg:flex" style={{
@@ -345,7 +345,7 @@ export default function App() {
         {/* Mobile header */}
         <div className="lg:hidden" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 20px', position: 'sticky', top: 0, zIndex: 40,
+          padding: '14px 20px', position: 'sticky', top: 'env(safe-area-inset-top, 0px)', zIndex: 40,
           background: dark ? 'rgba(9,9,11,0.92)' : 'rgba(250,250,250,0.92)',
           backdropFilter: 'blur(20px)',
           borderBottom: `1px solid ${T.border}`,

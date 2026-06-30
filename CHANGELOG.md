@@ -4,6 +4,25 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 4)
+
+### Fix — iOS mobile: disable pinch-zoom + bounce, fix white status-bar gap
+
+**Issue 1 — Pinch-to-zoom and page bounce (`index.html`, `src/index.css`):**
+- Viewport meta updated: added `maximum-scale=1.0, user-scalable=no, viewport-fit=cover`
+- `html, body` locked with `overflow: hidden; overscroll-behavior: none; touch-action: manipulation; position: fixed; width: 100%; height: 100%`
+- `#root` becomes the single scroll container: `height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: none`
+- `background-color: #18181b` on `#root` fills the notch/status-bar area before React renders
+
+**Issue 2 — White bar at top (`index.html`, `src/index.css`, `src/App.jsx`):**
+- `theme-color` updated from `#09090B` → `#18181b` (zinc-900, matches status bar area)
+- `apple-mobile-web-app-capable` and `apple-mobile-web-app-status-bar-style: black-translucent` were already present
+- `paddingTop: 'env(safe-area-inset-top)'` added to the outermost App wrapper div so content clears the notch
+- Mobile header sticky position changed from `top: 0` → `top: env(safe-area-inset-top, 0px)` so it sticks below the notch (not behind it) after scroll
+- `minHeight: '100vh'` on App wrapper changed to `minHeight: '100%'` (correct inside fixed-body scroll container)
+
+---
+
 ## 2026-06-30 (session 3)
 
 ### Fix — Chart data source: Twelve Data → Yahoo Finance (yahoo-finance2)

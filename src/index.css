@@ -17,7 +17,25 @@
 
 /* ── Base ── */
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-body { font-family: var(--font-display); }
+
+/* Lock outer shells — prevents iOS overscroll bounce and page zoom */
+html, body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-display);
+}
+/* #root is the single scroll container for the whole app */
+#root {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  background-color: #18181b; /* fills notch/status-bar area before React renders */
+}
 input, textarea, select { font-size: max(16px, 1em) !important; font-family: var(--font-body); }
 
 /* ── Glass utility ── */

@@ -4,6 +4,45 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 6)
+
+### Feature — Chart Interaction Upgrade (Robinhood-level)
+
+Five features added to `src/components/PortfolioTab.jsx`:
+
+**1. Touch Scrub with Haptics**
+- `handleMove` replaced by `handleScrubMove` — RAF-throttled (`requestAnimationFrame`), no React setState per pixel.
+- Crosshair fires `navigator.vibrate(1)` each time the scrub crosses a new data point.
+- Scrub state split into `scrubIdx` (chart crosshair position) + `scrubVal/scrubTs` (hero display values), so the P&L header updates only on index transitions, not on every mousemove pixel.
+- `touchAction: 'none'` on chart div prevents browser scroll-hijacking the scrub.
+
+**2. Individual Stock Charts**
+- New `StockDetailSheet` component: bottom-sheet on mobile, side panel (440px) on desktop.
+- Opens via "Chart" button in each holding's expanded detail panel (`TrendingUp` icon).
+- Has its own range selector, per-range candle cache (useRef), same Catmull-Rom chart style, and shows ticker stats (shares, avg cost, total return, P&L).
+- `catmullRomPath` lifted to module scope so both components share it.
+
+**3. Animated Range Transitions**
+- `renderChart()` call site wrapped in `<AnimatePresence mode="wait">` + `motion.div key={chart-${range}-${chartKey}}`.
+- Each range switch fades in (opacity 0→1, scale 0.985→1, 220 ms) and fades out cleanly.
+- StockDetailSheet also wraps its chart in `AnimatePresence` with the same transition.
+
+**4. Enhanced Ambient Session Hue**
+- Open-market pulse: opacity `[0.2, 0.32, 0.2]` (was `[0.18, 0.28, 0.18]`), duration 2.8s.
+- Radial gradient ellipse broadened to 90% × 65% and pushed lower (`at 50% 75%`).
+- SVG drop-shadow glow scaled to 6px during market open (was 5px), using `${ambientColor}77` (was `66`).
+- `scrubSession` now computed from `scrubTs` (stable across renders) instead of `effectiveTimes[scrubIdx]`.
+
+**5. Pinch-to-Zoom (chart area only — page zoom still disabled)**
+- `zoomLevel` (1–8×) and `panOffset` (0–1) added as component state.
+- `handleTouchStart`: two-finger pinch starts zoom, records start distance/zoom/pan; single-finger starts pan when zoomed > 1; double-tap (< 300 ms) resets zoom+pan.
+- `handleTouchMoveAll`: two-finger → `setZoomLevel`; single-finger zoomed → `setPanOffset`; else → scrub.
+- Zoom slices `effectivePoints`/`effectiveTimes` to a `visibleCount = max(5, round(allLen / zoomLevel))` window anchored by `panOffset`.
+- Y-axis auto-scales to the visible window. Zoom level badge (e.g. "2.4×") overlaid top-right when zoomed.
+- `useEffect([range])` resets zoom + pan + scrub on range switch.
+
+---
+
 ## 2026-06-30 (session 5)
 
 ### Fix — iOS safe-area follow-up: white bottom bar + viewport shrink

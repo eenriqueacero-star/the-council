@@ -71,6 +71,23 @@ const SENTIMENT_COLORS = {
 const STAGGER = { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } };
 const ITEM    = { hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } } };
 
+// Catmull-Rom → cubic bezier — at module scope so StockDetailSheet can share it
+function catmullRomPath(xs, ys) {
+  if (!xs.length) return '';
+  if (xs.length < 2) return `M${xs[0]},${ys[0]}`;
+  let d = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`;
+  for (let i = 0; i < xs.length - 1; i++) {
+    const p0 = i > 0 ? i - 1 : i;
+    const p1 = i, p2 = i + 1, p3 = i + 2 < xs.length ? i + 2 : i + 1;
+    const cp1x = xs[p1] + (xs[p2] - xs[p0]) / 6;
+    const cp1y = ys[p1] + (ys[p2] - ys[p0]) / 6;
+    const cp2x = xs[p2] - (xs[p3] - xs[p1]) / 6;
+    const cp2y = ys[p2] - (ys[p3] - ys[p1]) / 6;
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${xs[p2].toFixed(1)},${ys[p2].toFixed(1)}`;
+  }
+  return d;
+}
+
 function DCASheet({ acct, acctHoldings, positionsLine, flagApiDown, dark, onClose }) {
   const T = theme(dark);
   const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
@@ -226,6 +243,179 @@ Respond ONLY with JSON in a \`\`\`json block: {"allocations":[{"ticker":"X","amo
   );
 }
 
+function StockDetailSheet({ ticker, posMap, quotes: parentQuotes, dark, onClose }) {
+  const T = theme(dark);
+  const MFONT = { fontFamily: "ui-monospace, 'SF Mono', monospace" };
+  const [visible,  setVisible]  = useState(true);
+  const [range,    setRange]    = useState('1M');
+  const [candles,  setCandles]  = useState([]);
+  const [loaded,   setLoaded]   = useState(false);
+  const [chartKey, setChartKey] = useState(0);
+  const [quote,    setQuote]    = useState(parentQuotes?.[ticker] || null);
+  const cacheRef = useRef({});
+
+  function handleClose() { setVisible(false); setTimeout(onClose, 300); }
+
+  useEffect(() => {
+    if (cacheRef.current[range]) {
+      setCandles(cacheRef.current[range]);
+      setChartKey(k => k + 1);
+      return;
+    }
+    setLoaded(false);
+    getCandles([ticker], range).then(data => {
+      const pts = (data[ticker] || []).map(b => ({ t: b.t, c: b.c }));
+      cacheRef.current[range] = pts;
+      setCandles(pts);
+      setChartKey(k => k + 1);
+      setLoaded(true);
+    }).catch(() => { setCandles([]); setLoaded(true); });
+  }, [ticker, range]);
+
+  useEffect(() => {
+    if (!parentQuotes?.[ticker]) {
+      getQuotes([ticker]).then(q => setQuote(q[ticker])).catch(() => {});
+    }
+  }, [ticker]);
+
+  const W = 400, H = 160, PAD_L = 52, PAD_B = 28, PAD_T = 12, PAD_R = 8;
+  const CW = W - PAD_L - PAD_R, CH = H - PAD_T - PAD_B;
+
+  const price   = quote?.price    || 0;
+  const prev    = quote?.prevClose|| price;
+  const dayPct  = prev ? ((price - prev) / prev) * 100 : 0;
+  const pos     = posMap[ticker]  || {};
+  const shares  = parseFloat(pos.shares) || 0;
+  const cost    = parseFloat(String(pos.cost || '').replace(/[^0-9.]/g, '')) || 0;
+  const totRet  = cost && shares ? ((price - cost) / cost) * 100 : null;
+  const totPnL  = shares && cost ? (price - cost) * shares : null;
+  const lc      = dayPct >= 0 ? '#22c55e' : '#ef4444';
+
+  const points  = candles.map(c => c.c);
+  const times   = candles.map(c => c.t);
+
+  const renderStockChart = () => {
+    if (!points.length && !loaded) return <div className="skeleton" style={{ height: H, borderRadius: 8 }} />;
+    if (!points.length) return <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ ...MFONT, fontSize: 11, color: T.text3 }}>No chart data</span></div>;
+    const min = Math.min(...points), max = Math.max(...points);
+    const rng = max - min || max * 0.01 || 1;
+    const padMin = min - rng * 0.08, padRng = (max + rng * 0.08) - (min - rng * 0.08);
+    const xs = points.map((_, i) => PAD_L + (i / Math.max(points.length - 1, 1)) * CW);
+    const ys = points.map(p => PAD_T + CH - ((p - padMin) / padRng) * CH);
+    const lp = catmullRomPath(xs, ys);
+    const ap = `${lp} L${xs[xs.length-1].toFixed(1)},${(PAD_T+CH).toFixed(1)} L${PAD_L},${(PAD_T+CH).toFixed(1)} Z`;
+    const gid = `ssg${chartKey}`, gfid = `ssgf${chartKey}`;
+    const yL = [padMin + padRng * 0.1, padMin + padRng * 0.5, padMin + padRng * 0.9].map(v => ({ v, y: PAD_T + CH - ((v - padMin) / padRng) * CH }));
+    const fmtD = ts => { if (!ts) return ''; const d = new Date(ts * 1000); return range === '1D' ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+    const xIdxs = times.length ? [0, Math.floor(times.length / 2), times.length - 1] : [];
+    return (
+      <div key={chartKey} style={{ position: 'relative', height: H, userSelect: 'none' }}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H} style={{ filter: `drop-shadow(0 0 3px ${lc}66)` }}>
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lc} stopOpacity="0.22" /><stop offset="100%" stopColor={lc} stopOpacity="0" />
+            </linearGradient>
+            <filter id={gfid} x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          {yL.map(({ v, y }, i) => (
+            <g key={i}>
+              <line x1={PAD_L} y1={y.toFixed(1)} x2={W - PAD_R} y2={y.toFixed(1)} stroke={T.border} strokeWidth="0.5" strokeDasharray="3 4" />
+              <text x={PAD_L - 4} y={(y + 4).toFixed(1)} textAnchor="end" fontSize="9" fill={T.text3} fontFamily="var(--font-mono)">${v >= 1000 ? (v/1000).toFixed(1)+'k' : v.toFixed(2)}</text>
+            </g>
+          ))}
+          {xIdxs.map((idx, i) => times[idx] && <text key={i} x={xs[idx].toFixed(1)} y={(H-6).toFixed(1)} textAnchor={i===0?'start':i===2?'end':'middle'} fontSize="9" fill={T.text3} fontFamily="var(--font-mono)">{fmtD(times[idx])}</text>)}
+          <path d={ap} fill={`url(#${gid})`} />
+          <path d={lp} fill="none" stroke={lc} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" filter={`url(#${gfid})`} />
+        </svg>
+      </div>
+    );
+  };
+
+  const isMob = typeof window !== 'undefined' && window.innerWidth < 1024;
+  const sheetStyle = isMob ? {
+    position:'fixed',bottom:0,left:0,right:0,zIndex:10000,
+    background: dark?'rgba(24,24,27,0.98)':'rgba(250,250,250,0.98)',
+    borderRadius:'16px 16px 0 0',backdropFilter:'blur(24px)',
+    maxHeight:'85vh',overflowY:'auto',boxShadow:'0 -8px 40px rgba(0,0,0,0.4)',
+    border:`1px solid ${T.border}`,
+  } : {
+    position:'fixed',top:0,right:0,bottom:0,width:440,zIndex:10000,
+    background: dark?'rgba(24,24,27,0.98)':'rgba(250,250,250,0.98)',
+    backdropFilter:'blur(24px)',overflowY:'auto',
+    boxShadow:'-8px 0 40px rgba(0,0,0,0.3)',border:`1px solid ${T.border}`,
+  };
+
+  return createPortal(
+    <AnimatePresence>
+      {visible && (<>
+        <motion.div key="sd-bd" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={handleClose}
+          style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:9999}} />
+        <motion.div key="sd-sheet"
+          initial={isMob?{y:'100%'}:{x:'100%'}} animate={isMob?{y:0}:{x:0}} exit={isMob?{y:'100%'}:{x:'100%'}}
+          transition={{type:'spring',damping:25,stiffness:300}}
+          drag={isMob?'y':false} dragConstraints={{top:0}} dragElastic={0.1}
+          onDragEnd={(_,i)=>{if(i.offset.y>100)handleClose();}}
+          style={sheetStyle}>
+          {isMob && <div style={{display:'flex',justifyContent:'center',padding:'12px 0 4px'}}><div style={{width:40,height:4,borderRadius:2,background:'rgba(255,255,255,0.2)'}}/></div>}
+          <div style={{padding:`16px 20px calc(28px + env(safe-area-inset-bottom,0px))`}}>
+            {/* Header */}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <TickerLogo ticker={ticker} dark={dark} size={40} />
+                <div>
+                  <div style={{...MFONT,fontSize:18,fontWeight:700,color:T.text}}>{ticker}</div>
+                  {price > 0 && (
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginTop:2}}>
+                      <span style={{fontSize:15,fontWeight:600,color:T.text}}>${price.toFixed(2)}</span>
+                      <span style={{...MFONT,fontSize:12,color:lc}}>{fmtPct(dayPct)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button onClick={handleClose} style={{background:'none',border:'none',cursor:'pointer',color:T.text3,padding:4,display:'flex'}}><X size={18}/></button>
+            </div>
+            {/* Chart with animated transition */}
+            <AnimatePresence mode="wait">
+              <motion.div key={`${range}-${chartKey}`} initial={{opacity:0,scale:0.98}} animate={{opacity:1,scale:1}} exit={{opacity:0}} transition={{duration:0.22}}>
+                {renderStockChart()}
+              </motion.div>
+            </AnimatePresence>
+            {/* Range pills */}
+            <div style={{display:'flex',alignItems:'center',marginTop:8,marginBottom:20,gap:2}}>
+              {RANGES.map(r=>(
+                <motion.button key={r} onClick={()=>setRange(r)} whileTap={{scale:0.92}} style={{
+                  fontFamily:'var(--font-display)',fontSize:12,fontWeight:range===r?600:400,
+                  padding:'5px 11px',borderRadius:20,border:'none',cursor:'pointer',
+                  background:range===r?T.accent:'transparent',color:range===r?'#fff':T.text3,transition:'all 0.18s ease',
+                }}>{r}</motion.button>
+              ))}
+            </div>
+            {/* Stats */}
+            {shares > 0 && (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'10px 16px',marginBottom:16}}>
+                {[
+                  ['Shares',`${shares}`],
+                  ['Avg Cost',cost>0?`$${cost.toFixed(2)}`:'—'],
+                  ['Total Return',totRet!==null?fmtPct(totRet):'—',totRet],
+                  ['Total P&L',totPnL!==null?`${totPnL>=0?'+':''}$${Math.abs(totPnL).toFixed(2)}`:'—',totPnL],
+                ].map(([label,v,num])=>(
+                  <div key={label} style={{background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:'10px 12px'}}>
+                    <div style={{...MFONT,fontSize:10,color:T.text3,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:4}}>{label}</div>
+                    <div style={{fontSize:15,fontWeight:600,color:num!=null?(num>=0?'#22c55e':'#ef4444'):T.text}}>{v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </>)}
+    </AnimatePresence>,
+    document.body
+  );
+}
+
 export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus, authReady, onTabChange }) {
   const T = theme(dark);
   const prefersReduced = useReducedMotion();
@@ -235,8 +425,13 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [range,         setRange]         = useState('1M');
   const [expanded,      setExpanded]      = useState(null);
   const [chartKey,      setChartKey]      = useState(0);
-  const [scrubIdx,      setScrubIdx]      = useState(null);
-  const [addMode,       setAddMode]       = useState(false);
+  const [scrubIdx,          setScrubIdx]          = useState(null);
+  const [scrubVal,          setScrubVal]          = useState(null);
+  const [scrubTs,           setScrubTs]           = useState(null);
+  const [zoomLevel,         setZoomLevel]         = useState(1);
+  const [panOffset,         setPanOffset]         = useState(0);
+  const [stockDetailTicker, setStockDetailTicker] = useState(null);
+  const [addMode,           setAddMode]           = useState(false);
   const [newTicker,     setNewTicker]     = useState('');
   const [newShares,     setNewShares]     = useState('');
   const [newCost,       setNewCost]       = useState('');
@@ -249,8 +444,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [isRefreshing,  setIsRefreshing]  = useState(false);
   const [macroPulse,    setMacroPulse]    = useState(null); // null = not fetched
   const [macroOpen,     setMacroOpen]     = useState(false);
-  const timerRef = useRef(null);
-  const candleCacheRef = useRef({}); // keyed by range; cleared when holdings change
+  const timerRef        = useRef(null);
+  const candleCacheRef  = useRef({}); // keyed by range; cleared when holdings change
+  const scrubRafRef     = useRef(null);
+  const lastScrubIdxRef = useRef(null);
+  const pinchRef        = useRef({});
 
   const tickers    = acctHoldings.filter(t => posMap[t]);
   const withShares = tickers.filter(t => parseFloat(posMap[t]?.shares) > 0);
@@ -390,6 +588,14 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
   useEffect(() => { fetchCandles(); }, [fetchCandles]);
 
+  // Reset scrub + zoom when switching ranges
+  useEffect(() => {
+    setScrubIdx(null); setScrubVal(null); setScrubTs(null);
+    setZoomLevel(1); setPanOffset(0);
+    lastScrubIdxRef.current = null;
+    if (scrubRafRef.current) { cancelAnimationFrame(scrubRafRef.current); scrubRafRef.current = null; }
+  }, [range]);
+
   let totalValue = 0, prevValue = 0;
   withShares.forEach(t => {
     const sh = parseFloat(posMap[t]?.shares) || 0;
@@ -405,32 +611,16 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
 
   const chartPoints     = candles.map(c => c.c);
   const rangeStartValue = candles.length > 1 ? candles[0].c : prevValue;
-  const displayValue    = (scrubIdx !== null && chartPoints[scrubIdx] != null) ? chartPoints[scrubIdx] : totalValue;
+  const displayValue    = scrubVal !== null ? scrubVal : totalValue;
   // For header: compare display point to the start of the selected range
   const headerBase      = candles.length > 1 ? rangeStartValue : prevValue;
   const headerChange    = displayValue - headerBase;
   const headerChangePct = headerBase > 0 ? (headerChange / headerBase) * 100 : 0;
   const lineColor       = headerChange > 0 ? T.green : headerChange < 0 ? T.red : T.text3;
 
-  // SVG chart
+  // SVG chart constants
   const W = 400, H = 160, PAD_L = 52, PAD_B = 28, PAD_T = 12, PAD_R = 8;
   const CW = W - PAD_L - PAD_R, CH = H - PAD_T - PAD_B;
-
-  // Catmull-Rom → cubic bezier conversion
-  function catmullRomPath(xs, ys) {
-    if (xs.length < 2) return `M${xs[0]},${ys[0]}`;
-    let d = `M${xs[0].toFixed(1)},${ys[0].toFixed(1)}`;
-    for (let i = 0; i < xs.length - 1; i++) {
-      const p0 = i > 0 ? i - 1 : i;
-      const p1 = i, p2 = i + 1, p3 = i + 2 < xs.length ? i + 2 : i + 1;
-      const cp1x = xs[p1] + (xs[p2] - xs[p0]) / 6;
-      const cp1y = ys[p1] + (ys[p2] - ys[p0]) / 6;
-      const cp2x = xs[p2] - (xs[p3] - xs[p1]) / 6;
-      const cp2y = ys[p2] - (ys[p3] - ys[p1]) / 6;
-      d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${xs[p2].toFixed(1)},${ys[p2].toFixed(1)}`;
-    }
-    return d;
-  }
 
   const renderChart = () => {
     if (!withShares.length) return (
@@ -439,11 +629,12 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       </div>
     );
     if (!chartPoints.length && !candlesLoaded) return <div className="skeleton" style={{ height: H, borderRadius: 8 }} />;
+
     let effectivePoints = chartPoints.length ? chartPoints : (prevValue > 0 ? [prevValue, totalValue || prevValue] : []);
     let effectiveTimes  = candles.length ? candles.map(c => c.t) : null;
     const isSynthetic   = !chartPoints.length;
 
-    // Append live portfolio value when quotes are fresher than the last candle (extended hours, after-hours)
+    // Append live portfolio value when quotes are fresher than last candle
     if (!isSynthetic && totalValue > 0 && effectiveTimes?.length) {
       const nowSecs = Math.floor(Date.now() / 1000);
       if (nowSecs - effectiveTimes[effectiveTimes.length - 1] > 300) {
@@ -458,33 +649,42 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
       </div>
     );
 
+    // Apply zoom + pan to slice visible window
+    const allLen       = effectivePoints.length;
+    const visibleCount = zoomLevel > 1 ? Math.max(5, Math.round(allLen / zoomLevel)) : allLen;
+    const maxStartIdx  = Math.max(0, allLen - visibleCount);
+    const startIdx     = zoomLevel > 1 ? Math.round(panOffset * maxStartIdx) : 0;
+    const displayPoints = zoomLevel > 1 ? effectivePoints.slice(startIdx, startIdx + visibleCount) : effectivePoints;
+    const displayTimes  = (zoomLevel > 1 && effectiveTimes) ? effectiveTimes.slice(startIdx, startIdx + visibleCount) : effectiveTimes;
+
     // Extended-hours segment detection for 1D (EDT = UTC-4; regular = 13:30–20:00 UTC)
     const sessionOf = ts => {
       const h = new Date(ts * 1000).getUTCHours() + new Date(ts * 1000).getUTCMinutes() / 60;
       if (h >= 13.5 && h < 20) return 'reg';
       return 'ext';
     };
-    const hasExtHours = range === '1D' && !isSynthetic && !!effectiveTimes?.length;
-    let regularStart = 0, regularEnd = (effectivePoints.length - 1);
+    const hasExtHours = range === '1D' && !isSynthetic && !!displayTimes?.length;
+    let regularStart = 0, regularEnd = displayPoints.length - 1;
     if (hasExtHours) {
-      const fr = effectiveTimes.findIndex(ts => sessionOf(ts) === 'reg');
-      const lr = effectiveTimes.map((ts, i) => ({ ts, i })).filter(({ ts }) => sessionOf(ts) === 'reg').pop()?.i;
+      const fr = displayTimes.findIndex(ts => sessionOf(ts) === 'reg');
+      const lr = displayTimes.map((ts, i) => ({ ts, i })).filter(({ ts }) => sessionOf(ts) === 'reg').pop()?.i;
       if (fr !== -1) regularStart = fr;
       if (lr != null) regularEnd  = lr;
     }
 
-    // Scrub-reactive session (for ambient hue): which session is the scrubbed point in?
+    // Scrub-reactive ambient session from scrubTs (stable cross-render)
     const scrubSession = (() => {
-      if (range !== '1D' || scrubIdx === null || !effectiveTimes?.[scrubIdx]) return null;
-      return sessionOf(effectiveTimes[scrubIdx]) === 'reg' ? 'open' : 'ext';
+      if (range !== '1D' || !scrubTs) return null;
+      return sessionOf(scrubTs) === 'reg' ? 'open' : 'ext';
     })();
-    const min = Math.min(...effectivePoints), max = Math.max(...effectivePoints);
+
+    const min = Math.min(...displayPoints), max = Math.max(...displayPoints);
     const rng = max - min || max * 0.01 || 1;
     const padMin = min - rng * 0.08, padMax = max + rng * 0.08;
     const padRng = padMax - padMin;
 
-    const xs = effectivePoints.map((_, i) => PAD_L + (i / Math.max(effectivePoints.length - 1, 1)) * CW);
-    const ys = effectivePoints.map(p => PAD_T + CH - ((p - padMin) / padRng) * CH);
+    const xs = displayPoints.map((_, i) => PAD_L + (i / Math.max(displayPoints.length - 1, 1)) * CW);
+    const ys = displayPoints.map(p => PAD_T + CH - ((p - padMin) / padRng) * CH);
 
     const linePath = catmullRomPath(xs, ys);
     const areaPath = `${linePath} L${xs[xs.length-1].toFixed(1)},${(PAD_T+CH).toFixed(1)} L${PAD_L},${(PAD_T+CH).toFixed(1)} Z`;
@@ -492,14 +692,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
     const scrubX   = scrubIdx !== null ? xs[scrubIdx] : null;
     const scrubY   = scrubIdx !== null ? ys[scrubIdx] : null;
 
-    // Y-axis: 3 labels
-    const yLabels = [padMin + padRng * 0.1, padMin + padRng * 0.5, padMin + padRng * 0.9].map((v, i) => ({
-      v, y: PAD_T + CH - ((v - padMin) / padRng) * CH
+    const yLabels = [padMin + padRng * 0.1, padMin + padRng * 0.5, padMin + padRng * 0.9].map(v => ({
+      v, y: PAD_T + CH - ((v - padMin) / padRng) * CH,
     }));
 
-    // X-axis: 3 date labels
-    // Candle timestamps are Unix seconds from Finnhub — multiply by 1000 for Date()
-    const fmtDate = (ts) => {
+    const fmtDate = ts => {
       if (!ts || isNaN(ts)) return '';
       const d = new Date(ts * 1000);
       if (isNaN(d.getTime())) return '';
@@ -507,68 +704,136 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
         ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
         : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
-    const xLabelIdxs = effectiveTimes ? [0, Math.floor(effectiveTimes.length / 2), effectiveTimes.length - 1] : [];
+    const xLabelIdxs = displayTimes ? [0, Math.floor(displayTimes.length / 2), displayTimes.length - 1] : [];
 
-    const handleMove = e => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const cx   = e.touches ? e.touches[0].clientX : e.clientX;
-      const relX = cx - rect.left - (rect.width * PAD_L / W);
-      const plotW = rect.width * CW / W;
-      const idx  = Math.round((relX / plotW) * (effectivePoints.length - 1));
-      setScrubIdx(Math.max(0, Math.min(effectivePoints.length - 1, idx)));
+    // ── Scrub handler: RAF-throttled + haptic per new data point ──
+    const handleScrubMove = e => {
+      if (e.touches?.length === 2) return; // let pinch handler take over
+      const touch = e.touches?.[0];
+      const cx    = touch ? touch.clientX : e.clientX;
+      const rect  = e.currentTarget.getBoundingClientRect();
+      if (scrubRafRef.current) return;
+      scrubRafRef.current = requestAnimationFrame(() => {
+        scrubRafRef.current = null;
+        const relX  = cx - rect.left - (rect.width * PAD_L / W);
+        const plotW = rect.width * CW / W;
+        const len   = displayPoints.length;
+        const idx   = Math.max(0, Math.min(len - 1, Math.round((relX / plotW) * (len - 1))));
+        if (idx !== lastScrubIdxRef.current) {
+          if (lastScrubIdxRef.current !== null) navigator.vibrate?.(1);
+          lastScrubIdxRef.current = idx;
+          setScrubIdx(idx);
+          setScrubVal(displayPoints[idx] ?? null);
+          setScrubTs(displayTimes?.[idx] ?? null);
+        }
+      });
+    };
+
+    // ── Pinch-to-zoom touch handlers ──
+    const handleTouchStart = e => {
+      if (e.touches.length === 2) {
+        const d = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        pinchRef.current = { ...pinchRef.current, pinching: true, startDist: d, startZoom: zoomLevel, startPan: panOffset };
+        // Cancel any in-flight scrub RAF
+        if (scrubRafRef.current) { cancelAnimationFrame(scrubRafRef.current); scrubRafRef.current = null; }
+        setScrubIdx(null); setScrubVal(null); setScrubTs(null);
+        lastScrubIdxRef.current = null;
+      } else if (e.touches.length === 1) {
+        if (zoomLevel > 1) {
+          pinchRef.current = { ...pinchRef.current, panning: true, panStartX: e.touches[0].clientX, panStartOffset: panOffset };
+        }
+        // Double-tap to reset zoom (300 ms window)
+        const now = Date.now();
+        if (now - (pinchRef.current.lastTap || 0) < 300) {
+          setZoomLevel(1); setPanOffset(0);
+          setScrubIdx(null); setScrubVal(null); setScrubTs(null);
+          lastScrubIdxRef.current = null;
+        }
+        pinchRef.current.lastTap = now;
+      }
+    };
+
+    const handleTouchMoveAll = e => {
+      if (e.touches.length === 2 && pinchRef.current.pinching) {
+        const d = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        setZoomLevel(Math.max(1, Math.min(8, pinchRef.current.startZoom * d / pinchRef.current.startDist)));
+        return;
+      }
+      if (e.touches.length === 1 && zoomLevel > 1 && pinchRef.current.panning) {
+        const rect    = e.currentTarget.getBoundingClientRect();
+        const plotW   = rect.width * CW / W;
+        const dx      = e.touches[0].clientX - pinchRef.current.panStartX;
+        const dFrac   = (-dx / plotW) * (visibleCount / Math.max(1, maxStartIdx));
+        setPanOffset(Math.max(0, Math.min(1, pinchRef.current.panStartOffset + dFrac)));
+        return;
+      }
+      if (e.touches.length === 1) handleScrubMove(e);
+    };
+
+    const handleTouchEnd = () => {
+      pinchRef.current.pinching = false;
+      pinchRef.current.panning  = false;
+      setScrubIdx(null); setScrubVal(null); setScrubTs(null);
+      lastScrubIdxRef.current = null;
     };
 
     // Ambient session hue — scrub overrides real-time session on 1D
     const ambientSession = (() => {
       if (scrubSession === 'ext') return 'ext1D';
       if (scrubSession === 'open') return 'open';
-      return marketState; // 'open' | 'premarket' | 'afterhours' | anything→closed
+      return marketState;
     })();
-    const SESS_HUE = {
-      open:       '#22c55e',
-      premarket:  '#60a5fa',
-      afterhours: '#f59e0b',
-      ext1D:      '#60a5fa',
-      default:    '#7c3aed',
-    };
+    const SESS_HUE = { open: '#22c55e', premarket: '#60a5fa', afterhours: '#f59e0b', ext1D: '#60a5fa', default: '#7c3aed' };
     const ambientColor = SESS_HUE[ambientSession] || SESS_HUE.default;
+    const isMarketOpen = ambientSession === 'open';
     const glowId = `gf${chartKey}`;
 
     return (
-      <div key={chartKey} style={{ position: 'relative', height: H, userSelect: 'none' }}
-        onMouseMove={handleMove} onTouchMove={handleMove}
-        onMouseLeave={() => setScrubIdx(null)} onTouchEnd={() => setScrubIdx(null)}>
-
-        {/* Ambient session glow behind chart */}
+      <div style={{ position: 'relative', height: H, userSelect: 'none', touchAction: 'none' }}
+        onMouseMove={handleScrubMove}
+        onMouseLeave={() => { setScrubIdx(null); setScrubVal(null); setScrubTs(null); lastScrubIdxRef.current = null; }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMoveAll}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Ambient session glow */}
         <motion.div
           key={ambientSession}
           initial={{ opacity: 0 }}
-          animate={ambientSession === 'open'
-            ? { opacity: [0.18, 0.28, 0.18] }
-            : { opacity: 0.18 }}
-          transition={ambientSession === 'open'
-            ? { duration: 3, repeat: Infinity, ease: 'easeInOut' }
-            : { duration: 2, ease: 'easeInOut' }}
+          animate={isMarketOpen ? { opacity: [0.2, 0.32, 0.2] } : { opacity: 0.18 }}
+          transition={isMarketOpen ? { duration: 2.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 2 }}
           style={{
             position: 'absolute', inset: 0, pointerEvents: 'none', borderRadius: 8,
-            background: `radial-gradient(ellipse 80% 60% at 50% 70%, ${ambientColor}55 0%, transparent 75%)`,
+            background: `radial-gradient(ellipse 90% 65% at 50% 75%, ${ambientColor}60 0%, transparent 72%)`,
           }}
         />
 
+        {/* Zoom indicator */}
+        {zoomLevel > 1.05 && (
+          <div style={{ position: 'absolute', top: 4, right: PAD_R + 2, fontFamily: 'var(--font-mono)', fontSize: 9, color: ambientColor, opacity: 0.7, pointerEvents: 'none' }}>
+            {zoomLevel.toFixed(1)}×
+          </div>
+        )}
+
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" width="100%" height={H}
-          style={{ filter: `drop-shadow(0 0 ${ambientSession === 'open' ? 5 : 3}px ${ambientColor}66)` }}>
+          style={{ filter: `drop-shadow(0 0 ${isMarketOpen ? 6 : 3}px ${ambientColor}77)` }}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%"   stopColor={lineColor} stopOpacity="0.22" />
               <stop offset="60%"  stopColor={ambientColor} stopOpacity="0.06" />
-              <stop offset="100%" stopColor={lineColor} stopOpacity="0"    />
+              <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
             </linearGradient>
             <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
-          {/* Y-axis grid lines + labels */}
           {yLabels.map(({ v, y }, i) => (
             <g key={i}>
               <line x1={PAD_L} y1={y.toFixed(1)} x2={W - PAD_R} y2={y.toFixed(1)} stroke={T.border} strokeWidth="0.5" strokeDasharray="3 4" />
@@ -577,15 +842,12 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               </text>
             </g>
           ))}
-          {/* X-axis date labels */}
-          {xLabelIdxs.map((idx, i) => effectiveTimes?.[idx] && (
+          {xLabelIdxs.map((idx, i) => displayTimes?.[idx] && (
             <text key={i} x={xs[idx].toFixed(1)} y={(H - 6).toFixed(1)} textAnchor={i === 0 ? 'start' : i === 2 ? 'end' : 'middle'} fontSize="9" fill={T.text3} fontFamily="var(--font-mono)">
-              {fmtDate(effectiveTimes[idx])}
+              {fmtDate(displayTimes[idx])}
             </text>
           ))}
-          {/* Gradient fill */}
           <path d={areaPath} fill={`url(#${gradId})`} />
-          {/* Chart line — segmented for 1D extended hours, with soft glow filter */}
           {hasExtHours ? (
             <g filter={`url(#${glowId})`}>
               {regularStart > 0 && (
@@ -594,16 +856,15 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               )}
               <path d={catmullRomPath(xs.slice(regularStart, regularEnd + 1), ys.slice(regularStart, regularEnd + 1))}
                 fill="none" stroke={lineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              {regularEnd < effectivePoints.length - 1 && (
+              {regularEnd < displayPoints.length - 1 && (
                 <path d={catmullRomPath(xs.slice(regularEnd), ys.slice(regularEnd))}
                   fill="none" stroke={lineColor} strokeWidth="1.5" strokeOpacity="0.4" strokeDasharray="5 3" strokeLinecap="round" />
               )}
-              {/* Session open/close boundary markers */}
               {regularStart > 0 && xs[regularStart] != null && (
                 <line x1={xs[regularStart].toFixed(1)} y1={PAD_T} x2={xs[regularStart].toFixed(1)} y2={PAD_T + CH}
                   stroke={T.text3} strokeWidth="0.6" strokeDasharray="3 3" strokeOpacity="0.35" />
               )}
-              {regularEnd < effectivePoints.length - 1 && xs[regularEnd] != null && (
+              {regularEnd < displayPoints.length - 1 && xs[regularEnd] != null && (
                 <line x1={xs[regularEnd].toFixed(1)} y1={PAD_T} x2={xs[regularEnd].toFixed(1)} y2={PAD_T + CH}
                   stroke={T.text3} strokeWidth="0.6" strokeDasharray="3 3" strokeOpacity="0.35" />
               )}
@@ -658,7 +919,7 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
               </span>
               <span style={{ fontSize: 13, color: T.text3 }}>
                 {(() => {
-                  const ts = scrubIdx !== null ? candles[scrubIdx]?.t : null;
+                  const ts = scrubTs;
                   if (!ts || isNaN(ts)) return range === '1D' ? 'Today' : range;
                   const d = new Date(ts * 1000);
                   if (isNaN(d.getTime())) return range === '1D' ? 'Today' : range;
@@ -690,8 +951,20 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
           </div>
         </div>
 
-        {/* Chart */}
-        <div style={{ marginTop: 20 }}>{renderChart()}</div>
+        {/* Chart — fade/scale transition on range change */}
+        <div style={{ marginTop: 20 }}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`chart-${range}-${chartKey}`}
+              initial={{ opacity: 0, scale: 0.985 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              {renderChart()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {/* Range pills */}
         <div style={{ display: 'flex', alignItems: 'center', marginTop: 8, marginBottom: 20, gap: 2 }}>
@@ -912,13 +1185,17 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
                                     </div>
                                   ))}
                                 </div>
-                                <div style={{ display: 'flex', gap: 8 }}>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                   {onTabChange && (
                                     <motion.button whileTap={{ scale: 0.96 }} onClick={e => { e.stopPropagation(); onTabChange('council'); }}
                                       style={{ fontFamily: 'var(--font-display)', fontSize: 12, fontWeight: 500, padding: '7px 14px', background: T.accent, color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                                       Run Council
                                     </motion.button>
                                   )}
+                                  <motion.button whileTap={{ scale: 0.96 }} onClick={e => { e.stopPropagation(); setStockDetailTicker(t); }}
+                                    style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: T.text2, display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 12px', cursor: 'pointer' }}>
+                                    <TrendingUp size={12} /> Chart
+                                  </motion.button>
                                   <motion.button whileTap={{ scale: 0.96 }} onClick={e => { e.stopPropagation(); setEditTicker(t); setEditShares(pos.shares || ''); setEditCost(pos.cost || ''); }}
                                     style={{ fontFamily: 'var(--font-display)', fontSize: 12, color: T.text2, display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 12px', cursor: 'pointer' }}>
                                     <Edit2 size={12} /> Edit
@@ -1067,6 +1344,17 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
           flagApiDown={flagApiDown}
           dark={dark}
           onClose={() => setDcaOpen(false)}
+        />
+      )}
+
+      {/* Individual stock chart sheet */}
+      {stockDetailTicker && (
+        <StockDetailSheet
+          ticker={stockDetailTicker}
+          posMap={posMap}
+          quotes={quotes}
+          dark={dark}
+          onClose={() => setStockDetailTicker(null)}
         />
       )}
     </div>

@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import AgentFeed from './AgentFeed.jsx';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, ChevronRight, Loader2, AlertTriangle, Crown, Wallet } from 'lucide-react';
 import CouncilLoader from './ui/CouncilLoader.jsx';
@@ -857,6 +858,9 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
           <p style={{ ...MONO, color: T.text3, fontSize: 11, marginTop: 6, opacity: 0.6 }}>6 specialists · 3 deliberation rounds · AXIOM final ruling</p>
         </motion.div>
       )}
+
+      {/* Agent Feed — live stream from background scans */}
+      <AgentFeed dark={dark} />
     </div>
   );
 }

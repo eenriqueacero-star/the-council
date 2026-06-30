@@ -4,6 +4,39 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 7 — Layer 2: Council Feed)
+
+### Feature — Agent Feed (Live Stream inside Council Tab)
+
+**New file: `src/components/AgentFeed.jsx`**
+
+Reads `users/{uid}/agent_feed` in real-time via Firestore `onSnapshot` (newest-first, limit 50). Placed as a section at the bottom of the Council tab.
+
+- **FeedCard component:** agent emblem (28px img), agent name in agent's color, severity badge (HIGH/MED in red/amber), bold headline, truncated detail with "more/less" expand, ticker chips, relative timestamp ("2h ago"), unread indicator dot. Left border color reflects severity/agent. `IntersectionObserver` (threshold 0.5) marks each card `read: true` in Firestore as it scrolls into view.
+- **Tap-to-detail:** `DetailSheet` bottom-sheet slides up with Framer Motion spring (`stiffness 380, damping 34`). Shows large agent emblem (56px), full headline + body (no truncation), ticker chips, full date/time, severity badge, Dismiss button.
+- **Filter chips:** All | REX | NOVA | SAGE | ATLAS | VEGA | ZEN + severity sub-filter (All | High | Med). Filters are client-side (already have all 50 docs).
+- **Mark All Read:** batch `writeBatch` updates all unread docs in one round-trip.
+- **Staggered animation:** each card fades+translates in with `delay: min(i × 50ms, 300ms)`.
+- **Empty state:** BellOff icon + "Your agents haven't reported anything yet…" when no docs; different message when filter produces zero results.
+- **Severity mapping:** `alert` → HIGH (red), `warning` → MED (amber), `info` → LOW (subtle).
+- Agent lookup built from `AGENTS` array: `agentId: 'rex'` → `{ name:'REX', color:'#6366F1', avatar:'/agents/rex.png' }`.
+
+**`src/App.jsx`:**
+- Added `query, where` to firestore imports.
+- Added `feedUnreadCount` state.
+- Inside `onAuthStateChanged` block: added second `onSnapshot` listener on `agent_feed` filtered by `where('read', '==', false)` to track unread count independently of whether Council tab is mounted. Cleans up with `feedUnsub()` on auth change or unmount.
+- Passes `feedUnreadCount` to `<BottomNav>`.
+
+**`src/components/BottomNav.jsx`:**
+- Accepts `feedUnreadCount` prop (default 0).
+- When `feedUnreadCount > 0`, renders a red badge (14px circle, `#EF4444`) in the top-right of the Council tab icon. Shows digit count (capped at "9+" for 10+). Badge has a 1.5px border matching nav background for crisp cutout on both dark/light.
+
+**`src/components/CouncilTab.jsx`:**
+- Imports `AgentFeed`.
+- Renders `<AgentFeed dark={dark} />` at the bottom of the council content, after the empty state prompt. All existing council functionality untouched.
+
+---
+
 ## 2026-06-30 (session 6 — iOS PWA fix)
 
 ### Fix — iOS True Full-Screen PWA + Safe Area

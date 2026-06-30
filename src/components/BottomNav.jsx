@@ -11,7 +11,7 @@ const TABS = [
 ];
 const MORE_IDS = new Set(['alpha','updates','settings','debug']);
 
-export default function BottomNav({ tab, setTab, dark }) {
+export default function BottomNav({ tab, setTab, dark, feedUnreadCount = 0 }) {
   return (
     <nav className="flex lg:hidden" style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
@@ -23,6 +23,7 @@ export default function BottomNav({ tab, setTab, dark }) {
     }}>
       {TABS.map(({ id, label, Icon }) => {
         const active = tab === id || (id === 'more' && MORE_IDS.has(tab));
+        const showBadge = id === 'council' && feedUnreadCount > 0;
         return (
           <motion.button
             key={id}
@@ -51,6 +52,18 @@ export default function BottomNav({ tab, setTab, dark }) {
               <span style={{ position: 'relative', zIndex: 1, display: 'flex' }}>
                 <Icon size={22} strokeWidth={active ? 2.2 : 1.7} />
               </span>
+              {showBadge && (
+                <span style={{
+                  position: 'absolute', top: 4, right: 4, zIndex: 2,
+                  minWidth: 14, height: 14, borderRadius: 7,
+                  background: '#EF4444', border: `1.5px solid ${dark ? '#18181b' : '#FAFAFA'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 8, fontWeight: 700, color: '#fff', lineHeight: 1,
+                  padding: feedUnreadCount > 9 ? '0 2px' : 0,
+                }}>
+                  {feedUnreadCount > 9 ? '9+' : feedUnreadCount}
+                </span>
+              )}
             </span>
             <span style={{ fontSize: 10, fontWeight: active ? 600 : 400 }}>
               {label}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, addDoc, collection, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, addDoc, collection, onSnapshot, setDoc, query, where } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { ACCOUNTS } from './constants/agents.js';
 import { getMarketState, getTimeToNextOpen } from './utils/marketState.js';
@@ -85,6 +85,7 @@ export default function App() {
   });
   const [saveStatus, setSaveStatus] = useState('idle');
   const [authReady,  setAuthReady]  = useState(false);
+  const [feedUnreadCount, setFeedUnreadCount] = useState(0);
 
   const apiDownTimer = useRef(null);
   const flagApiDown = () => {
@@ -108,11 +109,14 @@ export default function App() {
 
   useEffect(() => {
     let snapUnsub = () => {};
+    let feedUnsub = () => {};
     const authUnsub = onAuthStateChanged(auth, user => {
       snapUnsub();
+      feedUnsub();
+      feedUnsub = () => {};
       fsLoaded.current = false;
       setAuthReady(!!user);
-      if (!user) return;
+      if (!user) { setFeedUnreadCount(0); return; }
       const ref = doc(db, 'users', user.uid, 'data', 'positions');
       snapUnsub = onSnapshot(ref, snap => {
         fsLoaded.current = true;
@@ -129,17 +133,24 @@ export default function App() {
         });
       }, err => { console.error('positions snapshot error:', err); fsLoaded.current = true; });
 
+      // Feed unread count — lightweight listener on unread docs only
+      feedUnsub = onSnapshot(
+        query(collection(db, 'users', user.uid, 'agent_feed'), where('read', '==', false)),
+        snap => setFeedUnreadCount(snap.size),
+        () => {}
+      );
+
       // Resolve stale agent observations in the background
       const getCurrentPrice = async (ticker) => {
         try {
-          const q = await getQuotes([ticker]);
-          const r = q[ticker];
+          const r2 = await getQuotes([ticker]);
+          const r = r2[ticker];
           return r?.price > 0 ? r.price : (r?.prevClose || null);
         } catch { return null; }
       };
       resolveObservations(db, user.uid, getCurrentPrice).catch(console.error);
     });
-    return () => { authUnsub(); snapUnsub(); };
+    return () => { authUnsub(); snapUnsub(); feedUnsub(); };
   }, []);
 
   const savePositions = useCallback(() => {
@@ -407,7 +418,7 @@ export default function App() {
         </div>
       </div>
 
-      <BottomNav tab={tab} setTab={setTab} dark={dark} />
+      <BottomNav tab={tab} setTab={setTab} dark={dark} feedUnreadCount={feedUnreadCount} />
     </div>
   );
 }

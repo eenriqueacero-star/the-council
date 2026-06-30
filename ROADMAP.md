@@ -22,11 +22,13 @@ Current state of planned work. Update statuses here at the end of every session.
 - [x] `vercel.json` maxDuration entries for all 6 cron endpoints
 - [x] Edwin setup: needs `FIREBASE_SERVICE_ACCOUNT`, `CRON_SECRET`, `CRON_USER_IDS` in Vercel; `CRON_SECRET` + `VERCEL_APP_URL` in GitHub secrets
 
-### NEXT AFTER LAYER 1: Layer 2 — Council Feed UI
-- [ ] New "Feed" tab: renders `users/{uid}/agent_feed` in real time (Firestore `onSnapshot`)
-- [ ] Feed items show agent avatar, severity badge, headline, detail (expandable), ticker pill
-- [ ] Alert severity items appear as priority notifications with red badge
-- [ ] Mark-as-read on tap; unread count badge on tab icon
+### Layer 2 — Council Feed UI ✓
+- [x] Feed section inside Council tab: `onSnapshot` on `users/{uid}/agent_feed`, newest-first, limit 50
+- [x] Feed cards: agent emblem, agent name in color, severity badge, headline, expandable detail, ticker chips, relative timestamp
+- [x] IntersectionObserver auto-marks items read when scrolled into view; "Mark all read" batch button
+- [x] Tap-to-detail: bottom-sheet (Framer Motion spring) with full content and Dismiss button
+- [x] Agent + severity filter chips; staggered card entrance animation
+- [x] Unread count badge on Council tab in BottomNav (red dot with count, persists across tabs)
 
 ---
 

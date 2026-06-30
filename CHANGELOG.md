@@ -4,6 +4,54 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-30 (session 11 — Polish: Push Notifications, Onboarding, Settings, Loading, Share/Export)
+
+### Part 1 — Push Notifications (server-side from cron)
+- **`api/lib/pushNotify.js`** — new server-side Web Push helper using firebase-admin to load subscriptions, `sendPushToUser(userId, opts)` with per-severity dedup windows (alert: 4 h, warning: 15 min), `notification_log` Firestore collection for dedup tracking, stale endpoint pruning
+- **`api/cron/agents.js`** — `writeFeed` now fire-and-forgets `sendPushToUser` for every alert/warning feed item; agent emoji used in push titles (⚡ REX, 🔥 NOVA, 🛡️ SAGE, 🌍 ATLAS, 🐻 VEGA, ⚖️ ZEN, 👑 AXIOM)
+- **`web-push` npm package** — added to `package.json` and `node_modules` (was imported in `api/send-push.js` but missing from deps)
+
+### Part 2 — Onboarding Flow
+- **`src/components/OnboardingFlow.jsx`** — 5-screen full-screen walkthrough:
+  - Screen 1 Welcome: animated SparkLogo scale-in + glow
+  - Screen 2 Meet the Agents: auto-advancing carousel (3s) + manual dot navigation through 6 agents + AXIOM; agent-colored card with description
+  - Screen 3 Portfolio: descriptive text + [Set Up Portfolio] navigates to Portfolio tab
+  - Screen 4 Notifications: `enablePush()` via existing Web Push; granted/denied/unsupported states
+  - Screen 5 Ready: mini council (6 agent emblems in a circle + AXIOM center with crown)
+  - Framer Motion slide-left transitions; dot progress indicator
+  - Completion writes `hasSeenOnboarding: true` to `users/{uid}/data/preferences`
+- **`src/App.jsx`** — checks `hasSeenOnboarding` on auth state change; shows `OnboardingFlow` overlay; "Replay Onboarding" available in Settings
+
+### Part 3 — Settings Expansion
+- **`src/components/SettingsTab.jsx`** — fully rewritten with sections:
+  - Profile: display name, email, Sign Out
+  - Appearance: dark mode toggle
+  - DCA Schedule: per-account editable amounts saved to `users/{uid}/data/settings.dca`
+  - Notifications: Web Push toggle using `enablePush`/`disablePush` from `push.js`; price alert threshold picker
+  - Display: Replay Onboarding button
+  - Data: Export Portfolio CSV (downloads file from Firestore); Clear Agent Feed (deletes last 50 docs); Delete Account with confirmation modal
+  - About: version, stack credits
+- Uses `toast` for feedback on all actions
+
+### Part 4 — Skeleton Loading + Toast System
+- **`src/components/ui/Skeleton.jsx`** — reusable shimmer skeleton (`<Skeleton>`, `<SkeletonCard>`, `<SkeletonRows>`)
+- **`src/utils/toast.js`** — global event-bus toast API: `toast.success()` (3 s), `toast.error()` (stays), `toast.info()` (5 s)
+- **`src/components/ui/Toast.jsx`** — `ToastContainer` renders slide-down animated toasts, max 3 stacked, dismiss button
+- **`src/index.css`** — `@keyframes skeleton-shimmer` + `.skeleton-shimmer` class
+- `CouncilReports.jsx` loading state replaced with 3-card skeleton shimmer
+
+### Part 5 — Share / Export
+- **`src/components/CouncilReports.jsx`** — Share button in report detail sheet: `navigator.share()` (Web Share API) with text fallback to clipboard; formatted report text includes ticker verdicts, confidence, AXIOM summary
+- Settings → Data → Export Portfolio: downloads `council-portfolio-YYYY-MM-DD.csv` with Account/Ticker/Shares/Avg Cost columns
+
+### PWA Icons
+- **`scripts/gen-icons.cjs`** — pure Node.js PNG generator (no deps): CRC32, zlib deflate, point-in-polygon spark rasterization, angle-based gradient (blue→purple→red→amber→green)
+- **`public/icons/badge-96.png`** (3.1 KB), **`icon-192.png`** (8.4 KB), **`icon-512.png`** (25.9 KB), **`apple-touch-icon.png`** — generated
+- `public/manifest.json` — added apple-touch-icon entry
+- `index.html` — apple-touch-icon href updated to point to actual file
+
+---
+
 ## 2026-06-30 (session 10 — Layer 5: 3D Council Chamber)
 
 ### Feature — React Three Fiber Council Chamber

@@ -4,6 +4,20 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 11)
+
+### Polish Pass ✓
+- [x] **Push Notifications** — `api/lib/pushNotify.js` server-side Web Push from cron; `writeFeed` auto-sends push for alert/warning severity; 4h dedup for alerts, 15min for warnings; `notification_log` tracks sent items; `web-push` added to package.json
+- [x] **Onboarding Flow** — 5-screen `OnboardingFlow.jsx`; auto-detected on first login via `hasSeenOnboarding` Firestore flag; slide transitions; agent carousel; notification request; mini council on final screen
+- [x] **Settings expansion** — Profile, DCA per-account (editable, saves to Firestore), Notifications (push toggle + threshold), Display (replay onboarding), Data (CSV export, clear feed, delete account), About
+- [x] **Skeleton loading** — `Skeleton.jsx` with shimmer animation; `CouncilReports` loading → skeleton cards
+- [x] **Toast system** — global event-bus `toast.js`; `ToastContainer` in App.jsx; success/error/info with auto-dismiss
+- [x] **Share council report** — Web Share API + clipboard fallback; formatted text with ticker verdicts and AXIOM summary
+- [x] **Export portfolio CSV** — Settings → Data → downloads CSV with all holdings
+- [x] **PWA icons** — generated badge-96, icon-192, icon-512, apple-touch-icon via pure Node.js PNG generator; manifest.json + index.html updated
+
+---
+
 ## DONE (session 10)
 
 ### Layer 5 — 3D Council Chamber ✓

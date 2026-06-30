@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Crown, X, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { Crown, X, ChevronDown, ChevronRight, FileText, Share2 } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase.js';
 import { AGENTS, AXIOM_AVATAR } from '../constants/agents.js';
@@ -143,6 +143,15 @@ function TickerRow({ ticker, result, dark, expanded, onToggle }) {
 function ReportDetailSheet({ report, dark, onClose }) {
   const T = theme(dark);
   const [expandedTicker, setExpandedTicker] = useState(null);
+  const [shareFeedback, setShareFeedback] = useState(null);
+
+  async function handleShare() {
+    const result = await shareReport(report);
+    if (result === 'copied') {
+      setShareFeedback('Copied!');
+      setTimeout(() => setShareFeedback(null), 2000);
+    }
+  }
 
   const dateStr = report.createdAt?.toDate
     ? report.createdAt.toDate().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
@@ -188,6 +197,11 @@ function ReportDetailSheet({ report, dark, onClose }) {
             </div>
             <span style={{ ...MONO, fontSize: 10, color: T.text3 }}>{dateStr}</span>
           </div>
+          <button onClick={handleShare} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, position: 'relative' }}>
+            {shareFeedback
+              ? <span style={{ ...MONO, fontSize: 10, color: '#22C55E' }}>{shareFeedback}</span>
+              : <Share2 size={16} style={{ color: T.text3 }} />}
+          </button>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
             <X size={18} style={{ color: T.text3 }} />
           </button>
@@ -221,6 +235,35 @@ function ReportDetailSheet({ report, dark, onClose }) {
       </motion.div>
     </motion.div>
   );
+}
+
+function buildShareText(report) {
+  const date = report.createdAt?.toDate
+    ? report.createdAt.toDate().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : 'This week';
+  const lines = [`📊 Weekly Council Report — ${date}`];
+  for (const [ticker, result] of Object.entries(report.results || {})) {
+    lines.push(`${ticker}: ${result.finalVerdict} (${result.confidence}/10 confidence)`);
+  }
+  if (report.overallSummary) {
+    lines.push('', report.overallSummary);
+  }
+  lines.push('', '— The Council');
+  return lines.join('\n');
+}
+
+async function shareReport(report) {
+  const text = buildShareText(report);
+  if (navigator.share) {
+    try { await navigator.share({ title: 'The Council — Weekly Report', text }); return; } catch {}
+  }
+  // Fallback: copy to clipboard
+  try {
+    await navigator.clipboard.writeText(text);
+    return 'copied';
+  } catch {
+    return 'error';
+  }
 }
 
 function reportDateStr(ts) {
@@ -257,8 +300,10 @@ export default function CouncilReports({ dark }) {
   }, []);
 
   if (loading) return (
-    <div style={{ padding: '24px 0', textAlign: 'center', ...MONO, fontSize: 12, color: T.text3 }}>
-      Loading reports…
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+      {[1, 2, 3].map(i => (
+        <div key={i} className="skeleton-shimmer" style={{ height: 80, borderRadius: 12 }} />
+      ))}
     </div>
   );
 

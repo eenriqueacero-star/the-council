@@ -14,6 +14,7 @@ import {
   updateStance, updateGlobalOutlook,
   getAllStances, getAllGlobalOutlooks,
 } from '../lib/agentMemory.js';
+import { sendPushToUser, feedItemTitle } from '../lib/pushNotify.js';
 
 // ---------------------------------------------------------------------------
 // Weekly council helpers
@@ -83,6 +84,17 @@ async function writeFeed(userId, item) {
     createdAt: FieldValue.serverTimestamp(),
     timestamp: FieldValue.serverTimestamp(),
   });
+  // Push notification for alert/warning items (fire-and-forget, never blocks the cron)
+  if (item.severity === 'alert' || item.severity === 'warning') {
+    const tag = [item.agentId, item.ticker || 'all', item.source || 'scan'].filter(Boolean).join('-');
+    sendPushToUser(userId, {
+      title: feedItemTitle(item),
+      body:  item.headline || '',
+      url:   '/',
+      tag,
+      severity: item.severity,
+    }).catch(() => {});
+  }
 }
 
 async function getFullHoldings(userId) {

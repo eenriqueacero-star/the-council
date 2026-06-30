@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, addDoc, collection, onSnapshot, setDoc, query, where } from 'firebase/firestore';
+import { doc, addDoc, collection, onSnapshot, setDoc, query, where, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase.js';
 import { ACCOUNTS } from './constants/agents.js';
 import { getMarketState, getTimeToNextOpen } from './utils/marketState.js';
@@ -17,6 +17,8 @@ import AlphaTrackerTab from './components/AlphaTrackerTab.jsx';
 import UpdatesTab from './components/UpdatesTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import ScoutTab from './components/ScoutTab.jsx';
+import OnboardingFlow from './components/OnboardingFlow.jsx';
+import ToastContainer from './components/ui/Toast.jsx';
 import DebugTab from './components/DebugTab.jsx';
 import { getQuotes } from './api.js';
 import { sendNotification, getPermissionState } from './utils/notify.js';
@@ -69,6 +71,7 @@ export default function App() {
   const T = theme(dark);
 
   const [alertSettings, setAlertSettings] = useState({ globalThreshold: 5, perStock: {} });
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const alertFiredToday = useRef({});
   const lastAlertDate   = useRef(new Date().toDateString());
   const [running,    setRunning]    = useState(false);
@@ -139,6 +142,11 @@ export default function App() {
         snap => setFeedUnreadCount(snap.size),
         () => {}
       );
+
+      // Check onboarding status
+      getDoc(doc(db, 'users', user.uid, 'data', 'preferences')).then(snap => {
+        if (!snap.exists() || !snap.data()?.hasSeenOnboarding) setShowOnboarding(true);
+      }).catch(() => {});
 
       // Resolve stale agent observations in the background
       const getCurrentPrice = async (ticker) => {
@@ -270,7 +278,7 @@ export default function App() {
     if (tab === 'scout')    return <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} />;
     if (tab === 'alpha')    return <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>;
     if (tab === 'updates')  return <UpdatesTab dark={dark} />;
-    if (tab === 'settings') return <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} /></div>;
+    if (tab === 'settings') return <div style={padded}><SettingsTab dark={dark} setDark={setDark} alertSettings={alertSettings} setAlertSettings={setAlertSettings} onTriggerOnboarding={() => setShowOnboarding(true)} /></div>;
     if (tab === 'debug' && isDebugMode) return <DebugTab dark={dark} />;
     if (tab === 'more') return (
       <div style={{ maxWidth: 480, margin: '0 auto', padding: 'var(--space-page)' }}>
@@ -419,6 +427,19 @@ export default function App() {
       </div>
 
       <BottomNav tab={tab} setTab={setTab} dark={dark} feedUnreadCount={feedUnreadCount} />
+
+      {/* Onboarding overlay */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <OnboardingFlow
+            onComplete={() => setShowOnboarding(false)}
+            onSetupPortfolio={() => { setShowOnboarding(false); setTab('portfolio'); }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Toast notifications */}
+      <ToastContainer />
     </div>
   );
 }

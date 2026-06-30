@@ -4,6 +4,14 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 29)
+
+### Fix — get-candles: 1W and 1M returned empty arrays
+
+Changed resolution for 1W and 1M from `'15'` / `'60'` (intraday) to `'D'` (daily). Finnhub free tier does not serve historical intraday candles — only the current trading day intraday is available. Using intraday resolutions for multi-day ranges caused Finnhub to return `s: "no_data"`, which the handler converted to `[]`. All 9 portfolio tickers were returning empty arrays for every range except 1D. Fix aligns 1W/1M with the already-working 3M/6M/1Y which use daily bars.
+
+---
+
 ## 2026-06-29 (session 28)
 
 ### Feature — Chart: Robinhood-matched intervals + extended hours + ambient session hue

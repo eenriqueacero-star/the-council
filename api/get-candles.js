@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   let resolution, from;
   switch (range) {
     case '1D':  resolution = '5';  from = now - 86400;           break;
-    case '1W':  resolution = '15'; from = now - 7 * 86400;       break;
+    case '1W':  resolution = 'D';  from = now - 7 * 86400;       break;
     case '1M':  resolution = 'D';  from = now - 30 * 86400;      break;
     case '3M':  resolution = 'D';  from = now - 90 * 86400;      break;
     case '6M':  resolution = 'D';  from = now - 180 * 86400;     break;

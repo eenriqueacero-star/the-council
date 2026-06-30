@@ -4,6 +4,16 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-06-29 (session 27)
+
+### Fix — 1W chart shows 2 points (Finnhub free-tier intraday limit)
+
+Finnhub free tier only provides intraday bars (5-min, 15-min, 60-min) for the **current trading day**. Requesting 15-min bars over 7 days returns `no_data`, falling back to the synthetic 2-point line.
+
+`api/get-candles.js`: changed 1W resolution from `'15'` (15-min intraday) → `'D'` (daily). Now returns 5 real daily bars (Mon–Fri of the past week) instead of 2 synthetic points. Same Finnhub free-tier limitation applies to 1D when markets are closed — those 2 points are expected until Monday open.
+
+---
+
 ## 2026-06-29 (session 26)
 
 ### Fix — Chart crosshair tooltip shows "Invalid Date"

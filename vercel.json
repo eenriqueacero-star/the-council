@@ -10,7 +10,7 @@
     "api/get-technicals.js": { "maxDuration": 45 },
     "api/send-push.js":   { "maxDuration": 10 },
     "api/scout-cron.js":   { "maxDuration": 300 },
-    "api/cron/agents.js":  { "maxDuration": 120 }
+    "api/cron/agents.js":  { "maxDuration": 300 }
   },
   "crons": [
     { "path": "/api/scout-cron", "schedule": "0 13 * * 1-5" }

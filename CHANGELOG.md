@@ -4,6 +4,15 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-07-01 (session 12 — Fix: Vercel 12-function limit)
+
+### Serverless function count fix
+- **`api/lib/` → `api/_lib/`** — renamed lib directory to `_lib` so Vercel's function discovery skips it (Vercel excludes `_`-prefixed paths from the function count)
+- **`api/cron/agents.js`** — updated all four lib imports from `'../lib/'` to `'../_lib/'`
+- Result: 9 counted serverless functions (down from 13), well under the Hobby plan's 12-function limit
+
+---
+
 ## 2026-06-30 (session 11 — Polish: Push Notifications, Onboarding, Settings, Loading, Share/Export)
 
 ### Part 1 — Push Notifications (server-side from cron)

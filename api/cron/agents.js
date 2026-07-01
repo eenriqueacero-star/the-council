@@ -6,15 +6,15 @@
  * Auth: Authorization: Bearer $CRON_SECRET (set in Vercel env + GitHub secrets).
  */
 
-import { db } from '../lib/firebaseAdmin.js';
-import { fetchPrices, fetchNews, fetchEarnings, fetchTechnicals, fetchMacro } from '../lib/recon.js';
+import { db } from '../_lib/firebaseAdmin.js';
+import { fetchPrices, fetchNews, fetchEarnings, fetchTechnicals, fetchMacro } from '../_lib/recon.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import {
   getAgentFullMemory, getStaleStances,
   updateStance, updateGlobalOutlook,
   getAllStances, getAllGlobalOutlooks,
-} from '../lib/agentMemory.js';
-import { sendPushToUser, feedItemTitle } from '../lib/pushNotify.js';
+} from '../_lib/agentMemory.js';
+import { sendPushToUser, feedItemTitle } from '../_lib/pushNotify.js';
 
 // ---------------------------------------------------------------------------
 // Weekly council helpers

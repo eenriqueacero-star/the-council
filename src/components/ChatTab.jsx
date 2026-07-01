@@ -2,17 +2,26 @@ import React, { useState, useRef, useEffect, useReducer } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, Loader2, Send, Crown, AlertTriangle } from 'lucide-react';
 import { MONO, DISP } from '../constants/styles.js';
-import { AGENTS, AXIOM_AVATAR, PROTOCOLS, AXIOM_SYSTEM, AXIOM_CONVERSATIONAL } from '../constants/agents.js';
+import { AGENTS, AXIOM_AVATAR, PROTOCOLS, AXIOM_CONVERSATIONAL, AGENT_SHORT_ID } from '../constants/agents.js';
 import { extractJSON } from '../utils.js';
 import { callAgent, getQuotes, getNews, getFredData, getTechnicals, sleep } from '../api.js';
 import { auth, db } from '../firebase.js';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, getDoc, setDoc, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { loadTickerHistory } from '../utils/rulingContext.js';
 import { loadAgentContext, buildAgentContext } from '../utils/agentContext.js';
 import { loadAllAgentProfiles, refreshAgentResearch, buildProfileContext } from '../utils/agentMemory.js';
+import { loadTickerStances } from '../utils/stanceMemory.js';
 import { theme } from '../utils/theme.js';
 import SparkLogo from './SparkLogo.jsx';
 import { writeDebug } from '../utils/debugStore.js';
+import {
+  ANTI_HALLUCINATION_RULES, CONCISE_STYLE_RULES, QUICK_REPLIES_INSTRUCTION, ACTION_TAGS_INSTRUCTION,
+  buildHoldingsBlock, buildTickerFactBlock,
+} from '../utils/chatGrounding.js';
+import { parseAssistantMessage } from '../utils/chatParse.js';
+import ChatDataTable from './chat/ChatDataTable.jsx';
+import ChatActionButton from './chat/ChatActionButton.jsx';
+import QuickReplies from './chat/QuickReplies.jsx';
 
 const PS = {
   PASS:       { bg:'rgba(34,197,94,0.1)',   fg:'#22C55E', label:'PASS'    },
@@ -32,7 +41,20 @@ function isPortfolioQuery(text) {
   return PORTFOLIO_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-export default function ChatTab({ account, acct, posMap, positionsLine, flagApiDown, dark }) {
+// Human-readable label + icon for a pending ACTION tag's button.
+function describeAction(action) {
+  switch (action?.type) {
+    case 'SHOW_CHART':    return { label: `View ${action.param} Chart`, icon: '📊' };
+    case 'RUN_COUNCIL':   return { label: `Run Council on ${action.param}`, icon: '🏛️' };
+    case 'SHOW_HOLDINGS': return { label: 'Show Live Holdings', icon: '💼' };
+    case 'SHOW_STANCES':  return { label: `Show Agent Stances — ${action.param}`, icon: '⚖️' };
+    case 'MUTE_AGENT':    return { label: `Mute ${(action.param || '').toUpperCase()} Notifications`, icon: '🔕' };
+    case 'SHOW_REPORT':   return { label: 'Show Latest Weekly Report', icon: '📋' };
+    default: return null;
+  }
+}
+
+export default function ChatTab({ account, acct, posMap, acctHoldings, positionsLine, flagApiDown, dark, onTabChange, setChartTicker }) {
   const [chat,        setChat]       = useState([{ role:'pm', text:"The council is assembled. Ask me anything — market conditions, macro outlook, portfolio strategy, or name a ticker for a full investment ruling." }]);
   const [chatInput,   setChatInput]  = useState('');
   const [chatBusy,    setChatBusy]   = useState(false);
@@ -43,6 +65,9 @@ export default function ChatTab({ account, acct, posMap, positionsLine, flagApiD
   const [chatTrackShares, setChatTrackShares] = useState('');
   const [chatTrackSaving, setChatTrackSaving] = useState(false);
   const [chatTrackedMap,  setChatTrackedMap]  = useState({}); // { [runId]: 'entered' | 'watching' }
+  const [mutedAgents, setMutedAgents] = useState([]);
+  const [actionBusy, setActionBusy] = useState(null); // action key currently executing (disables its button)
+  const [actionDoneIdx, setActionDoneIdx] = useState(() => new Set()); // message indices whose action button was already tapped
   const chatEndRef = useRef(null);
   // Portfolio follow-up: after injecting data, carry it for next 3 messages
   const lastPortfolioDataRef = useRef('');
@@ -50,6 +75,137 @@ export default function ChatTab({ account, acct, posMap, positionsLine, flagApiD
   const T = theme(dark);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior:'smooth' }); }, [chat]);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    getDoc(doc(db, 'users', uid, 'data', 'settings')).then(snap => {
+      setMutedAgents(snap.exists() ? (snap.data()?.mutedAgents || []) : []);
+    }).catch(() => {});
+  }, []);
+
+  // Live quotes for every portfolio holding — grounds every AXIOM prompt in real prices/
+  // real company names so it can never invent one (see utils/chatGrounding.js). getQuotes()
+  // already carries a 45s cache, so repeated calls within a chat session are near-free.
+  async function fetchHoldingsBlock() {
+    const tickers = (acctHoldings?.length ? acctHoldings : Object.keys(posMap || {})).filter(Boolean);
+    if (!tickers.length) return { block: '', quotes: {} };
+    try {
+      const quotes = await getQuotes(tickers);
+      return { block: buildHoldingsBlock(tickers, quotes), quotes };
+    } catch {
+      return { block: '', quotes: {} };
+    }
+  }
+
+  // Builds the live portfolio table (both the table rows for ChatDataTable and the
+  // real-dollar summary text used for prompt injection) — shared by the natural-language
+  // "how's my portfolio doing" path and the explicit ACTION:SHOW_HOLDINGS action.
+  async function fetchPortfolioTable() {
+    const tickers = Object.keys(posMap || {}).filter(t => t && t.trim());
+    if (!tickers.length) return null;
+    const quotes = await getQuotes(tickers);
+    let totalValue = 0, totalDayGain = 0, totalUnrealizedPL = 0;
+    const rows = [];
+    for (const ticker of tickers) {
+      const q = quotes[ticker];
+      const pos = posMap[ticker] || {};
+      const shares = parseFloat(pos.shares) || 0;
+      const cost = parseFloat(String(pos.cost || '').replace(/[^0-9.]/g, '')) || 0;
+      const price = q?.price || q?.prevClose || 0;
+      const changePct = q?.changePct ?? 0;
+      const prevClose = q?.prevClose || price;
+      const mktVal = shares * price;
+      const dayGain = shares * (price - prevClose);
+      const unrealizedPL = cost > 0 ? (price - cost) * shares : null;
+      totalValue += mktVal;
+      totalDayGain += dayGain;
+      if (unrealizedPL != null) totalUnrealizedPL += unrealizedPL;
+      rows.push([ticker, `$${price.toFixed(2)}`, `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`, unrealizedPL != null ? `${unrealizedPL >= 0 ? '+' : ''}$${unrealizedPL.toFixed(2)}` : 'N/A']);
+    }
+    return {
+      quotes, rows,
+      headers: ['Ticker', 'Price', 'Day', 'Unrealized P&L'],
+      totalValue, totalDayGain, totalUnrealizedPL,
+      summaryText: `TOTAL: market value $${totalValue.toFixed(2)} | day change $${totalDayGain.toFixed(2)} (${totalValue > 0 ? ((totalDayGain / (totalValue - totalDayGain)) * 100).toFixed(2) : '0.00'}%) | total unrealized P&L $${totalUnrealizedPL.toFixed(2)}`,
+    };
+  }
+
+  async function toggleMuteAgent(agentId) {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const isMuted = mutedAgents.includes(agentId);
+    const next = isMuted ? mutedAgents.filter(a => a !== agentId) : [...mutedAgents, agentId];
+    setMutedAgents(next);
+    try { await setDoc(doc(db, 'users', uid, 'data', 'settings'), { mutedAgents: next }, { merge: true }); } catch {}
+    return !isMuted; // returns true if now muted
+  }
+
+  // Executes an ACTION:<TYPE>:<PARAM> tag AXIOM emitted. Every action is either pure
+  // navigation (SHOW_CHART) or a read + render of real data already fetched elsewhere in
+  // the app (RUN_COUNCIL reuses the existing runCouncilInChat function) — nothing here can
+  // place a trade or bypass the sell protocol.
+  async function executeAction(action, acctLine, uid) {
+    if (!action) return;
+    const key = `${action.type}:${action.param}`;
+    setActionBusy(key);
+    try {
+      const tkr = String(action.param || '').toUpperCase().trim();
+      if (action.type === 'SHOW_CHART' && tkr) {
+        setChartTicker?.(tkr);
+        onTabChange?.('portfolio');
+      } else if (action.type === 'RUN_COUNCIL' && tkr) {
+        await runCouncilInChat(tkr, acctLine, uid, `Convening the full council on ${tkr}.`);
+      } else if (action.type === 'SHOW_HOLDINGS') {
+        const table = await fetchPortfolioTable();
+        setChat(p => [...p, table
+          ? { role: 'pm', text: '', table: { headers: table.headers, rows: table.rows } }
+          : { role: 'pm', text: "No holdings on record for this account yet." }]);
+      } else if (action.type === 'SHOW_STANCES' && tkr && uid) {
+        // loadTickerStances keys its result by the SHORT cron agent id (rex/nova/...),
+        // not AGENTS[].id (technical/catalyst/...) — translate via AGENT_SHORT_ID.
+        const stances = await loadTickerStances(uid, tkr).catch(() => ({}));
+        const rows = AGENTS.map(ag => {
+          const s = stances[AGENT_SHORT_ID[ag.id]];
+          return [ag.name, s ? s.stance.toUpperCase() : 'no data', s ? `${s.conviction}/10` : '—'];
+        });
+        setChat(p => [...p, { role: 'pm', text: `Agent stances on ${tkr}:`, table: { headers: ['Agent', 'Stance', 'Conviction'], rows } }]);
+      } else if (action.type === 'MUTE_AGENT' && tkr) {
+        const agentId = tkr.toLowerCase();
+        const nowMuted = await toggleMuteAgent(agentId);
+        const ag = AGENTS.find(a => a.name.toLowerCase() === agentId || a.id === agentId);
+        setChat(p => [...p, { role: 'pm', text: `${(ag?.name || agentId.toUpperCase())} push notifications ${nowMuted ? 'muted' : 'unmuted'}.` }]);
+      } else if (action.type === 'SHOW_REPORT' && uid) {
+        const snap = await getDocs(query(collection(db, 'users', uid, 'council_reports'), orderBy('createdAt', 'desc'), limit(1)));
+        if (snap.empty) {
+          setChat(p => [...p, { role: 'pm', text: 'No weekly council reports yet — the first one lands next Monday.' }]);
+        } else {
+          const report = snap.docs[0].data();
+          const rows = Object.entries(report.results || {}).map(([t, r]) => [t, r.finalVerdict, `${r.confidence}/10`]);
+          setChat(p => [...p, { role: 'pm', text: report.overallSummary || `Weekly council — ${report.portfolioLabel}`, table: rows.length ? { headers: ['Ticker', 'Verdict', 'Confidence'], rows } : null }]);
+        }
+      }
+    } catch (e) {
+      console.error('[chat action] failed:', action.type, e?.message);
+    } finally {
+      setActionBusy(null);
+    }
+  }
+
+  // User tapped a ChatActionButton — execute the action it was carrying and mark it done
+  // so the button can't be double-fired. RUN_COUNCIL reuses the same multi-round flow as
+  // a typed request, so it holds chatBusy for the same reason (agents run sequentially).
+  async function handleActionTap(msgIndex, action, acctLine) {
+    if (actionDoneIdx.has(msgIndex) || chatBusy) return;
+    setActionDoneIdx(prev => new Set(prev).add(msgIndex));
+    const isLongRunning = action?.type === 'RUN_COUNCIL';
+    if (isLongRunning) setChatBusy(true);
+    try {
+      await executeAction(action, acctLine, auth.currentUser?.uid);
+    } finally {
+      if (isLongRunning) setChatBusy(false);
+    }
+  }
 
   async function saveFromChat(runId, rulingData, status, price, shares) {
     const uid = auth.currentUser?.uid;
@@ -290,7 +446,8 @@ Use these exact indicator values to ground your technical assessment.` : '\n[Alp
     }).join('\n');
 
     const synthSys = `You are AXIOM, chair of THE COUNCIL, delivering the final ruling on ${tkr} for ${acct.label}. ${PROTOCOLS}${macroBackdrop ? '\n' + macroBackdrop : ''}
-The council ran 3 deliberation rounds. Synthesize into a decisive verdict. Speak the ruling conversationally (2-4 sentences).
+${ANTI_HALLUCINATION_RULES}
+The council ran 3 deliberation rounds. Synthesize into a decisive verdict. Speak the ruling conversationally — 2-3 SHORT sentences max, lead with the verdict, no fluff.
 Output ONLY the final raw JSON ruling object — no markdown, no code fences, no reasoning text, no commentary before or after the JSON: {"speak":"<ruling text>","verdict":"BUY"|"WATCH"|"SKIP","conviction":<0-10>,"stopLoss":"<price>","takeProfit":"<price>"}
 BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this trade — do not enter.`;
 
@@ -365,38 +522,26 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
     const acctLine = `Account: ${acct.label} (${acct.sub}). Holdings: ${positionsLine}. DCA: ${acct.dcaNote}.`;
     const historyBlock = buildHistoryBlock(convHistory);
 
+    // Real-time holdings context (Part 1 fix) — every AXIOM prompt gets real company
+    // names/sectors + live prices so it can never invent one.
+    const { block: holdingsBlock, quotes: holdingsQuotes } = await fetchHoldingsBlock();
+
     // Portfolio data injection — fetch live prices if user asks about portfolio performance,
     // then carry that data for the next 3 follow-up messages automatically.
     let portfolioDataBlock = '';
+    let portfolioTableForRender = null;
     if (isPortfolioQuery(text)) {
-      // Fresh fetch
-      const tickers = Object.keys(posMap || {}).filter(t => t && t.trim());
-      if (tickers.length > 0) {
-        try {
-          const quotes = await getQuotes(tickers);
-          let totalValue = 0, totalDayGain = 0, totalUnrealizedPL = 0;
-          const rows = [];
-          for (const ticker of tickers) {
-            const q = quotes[ticker];
-            const pos = posMap[ticker] || {};
-            const shares = parseFloat(pos.shares) || 0;
-            const cost = parseFloat(String(pos.cost || '').replace(/[^0-9.]/g, '')) || 0;
-            const price = q?.price || q?.prevClose || 0;
-            const changePct = q?.changePct ?? 0;
-            const prevClose = q?.prevClose || price;
-            const mktVal = shares * price;
-            const dayGain = shares * (price - prevClose);
-            const unrealizedPL = cost > 0 ? (price - cost) * shares : null;
-            totalValue += mktVal;
-            totalDayGain += dayGain;
-            if (unrealizedPL != null) totalUnrealizedPL += unrealizedPL;
-            rows.push(`${ticker}: $${price.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% today) | ${shares}sh | cost $${cost.toFixed(2)} | mkt val $${mktVal.toFixed(2)} | day gain $${dayGain.toFixed(2)}${unrealizedPL != null ? ` | unrealized P&L $${unrealizedPL.toFixed(2)}` : ''}`);
-          }
-          portfolioDataBlock = `\n\nPORTFOLIO DATA (live as of ${new Date().toLocaleTimeString()}):\n${rows.join('\n')}\nTOTAL: market value $${totalValue.toFixed(2)} | day change $${totalDayGain.toFixed(2)} (${totalValue > 0 ? ((totalDayGain / (totalValue - totalDayGain)) * 100).toFixed(2) : '0.00'}%) | total unrealized P&L $${totalUnrealizedPL.toFixed(2)}\n`;
+      try {
+        const table = await fetchPortfolioTable();
+        if (table) {
+          const rowLines = table.rows.map(([t, price, day, pl]) => `${t}: ${price} (${day} today) | unrealized P&L ${pl}`);
+          portfolioDataBlock = `\n\nPORTFOLIO DATA (live as of ${new Date().toLocaleTimeString()}):\n${rowLines.join('\n')}\n${table.summaryText}\n`;
+          portfolioTableForRender = { headers: table.headers, rows: table.rows };
 
           // Fetch headlines for top 3 movers (by absolute $ day change) — gives AXIOM real news to cite
+          const tickers = Object.keys(posMap || {}).filter(t => t && t.trim());
           const tickerDayGains = tickers.map(t => {
-            const q = quotes[t]; const pos = posMap[t] || {};
+            const q = table.quotes[t]; const pos = posMap[t] || {};
             const shares = parseFloat(pos.shares) || 0;
             const price = q?.price || q?.prevClose || 0;
             const prevClose = q?.prevClose || price;
@@ -415,9 +560,9 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
           lastPortfolioDataRef.current = portfolioDataBlock;
           portfolioFollowUpRef.current = 3; // carry for next 3 follow-up messages
           writeDebug('CHAT', `Portfolio data injected for "${text.slice(0, 40)}"`, portfolioDataBlock);
-        } catch (err) {
-          console.error('[chat portfolio injection] quote fetch failed:', err?.message);
         }
+      } catch (err) {
+        console.error('[chat portfolio injection] quote fetch failed:', err?.message);
       }
     } else if (portfolioFollowUpRef.current > 0 && lastPortfolioDataRef.current) {
       // Auto-inject cached data for follow-up questions
@@ -428,6 +573,8 @@ BUY = approved entry. WATCH = wait for better setup. SKIP = council rejects this
 
     // AXIOM reads the message and decides: answer directly, route to specialist(s), or convene full council
     const axiomSys = `You are AXIOM, chair of THE COUNCIL. Talk like a sharp, knowledgeable friend — direct, casual, no corporate speak. Strong opinions backed by data. ${PROTOCOLS}
+${holdingsBlock}
+${ANTI_HALLUCINATION_RULES}
 
 TONE — always sound like the GOOD example:
 BAD: "Your portfolio declined 5.83% today, losing $194.07 in market value."
@@ -558,7 +705,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
         let response;
         try {
           const identityAnchor = `YOU ARE ${ag.name} (${ag.emoji}). First person only. 3-4 sentences max. Reference your colleagues by name when responding to their points.\n\n`;
-          const sys = identityAnchor + ag.conversationalPrompt + ROSTER + knowledgeBase + historyBlock;
+          const sys = identityAnchor + ag.conversationalPrompt + ROSTER + holdingsBlock + '\n' + ANTI_HALLUCINATION_RULES + knowledgeBase + historyBlock;
           response = (await callAgent(sys, userMsg, false, 280)).text;
         } catch {
           flagApiDown();
@@ -594,10 +741,14 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       // AXIOM closes when discussion is done
       if (spokenThisTurn.length > 0) {
         try {
-          const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated and reached a conclusion. Deliver a single crisp summary (2-3 sentences) that directly answers the investor's original question based on everything the team established. Be specific — include tickers, dates, or numbers if they came up. No fluff.`;
+          const closingSys = `You are AXIOM, chair of THE COUNCIL. The specialists have deliberated and reached a conclusion. Deliver a single crisp summary that directly answers the investor's original question based on everything the team established. Be specific — include tickers, dates, or numbers if they came up.
+${holdingsBlock}
+${ANTI_HALLUCINATION_RULES}
+${CONCISE_STYLE_RULES}${ACTION_TAGS_INSTRUCTION}${QUICK_REPLIES_INSTRUCTION}`;
           const closingCtx = `Investor asked: "${text}"\n\nFull council discussion:\n${spokenThisTurn.map(s => `[${s.name}]: ${s.response}`).join('\n\n')}\n\nDeliver the consensus answer.`;
-          const { text: closing } = await callAgent(closingSys, closingCtx, false, 250);
-          setChat(p => [...p, { role:'pm', text:closing }]);
+          const { text: closingRaw } = await callAgent(closingSys, closingCtx, false, 350);
+          const { text: closing, table, action, quickReplies } = parseAssistantMessage(closingRaw);
+          setChat(p => [...p, { role:'pm', text:closing, table, quickReplies, pendingAction: action, acctLine }]);
           setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:closing }]);
         } catch {}
       }
@@ -608,15 +759,43 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
 
     // === AXIOM DIRECT ANSWER (web-search enabled) ===
     let axiomReply = router.speak;
+    let directTable = portfolioTableForRender;
+    let directQuickReplies = [];
+    let directAction = null;
     try {
-      const axiomConvSys = AXIOM_CONVERSATIONAL + `\nToday: ${new Date().toDateString()}.${historyBlock}`;
-      const axiomConvMsg = `Investor: "${text}". ${acctLine}${portfolioDataBlock ? portfolioDataBlock : ''} Answer directly and conversationally. Search the web if you need current information.`;
-      const { text: axiomTxt } = await callAgent(axiomConvSys, axiomConvMsg, true, 400);
-      if (axiomTxt && axiomTxt.trim()) axiomReply = axiomTxt.trim();
+      // If a specific (non-portfolio) ticker was identified, ground it with a real quote
+      // + verified company profile too — this is the path that previously hallucinated
+      // MU's price and CRDO/ALAB/NBIS/FLY's company identities.
+      let tickerFactBlock = '';
+      if (router.ticker) {
+        const tkr = String(router.ticker).toUpperCase();
+        if (!holdingsQuotes[tkr]) {
+          try {
+            const q = await getQuotes([tkr]);
+            tickerFactBlock = buildTickerFactBlock(tkr, q[tkr]);
+          } catch {}
+        } else {
+          tickerFactBlock = buildTickerFactBlock(tkr, holdingsQuotes[tkr]);
+        }
+      }
+
+      const axiomConvSys = AXIOM_CONVERSATIONAL + `\nToday: ${new Date().toDateString()}.${historyBlock}
+${holdingsBlock}${tickerFactBlock}
+${ANTI_HALLUCINATION_RULES}
+${CONCISE_STYLE_RULES}${ACTION_TAGS_INSTRUCTION}${QUICK_REPLIES_INSTRUCTION}`;
+      const axiomConvMsg = `Investor: "${text}". ${acctLine}${portfolioDataBlock ? portfolioDataBlock : ''} Answer directly and conversationally. Search the web if you need current information beyond what's already provided above — but never override the verified prices/names given above with a web search result.`;
+      const { text: axiomTxt } = await callAgent(axiomConvSys, axiomConvMsg, true, 450);
+      if (axiomTxt && axiomTxt.trim()) {
+        const parsed = parseAssistantMessage(axiomTxt.trim());
+        axiomReply = parsed.text || axiomReply;
+        if (parsed.table) directTable = parsed.table;
+        directQuickReplies = parsed.quickReplies;
+        directAction = parsed.action;
+      }
     } catch {
       flagApiDown();
     }
-    setChat(p => [...p, { role:'pm', text:axiomReply }]);
+    setChat(p => [...p, { role:'pm', text:axiomReply, table: directTable, quickReplies: directQuickReplies, pendingAction: directAction, acctLine }]);
     setConvHistory(prev => [...prev, { role:'assistant', agentId:'pm', content:axiomReply }]);
     setChatBusy(false);
   }
@@ -627,26 +806,49 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
     if (m.role === 'user') return (
       <motion.div key={i} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
         style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <div style={{ maxWidth: '80%', background: T.accent, color: '#fff', borderRadius: '18px 18px 4px 18px', padding: '10px 14px', fontSize: 14, lineHeight: 1.55 }}>{m.text}</div>
+        <div style={{ maxWidth: '85%', background: T.accent, color: '#fff', borderRadius: '18px 18px 4px 18px', padding: '10px 14px', fontSize: 14, lineHeight: 1.55 }}>{m.text}</div>
       </motion.div>
     );
 
     if (m.role === 'pm') {
       const vs = m.verdict ? (PS[m.verdict === 'SKIP' ? 'SKIP' : m.verdict === 'PASS' ? 'PASS_FINAL' : m.verdict] || null) : null;
+      const isLast = i === chat.length - 1;
       return (
         <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
           style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
           <div style={{ flexShrink: 0, marginTop: 2 }}><img src={AXIOM_AVATAR} alt="AXIOM" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} /></div>
-          <div style={{ maxWidth: '82%' }}>
+          <div style={{ maxWidth: '85%', width: m.table ? '100%' : undefined }}>
             <div style={{ ...MONO, fontSize: 9, color: T.accent, marginBottom: 4, letterSpacing: '0.08em' }}>AXIOM</div>
-            <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>
-              {m.text}
-            </div>
+            {m.text && (
+              <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>
+                {m.text}
+              </div>
+            )}
+            {m.table && <ChatDataTable headers={m.table.headers} rows={m.table.rows} dark={dark} />}
+            {m.pendingAction && (() => {
+              const desc = describeAction(m.pendingAction);
+              if (!desc) return null;
+              const done = actionDoneIdx.has(i);
+              const key = `${m.pendingAction.type}:${m.pendingAction.param}`;
+              return (
+                <ChatActionButton
+                  label={done ? `${desc.label} ✓` : desc.label}
+                  icon={desc.icon}
+                  dark={dark}
+                  busy={actionBusy === key}
+                  disabled={done || actionBusy === key || chatBusy}
+                  onClick={() => handleActionTap(i, m.pendingAction, m.acctLine)}
+                />
+              );
+            })()}
             {vs && (
               <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ ...MONO, background: vs.bg, color: vs.fg, fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>{vs.label}</span>
                 <span style={{ ...MONO, fontSize: 9, color: T.text3 }}>{m.conviction}/10 · {m.ticker || ''}</span>
               </div>
+            )}
+            {isLast && m.quickReplies?.length > 0 && (
+              <QuickReplies options={m.quickReplies} onSelect={q => sendChat(q)} dark={dark} disabled={chatBusy} />
             )}
           </div>
         </motion.div>
@@ -657,7 +859,7 @@ Output ONLY the raw JSON object — no code fences, no backticks, no prose befor
       <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.22 }}
         style={{ display: 'flex', justifyContent: 'flex-start', gap: 10 }}>
         <img src={m.avatar} alt={m.name} style={{ flexShrink: 0, marginTop: 2, width: 26, height: 26, borderRadius: 8, objectFit: 'cover' }} />
-        <div style={{ maxWidth: '82%' }}>
+        <div style={{ maxWidth: '85%' }}>
           <div style={{ ...MONO, fontSize: 9, color: m.color || m.accent, marginBottom: 4, letterSpacing: '0.08em' }}>{m.name}</div>
           <div style={{ background: BUBBLE_BG_AGENT, color: T.text, borderRadius: '18px 18px 18px 4px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6 }}>{m.text}</div>
         </div>

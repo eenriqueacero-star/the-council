@@ -89,6 +89,7 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState('idle');
   const [authReady,  setAuthReady]  = useState(false);
   const [feedUnreadCount, setFeedUnreadCount] = useState(0);
+  const [chartTicker, setChartTicker] = useState(null); // lifted so chat's "show chart" action can open it on Portfolio
 
   const apiDownTimer = useRef(null);
   const flagApiDown = () => {
@@ -260,6 +261,7 @@ export default function App() {
       <PortfolioTab {...shared}
         positions={positions} setPos={setPos} addTicker={addTicker} removeTicker={removeTicker}
         marketState={mktState} onTabChange={setTab}
+        chartTicker={chartTicker} setChartTicker={setChartTicker}
       />
     );
     if (tab === 'council') return (
@@ -274,7 +276,7 @@ export default function App() {
         />
       </div>
     );
-    if (tab === 'chat')      return <div style={padded}><ChatTab {...shared} posMap={posMap} /></div>;
+    if (tab === 'chat')      return <div style={padded}><ChatTab {...shared} posMap={posMap} onTabChange={setTab} setChartTicker={setChartTicker} /></div>;
     if (tab === 'scout')    return <ScoutTab dark={dark} posMap={posMap} acctHoldings={acctHoldings} isDebugMode={isDebugMode} />;
     if (tab === 'alpha')    return <div style={padded}><AlphaTrackerTab account={account} dark={dark} /></div>;
     if (tab === 'updates')  return <UpdatesTab dark={dark} />;

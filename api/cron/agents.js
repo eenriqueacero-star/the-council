@@ -78,6 +78,23 @@ function getUsers() {
   return (process.env.CRON_USER_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 
+// Cheap per-invocation cache for muted-agent lists (60s TTL) — writeFeed is called many
+// times per userId within a single cron run, so this avoids re-reading the settings doc
+// on every feed item.
+const mutedAgentsCache = new Map(); // userId -> { list, ts }
+
+async function getMutedAgents(userId) {
+  const cached = mutedAgentsCache.get(userId);
+  if (cached && Date.now() - cached.ts < 60000) return cached.list;
+  let list = [];
+  try {
+    const snap = await db.doc(`users/${userId}/data/settings`).get();
+    list = snap.exists ? (snap.data()?.mutedAgents || []) : [];
+  } catch {}
+  mutedAgentsCache.set(userId, { list, ts: Date.now() });
+  return list;
+}
+
 async function writeFeed(userId, item) {
   await db.collection(`users/${userId}/agent_feed`).add({
     ...item,
@@ -85,8 +102,12 @@ async function writeFeed(userId, item) {
     createdAt: FieldValue.serverTimestamp(),
     timestamp: FieldValue.serverTimestamp(),
   });
-  // Push notification for alert/warning items (fire-and-forget, never blocks the cron)
-  if (item.severity === 'alert' || item.severity === 'warning') {
+  // Push notification for alert/warning items (fire-and-forget, never blocks the cron).
+  // Skipped entirely when the investor has muted this agent from the chat (ACTION:MUTE_AGENT) —
+  // the feed item itself is still written so the network/feed UI stays complete.
+  if ((item.severity === 'alert' || item.severity === 'warning') && item.agentId) {
+    const muted = await getMutedAgents(userId);
+    if (muted.includes(item.agentId)) return;
     const tag = [item.agentId, item.ticker || 'all', item.source || 'scan'].filter(Boolean).join('-');
     sendPushToUser(userId, {
       title: feedItemTitle(item),
@@ -1267,6 +1288,10 @@ Return ONLY valid JSON:
 const AGENTS = new Set(['rex', 'nova', 'sage', 'atlas', 'vega', 'zen', 'weekly-council']);
 
 export default async function handler(req, res) {
+  // Log every incoming request unconditionally, before auth, so we can tell "never called"
+  // apart from "called but rejected" in Vercel's function logs.
+  console.error(`[cron/agents] incoming request: method=${req.method} agent=${req.query?.agent || '(none)'} authHeaderPresent=${!!req.headers.authorization}`);
+
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
 
   const agent = (req.query?.agent || '').toLowerCase();

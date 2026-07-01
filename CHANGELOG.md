@@ -4,6 +4,55 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-07-01 (session 14 — Fix: Chat Hallucinations, Verbosity, Interactive Chat, Scout Cron)
+
+### CRITICAL — Part 1: Chat hallucination fix
+
+The chat was inventing company names/prices (ALAB→"Alabama", NBIS→"Neurocrine", FLY→"Flywire", CRDO→"blockchain company", MU priced at ~$1,156 vs. real ~$100-110). Root cause: none of the free-text chat paths ever injected real company identity or a live quote before letting the model speak.
+
+- **`src/constants/companyInfo.js`** — curated ground-truth `COMPANY_INFO` map (name + sector) for every portfolio ticker + a few common discovery names. Prices are never hardcoded here — always fetched live.
+- **`src/utils/chatGrounding.js`** — `buildHoldingsBlock(tickers, quotes)` builds a "CURRENT HOLDINGS" block (real name + live price/day-change per ticker); `buildTickerFactBlock(ticker, quote)` does the same for a single ticker the user asks about that may not be a holding; `ANTI_HALLUCINATION_RULES` constant instructs the model to use only provided data and say "I don't have verified data" rather than guess.
+- **`src/components/ChatTab.jsx`**: every AXIOM/specialist prompt path now gets the holdings block + anti-hallucination rules — the router (`axiomSys`), the direct-answer path (`axiomConvSys`, plus a per-ticker `buildTickerFactBlock` fetch when a specific non-portfolio ticker is identified), the specialist conversational route, the post-deliberation closing summary, and the full-council `synthSys`.
+- Refactored the portfolio-query quote fetch into a shared `fetchPortfolioTable()` (was duplicated inline) so the same real numbers back both the natural-language "how's my portfolio" answer and the new `ACTION:SHOW_HOLDINGS` table.
+
+### Part 2 — Chat verbosity
+
+- **`CONCISE_STYLE_RULES`** (`chatGrounding.js`) — lead with the answer, bullets over prose, no fluff/repeating the question, markdown table for multi-stock comparisons, yes/no-first for yes/no questions. Injected into `axiomConvSys`, the closing summary, and `synthSys` (which also had its "2-4 sentences" bumped down to "2-3 SHORT sentences, lead with verdict").
+
+### Part 3 — Interactive chat
+
+- **`src/utils/chatParse.js`** — `parseAssistantMessage(raw)` splits AXIOM's raw output into `{ text, table, action, quickReplies }`: strips a trailing `QUICK_REPLIES:[...]` line, an `ACTION:<TYPE>:<PARAM>` line, and detects/extracts a markdown table.
+- **`src/components/chat/ChatDataTable.jsx`** — monospace, color-coded (`+`/BULL/BUY/PASS green, `-`/BEAR/SKIP/FAIL red, CAUTION/WATCH/TRIM amber), horizontally scrollable table rendered inside a chat bubble.
+- **`src/components/chat/ChatActionButton.jsx`** — full-width, 48px-min-height tappable action button.
+- **`src/components/chat/QuickReplies.jsx`** — horizontal scrollable row of follow-up question chips; tapping one calls `sendChat(q)` directly.
+- **Action tags**: AXIOM can emit one `ACTION:<TYPE>:<PARAM>` per response (`SHOW_CHART`, `RUN_COUNCIL`, `SHOW_HOLDINGS`, `SHOW_STANCES`, `MUTE_AGENT`, `SHOW_REPORT`). Rather than auto-executing (which would let a "suggested" action run without confirmation), the parsed action is attached to the message as `pendingAction` and rendered as a `ChatActionButton`; tapping it calls `executeAction()`, which is pure navigation/read + render — nothing places a trade or touches the sell protocol.
+  - `SHOW_CHART` sets a newly-lifted `chartTicker` state in `App.jsx` and switches to the Portfolio tab, which now opens `StockDetailSheet` for that ticker (`PortfolioTab.jsx`'s local `stockDetailTicker` state was lifted so cross-tab navigation works, with a local-state fallback preserved for safety).
+  - `RUN_COUNCIL` reuses the existing `runCouncilInChat()` — no new council logic.
+  - `SHOW_HOLDINGS`/`SHOW_STANCES`/`SHOW_REPORT` render a `ChatDataTable` from data already available via `fetchPortfolioTable()`, `loadTickerStances()`, and the latest `council_reports` doc respectively.
+  - `MUTE_AGENT` writes `users/{uid}/data/settings.mutedAgents` (client) and `writeFeed()` in `api/cron/agents.js` now checks that array (60s in-memory cache) before sending a push for a muted agent's alert/warning — the feed item itself still gets written, only the push is suppressed.
+- **Quick replies**: `QUICK_REPLIES_INSTRUCTION` asks AXIOM for 2-3 follow-ups; rendered as chips under the most recent AXIOM message only.
+- Found and fixed a real bug in `ChatDataTable`'s color-coding: the original word-boundary regex (`\bBULL\b`) never matches the actual stance values ("BULLISH"/"BEARISH"), so switched to substring matching.
+- Found and fixed a long/short agent-id mismatch in the new `SHOW_STANCES` action: `loadTickerStances()` keys its result by the short cron id (`rex`/`nova`/…), not `AGENTS[].id` (`technical`/`catalyst`/…) — now translated via the `AGENT_SHORT_ID` map (added in the previous session for the same reason in the knowledge network).
+- Deferred: dedicated slide-up data panels reusing `HoldingDetail`/`StanceMatrix`-style components — implemented as inline `ChatDataTable`s in the chat bubble instead, which delivers the same structured/tappable value with far less surface area to break existing screens. `ACTION:RUN_SCAN` (trigger a cron agent on demand from chat) was intentionally not implemented — it would require exposing `CRON_SECRET`-gated logic to an authenticated-but-untrusted client path, which needs its own auth design rather than a quick add-on.
+
+### Part 4 — Scout cron fix
+
+Root cause found: `api/scout-cron.js` checked `req.headers['x-vercel-cron-secret']`, but Vercel's native Cron Jobs feature actually sends `Authorization: Bearer <CRON_SECRET>` (same convention as `api/cron/agents.js`). Once `CRON_SECRET` was set, every real Vercel Cron invocation was silently rejected with 401 — which is why scout stopped running with no visible error (it's on Vercel's native cron, not the GitHub Actions workflow, so nothing showed up as a failed GitHub Action either).
+
+- **`api/scout-cron.js`** — auth check now matches the `Authorization: Bearer` header; added unconditional request logging before the auth check so a future "never called" is distinguishable from "called but rejected" in Vercel's function logs.
+- **`api/cron/agents.js`** — same unconditional request logging added to the main handler.
+- Verified via GitHub Actions run history: the "Agent Background Scans" workflow (REX/NOVA/SAGE/ATLAS/VEGA/ZEN/weekly-council) has been running successfully every few hours — that side is healthy and was never the problem. Scout is intentionally a separate system (Vercel native cron, not GitHub Actions) since ROADMAP already documents it that way.
+
+### Part 5 — Mobile/desktop chat UI
+
+- Chat bubbles (`user`/`pm`/`agent`) bumped to 85% max-width per spec.
+- Tables scroll horizontally instead of overflowing (`ChatDataTable`).
+- Action buttons are full-width, 48px min height.
+- Quick-reply chips scroll horizontally in a single row.
+- Deferred: distinct desktop-only layouts (wider chat, side-panel data panels, inline action buttons) — the mobile-first sizing above renders acceptably on desktop too inside the existing `padded` (760px) container, so a separate breakpoint wasn't built this session.
+
+---
+
 ## 2026-07-01 (session 13 — Layer 6: Living Knowledge Network + Agent Self-Improvement)
 
 ### Part 1/2/3 — Knowledge Network (replaces the 3D Council Chamber)

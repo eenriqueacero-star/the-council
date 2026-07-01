@@ -188,9 +188,18 @@ Output ONLY raw JSON: {"verdict":"BUY"|"WATCH"|"SKIP","conviction":<0-10>,"headl
 }
 
 export default async function handler(req, res) {
-  // Vercel cron jobs send a special header; verify it matches CRON_SECRET if set
+  // Log every incoming request unconditionally — before any auth check — so a scheduler
+  // failing to hit this endpoint at all (vs. hitting it and getting rejected) is visible
+  // in Vercel's function logs either way.
+  console.error(`[scout-cron] incoming request: method=${req.method} authHeaderPresent=${!!req.headers.authorization} ua=${req.headers['user-agent'] || 'unknown'}`);
+
+  // Vercel's own Cron Jobs feature sends `Authorization: Bearer <CRON_SECRET>` (same
+  // convention as api/cron/agents.js) — NOT an `x-vercel-cron-secret` header. The previous
+  // check here looked for the wrong header, so it silently 401'd every real Vercel Cron
+  // invocation once CRON_SECRET was set, which is why scout stopped running.
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers['x-vercel-cron-secret'] !== cronSecret) {
+  if (cronSecret && req.headers.authorization !== `Bearer ${cronSecret}`) {
+    console.error('[scout-cron] rejected: missing/incorrect Authorization header');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

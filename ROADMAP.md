@@ -4,6 +4,22 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 14)
+
+### Chat: hallucination fix, verbosity, interactivity ✓
+- [x] CRITICAL: real company-name/sector map + live-quote grounding block injected into every AXIOM/specialist chat prompt — stops invented company names/prices
+- [x] Concise communication-style rules injected into all AXIOM-speaking prompts
+- [x] `ChatDataTable`/`ChatActionButton`/`QuickReplies` components; `ACTION:` tag + `QUICK_REPLIES:` parsing
+- [x] Actions wired: SHOW_CHART (cross-tab, lifted `chartTicker` state), RUN_COUNCIL, SHOW_HOLDINGS, SHOW_STANCES, MUTE_AGENT (+ server-side push suppression), SHOW_REPORT
+- [ ] Deferred: ACTION:RUN_SCAN (needs its own client-auth design), dedicated slide-up data panels (inline tables used instead), desktop-specific chat layout
+
+### Scout cron fix ✓
+- [x] Root cause: `api/scout-cron.js` checked the wrong header (`x-vercel-cron-secret` instead of `Authorization: Bearer`) — every real Vercel Cron call was silently 401'd
+- [x] Unconditional request logging added to both `api/scout-cron.js` and `api/cron/agents.js`
+- [x] Confirmed via GitHub Actions history that the 6-agent + weekly-council workflow is healthy and was never the issue
+
+---
+
 ## DONE (session 13)
 
 ### Layer 6 — Living Knowledge Network + Agent Self-Improvement ✓

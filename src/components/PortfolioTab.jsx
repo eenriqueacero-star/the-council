@@ -416,7 +416,7 @@ function StockDetailSheet({ ticker, posMap, quotes: parentQuotes, dark, onClose 
   );
 }
 
-export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus, authReady, onTabChange }) {
+export default function PortfolioTab({ account, acct, posMap, acctHoldings, positions, setPos, addTicker, removeTicker, flagApiDown, marketState, onDayChange, dark, saveStatus, authReady, onTabChange, chartTicker: liftedChartTicker, setChartTicker: setLiftedChartTicker }) {
   const T = theme(dark);
   const prefersReduced = useReducedMotion();
   const [quotes,        setQuotes]        = useState({});
@@ -430,7 +430,11 @@ export default function PortfolioTab({ account, acct, posMap, acctHoldings, posi
   const [scrubTs,           setScrubTs]           = useState(null);
   const [zoomLevel,         setZoomLevel]         = useState(1);
   const [panOffset,         setPanOffset]         = useState(0);
-  const [stockDetailTicker, setStockDetailTicker] = useState(null);
+  // Chart sheet ticker is lifted to App.jsx when available (so chat's SHOW_CHART action
+  // can open it from another tab) — falls back to local state if not provided.
+  const [localChartTicker, setLocalChartTicker] = useState(null);
+  const stockDetailTicker = liftedChartTicker !== undefined ? liftedChartTicker : localChartTicker;
+  const setStockDetailTicker = setLiftedChartTicker || setLocalChartTicker;
   const [addMode,           setAddMode]           = useState(false);
   const [newTicker,     setNewTicker]     = useState('');
   const [newShares,     setNewShares]     = useState('');

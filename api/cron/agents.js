@@ -15,6 +15,7 @@ import {
   getAllStances, getAllGlobalOutlooks,
 } from '../_lib/agentMemory.js';
 import { sendPushToUser, feedItemTitle } from '../_lib/pushNotify.js';
+import { maybeGenerateProposal, getProposalAwareness } from '../_lib/selfImprovement.js';
 
 // ---------------------------------------------------------------------------
 // Weekly council helpers
@@ -97,6 +98,45 @@ async function writeFeed(userId, item) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Cross-agent requests (Layer 6, Part 6) — agents ask each other for info during
+// the weekly council; the target agent resolves it deterministically from its
+// own already-computed scan data the next time its solo cron runs.
+// ---------------------------------------------------------------------------
+
+const VALID_AGENT_IDS = new Set(['rex', 'nova', 'sage', 'atlas', 'vega', 'zen']);
+
+function extractAgentRequest(text) {
+  if (!text) return null;
+  const m = text.match(/REQUEST_FROM:\s*(\w+)\s*:\s*(.+)/i);
+  if (!m) return null;
+  const toAgent = m[1].toLowerCase();
+  if (!VALID_AGENT_IDS.has(toAgent)) return null;
+  return { toAgent, question: m[2].trim().slice(0, 240) };
+}
+
+async function resolveAgentRequests(userId, agentId, answerFn) {
+  let written = 0;
+  try {
+    const snap = await db.collection(`users/${userId}/agent_requests`)
+      .where('toAgent', '==', agentId).where('status', '==', 'pending').limit(5).get();
+    for (const d of snap.docs) {
+      const req = d.data();
+      let answer;
+      try { answer = answerFn(req.ticker, req.question); } catch { answer = null; }
+      if (!answer) continue;
+      await d.ref.update({ status: 'answered', answer, answeredAt: FieldValue.serverTimestamp() });
+      await writeFeed(userId, {
+        agentId, ticker: req.ticker || null, severity: 'info', source: 'agent_request_answered',
+        headline: `${agentId.toUpperCase()} answered ${(req.fromAgent || '?').toUpperCase()}'s question${req.ticker ? ` on ${req.ticker}` : ''}`,
+        detail: `Q: ${req.question}\nA: ${answer}`,
+      });
+      written++;
+    }
+  } catch (e) { console.error(`[agent_requests] ${agentId} resolve error:`, e.message); }
+  return written;
+}
+
 async function getFullHoldings(userId) {
   try {
     const doc = await db.doc(`users/${userId}/data/positions`).get();
@@ -134,6 +174,7 @@ async function runRex(userId) {
   const prices = await fetchPrices(tickers);
   let written = 0;
   const tickerStances = []; // collect for global outlook derivation
+  const techMap = {}; // ticker -> technicals, kept for cross-agent request answers
 
   // Check for stale stances and notify
   const staleItems = await getStaleStances(userId);
@@ -152,6 +193,7 @@ async function runRex(userId) {
   for (const ticker of tickers) {
     const tech  = await fetchTechnicals(ticker);
     if (!tech) continue;
+    techMap[ticker] = tech;
 
     const price  = prices[ticker]?.price || 0;
     const events = [];
@@ -287,6 +329,13 @@ async function runRex(userId) {
     try { await updateGlobalOutlook(userId, 'rex', { outlook, conviction, reasoning }); } catch {}
   }
 
+  written += await resolveAgentRequests(userId, 'rex', (ticker, q) => {
+    const t = techMap[ticker];
+    if (!t) return null;
+    return `${ticker}: RSI ${t.rsi?.toFixed(0) ?? 'N/A'}, MACD ${t.macdBullish ? 'bullish' : 'bearish'}, ${t.sma50 && t.sma200 ? (t.sma50 > t.sma200 ? 'SMA50 above SMA200' : 'SMA50 below SMA200') : 'SMA data N/A'}.`;
+  });
+
+  await maybeGenerateProposal(userId, 'rex');
   return written;
 }
 
@@ -416,6 +465,14 @@ async function runNova(userId) {
     try { await updateGlobalOutlook(userId, 'nova', { outlook, conviction, reasoning }); } catch {}
   }
 
+  written += await resolveAgentRequests(userId, 'nova', (ticker, q) => {
+    const e = earningsMap[ticker];
+    const negatives = (newsMap[ticker] || []).filter(a => a.sentiment === 'negative').length;
+    if (!e && !negatives) return `No confirmed catalyst or notable news cluster on ${ticker} in the current scan window.`;
+    return `${ticker}: ${e ? `earnings ${e.date} (in ${e.daysAway}d${e.estimated ? ', estimated' : ''})` : 'no upcoming earnings within 90 days'}. ${negatives} negative article${negatives === 1 ? '' : 's'} in last 24h.`;
+  });
+
+  await maybeGenerateProposal(userId, 'nova');
   return written;
 }
 
@@ -515,6 +572,14 @@ async function runSage(userId) {
       : { outlook: 'neutral', conviction: 5, reasoning: `Portfolio concentration within limits. No major drawdown today.` };
   try { await updateGlobalOutlook(userId, 'sage', portfolioHealth); } catch {}
 
+  written += await resolveAgentRequests(userId, 'sage', (ticker, q) => {
+    const v = values[ticker];
+    if (!v) return null;
+    const pct = (v.val / totalValue) * 100;
+    return `${ticker} is ${pct.toFixed(1)}% of portfolio ($${v.val.toFixed(0)}) — ${pct >= 25 ? 'elevated concentration' : 'within normal risk range'}.`;
+  });
+
+  await maybeGenerateProposal(userId, 'sage');
   return written;
 }
 
@@ -681,6 +746,10 @@ async function runAtlas(userIds) {
         written++;
       }
     } catch (e) { console.error('[atlas] updateGlobalOutlook error:', e.message); }
+    written += await resolveAgentRequests(userId, 'atlas', (ticker, q) =>
+      `Macro tape: VIX ${vix?.toFixed(1) ?? 'N/A'}, yield spread ${macro.yieldSpread?.toFixed(2) ?? 'N/A'}%${macro.yieldInverted ? ' (inverted)' : ''}, current stance ${macroStance} (${macroConviction}/10).`
+    );
+    await maybeGenerateProposal(userId, 'atlas');
   }
   return written;
 }
@@ -711,6 +780,7 @@ async function runVega(userId) {
   }
 
   let bearCount = 0;
+  const vegaTechMap = {}; // ticker -> technicals, kept for cross-agent request answers
   for (const ticker of tickers) {
     const q = prices[ticker];
     if (!q) continue;
@@ -739,6 +809,7 @@ async function runVega(userId) {
           detail:   `Price ($${q.price.toFixed(2)}) is below SMA50 ($${tech.sma50.toFixed(2)}) and SMA200 ($${tech.sma200.toFixed(2)}). Confirmed downtrend — do not add to this position without a clear catalyst for reversal.` });
       }
     }
+    vegaTechMap[ticker] = tech;
 
     for (const ev of events) {
       await writeFeed(userId, { agentId: 'vega', ticker, ...ev });
@@ -799,6 +870,14 @@ async function runVega(userId) {
     try { await updateGlobalOutlook(userId, 'vega', { outlook, conviction, reasoning }); } catch {}
   }
 
+  written += await resolveAgentRequests(userId, 'vega', (ticker, q) => {
+    const qp = prices[ticker];
+    const t = vegaTechMap[ticker];
+    if (!qp) return null;
+    return `${ticker}: ${qp.changePct?.toFixed(1) ?? 'N/A'}% today. ${t?.sma50 && t?.sma200 ? (qp.price < t.sma50 && qp.price < t.sma200 ? 'Below both SMA50/SMA200 — confirmed downtrend.' : 'Above at least one key moving average.') : 'No fresh technicals pulled this scan.'}`;
+  });
+
+  await maybeGenerateProposal(userId, 'vega');
   return written;
 }
 
@@ -916,6 +995,14 @@ async function runZen(userId) {
     try { await updateGlobalOutlook(userId, 'zen', { outlook, conviction, reasoning }); } catch {}
   }
 
+  written += await resolveAgentRequests(userId, 'zen', (ticker, q) => {
+    const v = positionValues[ticker];
+    if (v == null) return null;
+    const pct = totalVal > 0 ? (v / totalVal) * 100 : 0;
+    return `${ticker} position is $${v.toFixed(0)} (${pct.toFixed(1)}% of portfolio) — ${v < 50 ? 'below minimum impact threshold' : 'adequately sized'}.`;
+  });
+
+  await maybeGenerateProposal(userId, 'zen');
   return written;
 }
 
@@ -954,6 +1041,39 @@ async function runWeeklyCouncil(userIds) {
   const globalOutlookLine = Object.entries(globalOutlooks)
     .map(([id, o]) => `${id.toUpperCase()}: ${o.stance} ${o.conviction}/10`)
     .join(' | ');
+
+  // 3b. Research phase — each agent researches its domain once before the debate; every
+  // agent's findings are shared with the whole council for every ticker below, so agents
+  // build on each other's research instead of analyzing in isolation.
+  const holdingsLine = uniqueTickers.join(', ');
+  const researchNotes = {};
+  for (let i = 0; i < WEEKLY_AGENT_DEFS.length; i++) {
+    const ag = WEEKLY_AGENT_DEFS[i];
+    const sys = `You are ${ag.name}, ${ag.role} on an investment council. Before today's council, research the latest developments relevant to your specialty (${ag.focus}).`;
+    const msg = `Current holdings: ${holdingsLine}\nCurrent market conditions: ${macroLine}\n\nWhat have you learned recently that the council should know? Focus on new patterns or signals relevant to our holdings, risks other agents might not see from their angle, opportunities worth investigating, and anything you've been wrong about recently. Be specific to our actual holdings — plain text, 3-4 sentences, no JSON, no markdown.`;
+    try {
+      const note = await callGroq(sys, msg, i);
+      researchNotes[ag.id] = (note || '').trim().slice(0, 500);
+    } catch (e) {
+      console.error(`[weekly-council] research phase failed for ${ag.name}:`, e.message);
+      researchNotes[ag.id] = '';
+    }
+    await sleep(400);
+  }
+  const researchBlock = WEEKLY_AGENT_DEFS
+    .map(ag => researchNotes[ag.id] ? `${ag.name}: ${researchNotes[ag.id]}` : null)
+    .filter(Boolean).join('\n');
+  console.error(`[weekly-council] research phase complete — ${Object.values(researchNotes).filter(Boolean).length}/6 notes filed`);
+
+  // Self-improvement awareness (Part 5) — tell each agent if a proposal it filed was
+  // reviewed since its last run, computed once and reused for every ticker below.
+  const awarenessLines = {};
+  for (const ag of WEEKLY_AGENT_DEFS) {
+    awarenessLines[ag.id] = await getProposalAwareness(primaryUserId, ag.id);
+  }
+
+  // Cross-agent requests filed during this week's debate (Part 6 teamwork)
+  const weeklyRequests = [];
 
   // 4. Agent + AXIOM cache keyed by ticker (shared across all portfolios for same stock)
   const agentTakesCache = {};
@@ -1007,13 +1127,14 @@ async function runWeeklyCouncil(userIds) {
     for (let i = 0; i < WEEKLY_AGENT_DEFS.length; i++) {
       const ag = WEEKLY_AGENT_DEFS[i];
       const sys = `You are ${ag.name}, ${ag.role}. Focus on: ${ag.focus}.
-
+${awarenessLines[ag.id] ? `\n${awarenessLines[ag.id]}\n` : ''}
 WEEKLY COUNCIL — assessing an EXISTING portfolio position (not a new trade).
 Verdicts: HOLD (keep as-is) | ADD (increase position) | TRIM (reduce exposure) | EXIT (close entirely — thesis broken).
+If you need information from another specialist to sharpen this verdict, append exactly one line to the END of your reasoning in the form: REQUEST_FROM:<agentid>: <question> — where <agentid> is one of rex, nova, sage, atlas, vega, zen (not yourself). Only do this when a real gap exists.
 Return ONLY valid JSON, no markdown:
 {"agent":"${ag.name}","stance":"bullish|bearish|neutral","conviction":1-10,"verdict":"HOLD|ADD|TRIM|EXIT","reasoning":"2-3 sentences"}`;
 
-      const msg = `WEEKLY COUNCIL ASSESSMENT\n\n${reconBlock}\n\nAs ${ag.name}, give your verdict on ${ticker} as an existing holding.`;
+      const msg = `WEEKLY COUNCIL ASSESSMENT\n\n${reconBlock}${researchBlock ? `\n\nCOUNCIL RESEARCH THIS WEEK (from all 6 specialists):\n${researchBlock}` : ''}\n\nAs ${ag.name}, give your verdict on ${ticker} as an existing holding.`;
 
       let take = null;
       try {
@@ -1026,6 +1147,14 @@ Return ONLY valid JSON, no markdown:
         }
       }
       const resolved = take || { agent: ag.name, stance: 'neutral', conviction: 5, verdict: 'HOLD', reasoning: 'Agent unavailable this week.' };
+
+      // Parse + strip any cross-agent request the agent embedded in its reasoning
+      const req = extractAgentRequest(resolved.reasoning);
+      if (req && req.toAgent !== ag.id) {
+        resolved.reasoning = resolved.reasoning.replace(/REQUEST_FROM:\s*\w+\s*:\s*.+$/i, '').trim();
+        weeklyRequests.push({ fromAgent: ag.id, toAgent: req.toAgent, question: req.question, ticker });
+      }
+
       agentTakes.push(resolved);
       console.error(`[weekly-council]   ${ticker}/${ag.name} → ${resolved.verdict}`);
       await sleep(500);
@@ -1059,6 +1188,22 @@ Return ONLY valid JSON:
     }
 
     console.error(`[weekly-council] ${ticker} ✓ → ${axiomCache[ticker].finalVerdict}`);
+  }
+
+  // 4d. File cross-agent requests raised during the debate — resolved by the target
+  // agent's own solo cron run the next time it scans that ticker (see resolveAgentRequests).
+  if (weeklyRequests.length) {
+    console.error(`[weekly-council] ${weeklyRequests.length} cross-agent request(s) filed`);
+    for (const userId of userIds) {
+      for (const r of weeklyRequests) {
+        try {
+          await db.collection(`users/${userId}/agent_requests`).add({
+            fromAgent: r.fromAgent, toAgent: r.toAgent, question: r.question, ticker: r.ticker,
+            status: 'pending', createdAt: FieldValue.serverTimestamp(),
+          });
+        } catch (e) { console.error('[weekly-council] agent_requests write failed:', e.message); }
+      }
+    }
   }
 
   // 5. Build and save per-user reports + feed items

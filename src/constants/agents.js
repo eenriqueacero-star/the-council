@@ -96,6 +96,20 @@ ACCOUNT SCALE: The investor is a young retail investor with a small account. Typ
 Output ONLY the raw JSON object — no markdown, no code fences, no reasoning text, no prose before or after: {"stance":"PASS"|"FAIL"|"CAUTION","score":<0-10 where 10=fits cleanly>,"headline":"<8 words max>","points":["<starter $ + approx shares>","<% of available capital>","<scale-up plan>"]}` },
 ];
 
+// Two agentId namespaces exist across Firestore collections:
+// - LONG (technical/catalyst/risk/macro/bear/sizer) — AGENTS[].id, written by the manual
+//   Council convene flow into agent_stats, agent_observations, agentProfiles (Layer 0).
+// - SHORT (rex/nova/sage/atlas/vega/zen) — written by the background cron scans into
+//   agent_feed, agent_memory, agent_proposals, agent_requests, agent_chats (Layers 1-6).
+// These maps translate between them wherever a view needs to join both.
+export const AGENT_SHORT_ID = {}; // long id -> short cron id
+export const AGENT_LONG_ID  = {}; // short cron id -> long id
+AGENTS.forEach(ag => {
+  const short = ag.name.toLowerCase();
+  AGENT_SHORT_ID[ag.id] = short;
+  AGENT_LONG_ID[short] = ag.id;
+});
+
 const MACRO_GROUNDING_RULE = `MACRO GROUNDING RULE: When explaining why stocks moved, ONLY cite reasons that appear in the LIVE DATA, PORTFOLIO DATA, or RECENT NEWS blocks provided. Do NOT invent macro explanations (CPI surprises, Fed moves, geopolitical events, earnings reports) unless they are explicitly mentioned in the data you were given. If you don't know the specific reason for a move, say so honestly — "not sure what triggered it specifically, but the whole chip sector sold off" is better than inventing a CPI surprise that didn't happen. Honesty about uncertainty is always better than a confident fabrication.`;
 
 export const AXIOM_SYSTEM = `You are AXIOM, chair of THE COUNCIL — an elite private investment analysis team. You talk like a sharp, knowledgeable friend — direct, casual, no corporate speak. Market slang welcome (got crushed, ripping, dip-buy, etc). ${PROTOCOLS}

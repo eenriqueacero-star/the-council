@@ -4,6 +4,24 @@ Current state of planned work. Update statuses here at the end of every session.
 
 ---
 
+## DONE (session 13)
+
+### Layer 6 — Living Knowledge Network + Agent Self-Improvement ✓
+- [x] Knowledge network view layer (`networkGraph.js`) over existing agent_feed/agent_memory/agent_stats/council_reports — no new node-storage collection
+- [x] `KnowledgeNetwork.jsx` — 2D canvas force-directed graph, custom spring physics, replaces the 3D Council Chamber (deleted `src/components/3d/*`, removed three.js deps)
+- [x] Real-event-only pulses via onSnapshot: agent scan → event, stance change/flip, agent disagreement crackle, AXIOM verdict inbound+outbound wave
+- [x] Pan/zoom/tap/double-tap-reset interaction; tap-to-inspect `NodeInfoPanel.jsx` for agent/holding/event/insight/connection
+- [x] "Talk to {AGENT}" — `AgentChatSheet.jsx` + `agentChat.js`, grounded in the agent's real stances/feed/track record, persisted to `agent_chats`
+- [x] Self-improvement proposals — `api/_lib/selfImprovement.js`, 7-day gate, WHAT/WHY/HOW/CODE SPEC structure, review UI (approve/reject/copy) in the agent panel
+- [x] Agent awareness of proposal review outcome injected into weekly council prompts
+- [x] Weekly council research phase — all 6 agents research their domain once, shared into every ticker's debate
+- [x] Cross-agent requests (`REQUEST_FROM:` marker) — filed during weekly council, resolved deterministically by the target agent's next solo cron run
+- [x] Fixed pre-existing long/short agent-id namespace mismatch (`AGENT_SHORT_ID`/`AGENT_LONG_ID` maps)
+- [ ] Edwin: deploy the two new Firestore composite indexes (`firebase deploy --only firestore:indexes`)
+- [ ] Deferred: 3D desktop variant, on-device iOS pinch-zoom testing, dedicated agent_requests inbox UI
+
+---
+
 ## DONE (session 11)
 
 ### Polish Pass ✓

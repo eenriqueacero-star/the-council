@@ -4,6 +4,53 @@ Reverse-chronological. Update this file at the end of every session before pushi
 
 ---
 
+## 2026-07-01 (session 13 — Layer 6: Living Knowledge Network + Agent Self-Improvement)
+
+### Part 1/2/3 — Knowledge Network (replaces the 3D Council Chamber)
+
+The Council tab's hero visual is now a 2D force-directed knowledge graph instead of the R3F 3D scene. It's a pure VIEW over existing Firestore collections — no new node-storage collection, no decorative animation. Every pulse is triggered by a real `onSnapshot` event.
+
+- **`src/utils/networkGraph.js`** — `buildNetworkData()` derives `{nodes, edges}` from `agent_feed` (last 7 days), `agent_memory` (stances/global outlooks), `agent_stats` (win rates), `council_reports` (verdicts), and live quotes. Node types: agent (6 + AXIOM, size scales with win rate + call volume), holding (colored by bull/bear consensus), event (shrinks and auto-drops after 7 days), insight (from council reports, colored by verdict). Edges: agent↔holding (stance), agent↔agent (stronger when they disagree), event↔agent/holding, insight↔holding/AXIOM.
+- **`src/components/network/KnowledgeNetwork.jsx`** — canvas-based force-directed graph with a custom lightweight spring-physics simulation (no d3-force dependency): repulsion between all node pairs, spring edges, anchor pull (agents ring around AXIOM at center, holdings spread by ticker hash), gentle organic drift. Pan (drag), zoom (wheel/pinch), tap-to-select (hit-tests nodes then edges), double-tap to reset. Avatars drawn as clipped circular images with a shared module-level image cache.
+  - **Pulses fire only on real Firestore events**: new `agent_feed` doc → pulse agent→event→holding; `agent_memory` stance change → pulse agent→holding (double-pulse + node flash on a bullish/bearish flip); two agents disagreeing on the same ticker → rapid alternating crackle pulses on their agent↔agent edge; new `council_reports` doc → inbound wave from all 6 agents into AXIOM, then outbound wave AXIOM→insight→holding per ticker.
+  - 2D canvas everywhere (mobile-safe by default); 3D desktop variant deferred (network graph works fine on both).
+- **`src/components/network/NodeInfoPanel.jsx`** — tap-to-inspect bottom sheet (same Framer Motion spring pattern as `CouncilReports.jsx`). Agent: win rate, last 5 graded calls, current stances w/ conviction bars, recent feed, "Talk to {AGENT}" + "Proposals" buttons. Holding: price/day change, 6-agent stance matrix, consensus, latest council verdict, recent events. Event: full feed detail. Insight: full council verdict incl. all 6 agent takes + dissent. Connection: relationship detail (stance reasoning, agreement/disagreement breakdown, etc).
+- Old `src/components/3d/*` (CouncilChamber, CouncilScene, AgentModel, CouncilTable) deleted — fully superseded per the Part 2 spec ("replace the current 3D scene"). `three`, `@react-three/fiber`, `@react-three/drei` removed from `package.json` (no longer referenced anywhere).
+
+### Part 4 — Talk to an Agent
+
+- **`src/utils/agentChat.js`** — `buildAgentChatSystem()` grounds every reply in the agent's real stored data (current stances, global outlook, last 5 feed items, track record, other agents' outlooks, self-improvement proposals) so it can't fabricate a rationale it never held. `loadChatMessages`/`saveChatMessage` persist to `users/{uid}/agent_chats/{agentId}/messages` (last 10 loaded on open).
+- **`src/components/network/AgentChatSheet.jsx`** — 85%-height bottom sheet chat, opened from the agent info panel. Sends messages via the existing `callAgent`/`api/run-agent.js` path.
+
+### Part 5 — Agent Self-Improvement Proposals
+
+- **`api/_lib/selfImprovement.js`** — `maybeGenerateProposal(userId, agentId)` runs at the end of each solo cron scan (rex/nova/sage/atlas/vega/zen); gated to once per 7 days per agent via the latest `agent_proposals` doc's `createdAt`. Gathers real performance context (win rate + last 10 graded calls + recent losses from `agent_stats`/`agent_observations`) and asks the agent to self-reflect with a structured WHAT/WHY/HOW/CODE SPEC prompt. Saves to `users/{uid}/agent_proposals/{agentId}__{timestamp}` (`status: pending`) and writes an `info` feed item (so it shows up as an event node too).
+- **`getProposalAwareness(userId, agentId)`** — if an agent's latest proposal was approved/rejected since it last saw it, returns a one-line awareness statement injected into the weekly council's per-agent system prompt, then marks it acknowledged.
+- **Review UI** — `NodeInfoPanel`'s agent panel has a "Proposals" toggle listing all filed proposals (`src/utils/agentProposals.js`); tap to expand full WHAT/WHY/HOW + copyable code spec, Approve/Reject buttons write back to Firestore (`src/components/network/NodeInfoPanel.jsx` → `ProposalsSection`).
+- Wired into `api/cron/agents.js`: `runRex`, `runNova`, `runSage`, `runAtlas`, `runVega`, `runZen` each call `maybeGenerateProposal` at the end of their run.
+
+### Part 6 — Agent Research + Teamwork (Weekly Council)
+
+- **`api/cron/agents.js` → `runWeeklyCouncil`**: added a research phase before the per-ticker debate — each of the 6 agents researches its domain once (holdings + macro context), and all 6 research notes are shared into every ticker's per-agent prompt as `COUNCIL RESEARCH THIS WEEK` so agents build on each other's findings instead of analyzing in isolation.
+- **Cross-agent requests**: agents can append `REQUEST_FROM:<agentid>: <question>` to their weekly reasoning when they have a real information gap; `extractAgentRequest()` parses and strips it, writes to `users/{uid}/agent_requests/{auto-id}` (`status: pending`). The next time the target agent's solo cron runs, `resolveAgentRequests()` answers pending requests addressed to it deterministically from data it already computed that scan (e.g. NOVA answers a REX request about CRDO's catalyst from its own `earningsMap`), writes the answer back to Firestore, and files an `info` feed item — which shows up as a real event + pulse in the knowledge network.
+
+### Bug fix found during this work — dual agent-ID namespace
+
+Discovered (pre-existing, not introduced this session) that the codebase has two separate agent-id namespaces: the LONG `AGENTS[].id` (`technical`/`catalyst`/`risk`/`macro`/`bear`/`sizer`, written by the manual Council convene flow into `agent_stats`/`agent_observations`/`agentProfiles`) vs. the SHORT cron id (`rex`/`nova`/`sage`/`atlas`/`vega`/`zen`, written by all the cron collections `agent_feed`/`agent_memory`/`agent_proposals`/`agent_requests`). Added `AGENT_SHORT_ID` / `AGENT_LONG_ID` translation maps to `src/constants/agents.js` and used them consistently across the new network/chat/proposal code so win-rate lookups (long id) and cron-data lookups (short id) both resolve correctly.
+
+### Firestore indexes
+
+`firestore.indexes.json` — added two composite indexes: `agent_proposals (agentId ASC, createdAt DESC)` and `agent_feed (agentId ASC, createdAt DESC)`, needed by the proposals list and the agent info panel's "recent feed" query. **Edwin: run `firebase deploy --only firestore:indexes`** (or deploy via the Firebase console) before these queries will work in production — until then they'll fail with a "requires an index" error that's already caught (empty list, no crash).
+
+### Deferred (not implemented this session)
+
+- 3D desktop variant of the network graph (2D canvas used everywhere — performs fine, and the spec explicitly allows either)
+- Pinch-to-zoom fully tuned/tested on real iOS hardware (implemented via touch-distance ratio, not device-tested)
+- Cross-agent request resolution is deterministic (reuses each agent's already-computed scan data) rather than a fresh LLM call — keeps cost/complexity down while still producing real, grounded answers
+- No dedicated UI list for `agent_requests` — they're visible via the feed items they generate and the agent-agent edges in the network, but there's no standalone request inbox screen
+
+---
+
 ## 2026-07-01 (session 12 — Fix: Vercel 12-function limit)
 
 ### Serverless function count fix
